@@ -43,24 +43,45 @@ abstract final class ShipglowsWindow {
 
   static bool _frameApplied = false;
   static Color? _frameBorderColor;
+  static bool _frameSystemCorners = true;
 
-  /// Rounds the window corners like native Windows 11 windows and draws a
-  /// 1 px border of [borderColor] around them (system color when null).
+  /// Shapes the window frame on Windows 11; no-op elsewhere.
   ///
-  /// The radius is the system one (~8 px); Windows 10 keeps square corners.
-  /// No-op off Windows.
-  static Future<void> setFrame({Color? borderColor}) async {
+  /// With [systemCorners] the window gets the native rounded corners (~8 px)
+  /// and a 1 px DWM border of [borderColor] (system color when null).
+  /// Without it the window turns transparent and the native corners and
+  /// border are removed, so the app can clip its own radius (see
+  /// [ShipglowsWindowFrame.cornerRadius]). Windows 10 keeps square corners.
+  static Future<void> setFrame({
+    Color? borderColor,
+    bool systemCorners = true,
+  }) async {
     if (!isSupported || defaultTargetPlatform != TargetPlatform.windows) {
       return;
     }
-    if (_frameApplied && borderColor == _frameBorderColor) return;
+    if (_frameApplied &&
+        borderColor == _frameBorderColor &&
+        systemCorners == _frameSystemCorners) {
+      return;
+    }
+    final wasSystemCorners = !_frameApplied || _frameSystemCorners;
     _frameApplied = true;
     _frameBorderColor = borderColor;
+    _frameSystemCorners = systemCorners;
     final hwnd = await windowManager.getId();
     applyDwmFrame(
       hwnd,
       borderColorRef: borderColor == null ? null : _colorRef(borderColor),
+      systemCorners: systemCorners,
     );
+    if (!systemCorners) {
+      // Frameless: no DWM border left to draw a straight line past the
+      // rounded corners; ShipglowsWindowFrame brings the resize edges back.
+      await windowManager.setAsFrameless();
+      await windowManager.setBackgroundColor(const Color(0x00000000));
+    } else if (!wasSystemCorners) {
+      await windowManager.setBackgroundColor(const Color(0xFF000000));
+    }
   }
 
   /// Win32 `COLORREF` (`0x00BBGGRR`); DWM borders have no alpha.

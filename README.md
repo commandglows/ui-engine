@@ -13,6 +13,11 @@ on top of [`window_manager`](https://pub.dev/packages/window_manager).
 - Windows 11: native rounded corners and a 1 px border in the app color
   (`ShipglowsWindowFrame.borderColor`, or `ShipglowsWindow.setFrame`). The
   radius is the system one; Windows 10 stays square.
+- Or the app's own radius: `ShipglowsWindowFrame.cornerRadius` makes the
+  window frameless and transparent, clips it to that radius (antialiased) and
+  adds 6 px resize edges. No native drop shadow in that mode.
+- `outline`: an app-drawn border of any width along the corners, hidden when
+  maximized or full screen.
 - Mobile and web: no-op, the app renders unchanged.
 - Not included: the Windows 11 Snap Layouts flyout on maximize hover
   (`Win` + `Z` still opens it). Keep the maximize button isolated so it can be
