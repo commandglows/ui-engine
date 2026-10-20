@@ -17,6 +17,7 @@ class ShipglowsWindowFrame extends StatelessWidget {
     this.leading,
     this.title,
     this.actions = const <Widget>[],
+    this.borderColor,
   });
 
   /// The app content shown under the bar.
@@ -37,9 +38,17 @@ class ShipglowsWindowFrame extends StatelessWidget {
   /// Optional app widgets placed before the caption buttons.
   final List<Widget> actions;
 
+  /// Color of the 1 px border Windows 11 draws around the rounded window,
+  /// typically the app's card outline; null keeps the system border.
+  final Color? borderColor;
+
   @override
   Widget build(BuildContext context) {
     if (!enabled || !ShipglowsWindow.isSupported) return child;
+    // Deduplicated: only a new color reaches DWM.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => ShipglowsWindow.setFrame(borderColor: borderColor),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

@@ -10,6 +10,9 @@ on top of [`window_manager`](https://pub.dev/packages/window_manager).
 - Native move loop: edge snapping, Windows 11 snap bar, `Win` + arrows.
 - Double-click toggles maximize; top edge and corners stay resizable.
 - Windows/Linux: our minimize/maximize/close buttons. macOS: native traffic lights.
+- Windows 11: native rounded corners and a 1 px border in the app color
+  (`ShipglowsWindowFrame.borderColor`, or `ShipglowsWindow.setFrame`). The
+  radius is the system one; Windows 10 stays square.
 - Mobile and web: no-op, the app renders unchanged.
 - Not included: the Windows 11 Snap Layouts flyout on maximize hover
   (`Win` + `Z` still opens it). Keep the maximize button isolated so it can be
