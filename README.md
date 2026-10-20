@@ -23,6 +23,11 @@ on top of [`window_manager`](https://pub.dev/packages/window_manager).
   (`Win` + `Z` still opens it). Keep the maximize button isolated so it can be
   added later.
 
+- Session restore (`ShipglowsWindowSession`): position, size, maximized
+  state, app zoom and last page come back at the next launch; a window left
+  on an unplugged screen is ignored. The page is an app-defined string, only
+  saved when listed in `restorableLocations`.
+
 ### Usage
 
 ```yaml
@@ -34,12 +39,32 @@ dependencies:
 ```dart
 // main(), after the binding is initialized and before runApp:
 await ShipglowsWindow.ensureInitialized(minimumSize: const Size(720, 480));
+await ShipglowsWindowSession.instance.restore(
+  appFolder: 'MyApp',
+  restorableLocations: {'/home', '/settings'},
+);
 
 // MaterialApp:
 builder: (context, child) => ShipglowsWindowFrame(
   style: ShipglowsTitleBarStyle.fromTheme(Theme.of(context)),
   child: child ?? const SizedBox.shrink(),
 ),
+```
+
+Zoom (`shipglows_flutter_zoom`) and last page:
+
+```dart
+final session = ShipglowsWindowSession.instance;
+FlutterZoomViewport(
+  initialZoom: session.zoom,
+  resetZoom: 1,
+  minimumZoom: session.minimumZoom,
+  maximumZoom: session.maximumZoom,
+  onZoomChanged: session.saveZoom,
+  child: child,
+);
+// On each route change: session.saveLocation(path);
+// Once the user may see it: final page = session.takePendingLocation();
 ```
 
 Each app passes its own brand tokens through `ShipglowsTitleBarStyle`.
