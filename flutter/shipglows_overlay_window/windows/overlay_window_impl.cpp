@@ -150,6 +150,11 @@ bool OverlayWindowImpl::CreateOverlay() {
   SetWindowPos(window_, nullptr, 0, 0, 0, 0,
                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
                    SWP_FRAMECHANGED);
+  // Only now is it known whether DWM rounds the corners; the WM_SIZE sent
+  // during CreateWindowExW must not have set a region (a region turns DWM
+  // frame rendering off, bringing the legacy caption painter back).
+  frame_ready_ = true;
+  UpdateRegion();
   if (config_.exclude_from_capture) {
     SetWindowDisplayAffinity(window_, WDA_EXCLUDEFROMCAPTURE);
   }
@@ -185,6 +190,7 @@ bool OverlayWindowImpl::CreateOverlay() {
 
 void OverlayWindowImpl::DestroyOverlay() {
   ready_ = false;
+  frame_ready_ = false;
   visible_ = false;
   view_visible_ = false;
   reveal_pending_ = false;
@@ -563,10 +569,12 @@ void OverlayWindowImpl::FitViewToClient() {
 }
 
 void OverlayWindowImpl::UpdateRegion() {
-  // DWM already rounds the corners on Windows 11.
-  if (!window_ || native_corners_) return;
-  if (IsZoomed(window_)) {
-    SetWindowRgn(window_, nullptr, FALSE);
+  if (!window_ || !frame_ready_) return;
+  // DWM already rounds the corners on Windows 11: no region at all.
+  if (native_corners_ || IsZoomed(window_)) {
+    if (GetWindowRgn(window_, nullptr) != ERROR) {
+      SetWindowRgn(window_, nullptr, FALSE);
+    }
     return;
   }
   RECT rect{};
@@ -692,8 +700,10 @@ std::optional<LRESULT> OverlayWindowImpl::HandleFrameMessage(HWND hwnd,
       }
       return 0;
     case WM_NCACTIVATE:
-      // -1: record the state change without repainting the caption.
-      return DefWindowProcW(hwnd, message, wparam, -1);
+      // Never DefWindowProc: it paints the legacy caption over the client
+      // area whenever DWM is not rendering this window's frame, even with
+      // lParam -1. TRUE lets the activation change proceed.
+      return TRUE;
     case WM_NCPAINT:
     case kNcUahDrawCaption:
     case kNcUahDrawFrame:

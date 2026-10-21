@@ -82,6 +82,8 @@ class OverlayWindowImpl : public OverlayWindow {
   HWND previous_foreground_ = nullptr;
   bool prepare_failed_ = false;
   bool native_corners_ = false;
+  // True once the DWM frame attributes are set; before that, no region.
+  bool frame_ready_ = false;
   bool ready_ = false;
   // The window is shown (frame, view, or both).
   bool visible_ = false;
