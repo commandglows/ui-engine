@@ -18,7 +18,8 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 
 - `CommandBarScope` around the app shell: global Ctrl/⌘+K (also inside text
   fields), inactive while another dialog is open; commands run with the
-  scope's context, so routing works from them.
+  scope's context, so routing works from them. On the web it cancels the
+  browser's own Ctrl/⌘+K (address bar search).
 - `CommandBarContribution` around a screen: its commands are listed under
   their section while it is mounted and its route is on top. A screen kept
   alive offstage (indexed stack tab) passes `isActive`.

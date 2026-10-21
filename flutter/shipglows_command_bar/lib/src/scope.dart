@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'browser_guard.dart'
+    if (dart.library.js_interop) 'browser_guard_web.dart';
 import 'command.dart';
 import 'recents.dart';
 import 'strings.dart';
@@ -31,7 +33,19 @@ Future<CommandBarChoice?> showCommandBar(
 }) {
   final style = CommandBarThemeData.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
-  final route = DialogRoute<CommandBarChoice>(
+  late final DialogRoute<CommandBarChoice> route;
+  // Removes this route only, even when another one was pushed over it.
+  void finish([CommandBarChoice? choice]) {
+    final owner = route.navigator;
+    if (owner == null || !route.isActive) return;
+    if (route.isCurrent) {
+      owner.pop(choice);
+    } else {
+      owner.removeRoute(route);
+    }
+  }
+
+  route = DialogRoute<CommandBarChoice>(
     context: context,
     themes: InheritedTheme.capture(from: context, to: navigator.context),
     barrierColor: style.barrierColor,
@@ -41,8 +55,8 @@ Future<CommandBarChoice?> showCommandBar(
       sections: sections,
       filters: filters,
       strings: strings,
-      onChoose: (choice) => Navigator.of(dialogContext).pop(choice),
-      onClose: () => Navigator.of(dialogContext).pop(),
+      onChoose: finish,
+      onClose: finish,
     ),
   );
   onRoute?.call(route);
@@ -187,6 +201,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
   @override
   final CommandBarRegistry registry = CommandBarRegistry();
   final MemoryCommandBarRecents _memoryRecents = MemoryCommandBarRecents();
+  final CommandBarBrowserGuard _browserGuard = CommandBarBrowserGuard();
   Route<CommandBarChoice>? _route;
 
   CommandBarRecentsStore get _recents => widget.recents ?? _memoryRecents;
@@ -198,11 +213,23 @@ class _CommandBarScopeState extends State<CommandBarScope>
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
+    if (widget.hotkey) _browserGuard.install();
+  }
+
+  @override
+  void didUpdateWidget(CommandBarScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.hotkey) {
+      _browserGuard.install();
+    } else {
+      _browserGuard.remove();
+    }
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
+    _browserGuard.remove();
     registry.dispose();
     super.dispose();
   }
@@ -268,7 +295,13 @@ class _CommandBarScopeState extends State<CommandBarScope>
   @override
   void close() {
     final route = _route;
-    if (route != null && route.isCurrent) route.navigator?.pop();
+    final owner = route?.navigator;
+    if (route == null || owner == null || !route.isActive) return;
+    if (route.isCurrent) {
+      owner.pop();
+    } else {
+      owner.removeRoute(route);
+    }
   }
 
   Future<void> _run(CommandBarChoice choice) async {

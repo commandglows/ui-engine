@@ -214,12 +214,10 @@ class CommandBarKeycap extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(6),
-        border: Border(
-          top: BorderSide(color: scheme.outlineVariant),
-          left: BorderSide(color: scheme.outlineVariant),
-          right: BorderSide(color: scheme.outlineVariant),
-          bottom: BorderSide(color: scheme.outline, width: 2),
-        ),
+        // A rounded border must keep one color, so the key's depth is a hard
+        // shadow under it.
+        border: Border.all(color: scheme.outlineVariant),
+        boxShadow: [BoxShadow(color: scheme.outline, offset: const Offset(0, 1))],
       ),
       child: Text(
         label,
