@@ -5,10 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'behavior.dart';
 import 'browser_guard.dart'
     if (dart.library.js_interop) 'browser_guard_web.dart';
 import 'command.dart';
 import 'recents.dart';
+import 'size_store.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'view.dart';
@@ -22,7 +24,9 @@ List<String> commandBarHotkeyKeys() => [commandBarPrimaryModifierLabel(), 'K'];
 ///
 /// Use it for a bar whose entries come from elsewhere; [CommandBarScope] calls
 /// it for the in-app bar. [refresh] rebuilds the list when [source] changes
-/// while open. [onRoute] receives the dialog route, so the caller can close
+/// while open. When [resizable], the side and bottom edges drag the bar to
+/// another size, kept in [sizeStore]; double-clicking an edge restores the
+/// theme's size. [onRoute] receives the dialog route, so the caller can close
 /// it.
 Future<CommandBarChoice?> showCommandBar(
   BuildContext context, {
@@ -31,6 +35,9 @@ Future<CommandBarChoice?> showCommandBar(
   List<CommandBarFilter> filters = const <CommandBarFilter>[],
   CommandBarStrings strings = CommandBarStrings.en,
   Listenable? refresh,
+  bool resizable = true,
+  CommandBarSizeStore? sizeStore,
+  CommandBarBehavior behavior = const CommandBarBehavior(),
   ValueChanged<Route<CommandBarChoice>>? onRoute,
 }) {
   final style = CommandBarThemeData.of(context);
@@ -58,6 +65,9 @@ Future<CommandBarChoice?> showCommandBar(
       filters: filters,
       strings: strings,
       refresh: refresh,
+      resizable: resizable,
+      sizeStore: sizeStore,
+      behavior: behavior,
       onChoose: finish,
       onClose: finish,
     ),
@@ -164,6 +174,9 @@ class CommandBarScope extends StatefulWidget {
     this.hotkey = true,
     this.onError,
     this.refresh,
+    this.resizable = true,
+    this.sizeStore,
+    this.behavior,
   });
 
   /// App-wide commands, built with the scope's context.
@@ -196,6 +209,16 @@ class CommandBarScope extends StatefulWidget {
   /// on their own.
   final Listenable? refresh;
 
+  /// Whether the user can drag the bar's edges to resize it.
+  final bool resizable;
+
+  /// Where the size the user dragged the bar to is kept; in memory when null.
+  final CommandBarSizeStore? sizeStore;
+
+  /// Optional search and listing behaviours, read each time the bar opens so
+  /// an app can follow its own settings. All off when null.
+  final CommandBarBehavior Function(BuildContext context)? behavior;
+
   /// The controller of the nearest scope, or null when there is none.
   static CommandBarController? maybeOf(BuildContext context) => context
       .getInheritedWidgetOfExactType<_CommandBarScopeMarker>()
@@ -210,6 +233,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
   @override
   final CommandBarRegistry registry = CommandBarRegistry();
   final MemoryCommandBarRecents _memoryRecents = MemoryCommandBarRecents();
+  final MemoryCommandBarSize _memorySize = MemoryCommandBarSize();
   final CommandBarBrowserGuard _browserGuard = CommandBarBrowserGuard();
   Route<CommandBarChoice>? _route;
 
@@ -296,6 +320,9 @@ class _CommandBarScopeState extends State<CommandBarScope>
       filters: widget.filters,
       strings: widget.strings,
       refresh: Listenable.merge([registry, ?widget.refresh]),
+      resizable: widget.resizable,
+      sizeStore: widget.sizeStore ?? _memorySize,
+      behavior: widget.behavior?.call(context) ?? const CommandBarBehavior(),
       onRoute: (route) => _route = route,
     );
     _route = null;
@@ -438,13 +465,49 @@ class _CommandBarContributionState extends State<CommandBarContribution> {
   Widget build(BuildContext context) => widget.child;
 }
 
-class _CommandBarDialog extends StatelessWidget {
+/// Smallest size the user can drag the bar to: the search field, the footer
+/// and a few rows.
+const Size _minDialogSize = Size(320, 220);
+
+/// Thickness of the invisible strip along an edge that starts a resize.
+const double _handleThickness = 8;
+
+/// Edge or corner of the bar that a handle resizes.
+enum _Edge {
+  start(dx: -1, dy: false),
+  end(dx: 1, dy: false),
+  bottom(dx: 0, dy: true),
+  bottomStart(dx: -1, dy: true),
+  bottomEnd(dx: 1, dy: true);
+
+  const _Edge({required this.dx, required this.dy});
+
+  /// -1 for the start edge, 1 for the end edge, 0 for neither.
+  final int dx;
+
+  /// Whether the edge moves the bottom.
+  final bool dy;
+
+  bool get isCorner => dx != 0 && dy;
+
+  MouseCursor get cursor => switch (this) {
+    _Edge.start || _Edge.end => SystemMouseCursors.resizeLeftRight,
+    _Edge.bottom => SystemMouseCursors.resizeUpDown,
+    _Edge.bottomStart => SystemMouseCursors.resizeUpRightDownLeft,
+    _Edge.bottomEnd => SystemMouseCursors.resizeUpLeftDownRight,
+  };
+}
+
+class _CommandBarDialog extends StatefulWidget {
   const _CommandBarDialog({
     required this.source,
     required this.sections,
     required this.filters,
     required this.strings,
     required this.refresh,
+    required this.resizable,
+    required this.sizeStore,
+    required this.behavior,
     required this.onChoose,
     required this.onClose,
   });
@@ -454,50 +517,242 @@ class _CommandBarDialog extends StatelessWidget {
   final List<CommandBarSection> sections;
   final List<CommandBarFilter> filters;
   final CommandBarStrings strings;
+  final bool resizable;
+  final CommandBarSizeStore? sizeStore;
+  final CommandBarBehavior behavior;
   final ValueChanged<CommandBarChoice> onChoose;
   final VoidCallback onClose;
 
   @override
+  State<_CommandBarDialog> createState() => _CommandBarDialogState();
+}
+
+class _CommandBarDialogState extends State<_CommandBarDialog> {
+  final GlobalKey _panelKey = GlobalKey();
+
+  /// Size the user dragged the bar to, or null for the theme's size.
+  Size? _size;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      _size = widget.sizeStore?.read();
+    } catch (error, stackTrace) {
+      _report(error, stackTrace);
+    }
+  }
+
+  /// Current size of the panel, as painted.
+  Size get _paintedSize {
+    final box = _panelKey.currentContext?.findRenderObject();
+    return box is RenderBox && box.hasSize ? box.size : _minDialogSize;
+  }
+
+  /// Moves [edge] by [delta]. The panel stays centered horizontally, so the
+  /// width changes twice as much as the pointer moves.
+  void _resize(_Edge edge, Offset delta) {
+    final current = _size ?? _paintedSize;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final dx = rtl ? -edge.dx : edge.dx;
+    setState(() {
+      _size = Size(
+        current.width + 2 * dx * delta.dx,
+        edge.dy ? current.height + delta.dy : current.height,
+      );
+    });
+  }
+
+  void _save(Size? size) {
+    final store = widget.sizeStore;
+    if (store == null) return;
+    unawaited(store.write(size).catchError(_report));
+  }
+
+  void _reset() {
+    setState(() => _size = null);
+    _save(null);
+  }
+
+  void _report(Object error, StackTrace stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'shipglows_command_bar',
+      ),
+    );
+  }
+
+  /// Constraints of the panel: the theme's maximum size, or the size the
+  /// user chose, kept between the minimum and the room on screen.
+  BoxConstraints _constraints(
+    ResolvedCommandBarTheme style,
+    double maxWidth,
+    double maxHeight,
+  ) {
+    final size = _size;
+    if (size == null) {
+      return BoxConstraints(
+        maxWidth: math.min(style.maxWidth, maxWidth),
+        maxHeight: math.min(style.maxHeight, maxHeight),
+      );
+    }
+    return BoxConstraints.tight(
+      Size(
+        size.width.clamp(math.min(_minDialogSize.width, maxWidth), maxWidth),
+        size.height.clamp(
+          math.min(_minDialogSize.height, maxHeight),
+          maxHeight,
+        ),
+      ),
+    );
+  }
+
+  Widget _handle(_Edge edge, Color color) {
+    final side = edge.dx != 0 && !edge.dy;
+    final corner = edge.isCorner;
+    final thickness = corner ? _handleThickness * 2 : _handleThickness;
+    return PositionedDirectional(
+      start: edge.dx > 0 ? null : 0,
+      end: edge.dx < 0 ? null : 0,
+      top: edge.dy ? null : 0,
+      bottom: 0,
+      width: edge.dx == 0 ? null : thickness,
+      height: edge.dy ? thickness : null,
+      child: _ResizeHandle(
+        cursor: edge.cursor,
+        color: color,
+        grip: corner
+            ? null
+            : side
+            ? Axis.vertical
+            : Axis.horizontal,
+        onDrag: (delta) => _resize(edge, delta),
+        onEnd: () => _save(_size),
+        onReset: _reset,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final style = CommandBarThemeData.of(context);
-    final size = MediaQuery.sizeOf(context);
+    final screen = MediaQuery.sizeOf(context);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-    final top = size.height < 600 ? 16.0 : size.height * 0.12;
-    final available = size.height - top - keyboard - 16;
+    final top = screen.height < 600 ? 16.0 : screen.height * 0.12;
+    final maxWidth = math.max(0.0, screen.width - 32);
+    final maxHeight = math.max(0.0, screen.height - top - keyboard - 16);
+
+    final panel = Material(
+      key: _panelKey,
+      color: style.backgroundColor,
+      elevation: 12,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(style.radius),
+        side: BorderSide(color: style.borderColor),
+      ),
+      child: Semantics(
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: widget.strings.dialogLabel,
+        child: CommandBarView(
+          source: widget.source,
+          sections: widget.sections,
+          filters: widget.filters,
+          strings: widget.strings,
+          refresh: widget.refresh,
+          behavior: widget.behavior,
+          onChoose: widget.onChoose,
+          onClose: widget.onClose,
+        ),
+      ),
+    );
+
     return Padding(
       padding: EdgeInsets.fromLTRB(16, top, 16, 16 + keyboard),
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: style.maxWidth,
-            maxHeight: math.max(0, math.min(style.maxHeight, available)),
-          ),
-          child: Material(
-            color: style.backgroundColor,
-            elevation: 12,
-            clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(style.radius),
-              side: BorderSide(color: style.borderColor),
-            ),
-            child: Semantics(
-              scopesRoute: true,
-              namesRoute: true,
-              explicitChildNodes: true,
-              label: strings.dialogLabel,
-              child: CommandBarView(
-                source: source,
-                sections: sections,
-                filters: filters,
-                strings: strings,
-                refresh: refresh,
-                onChoose: onChoose,
-                onClose: onClose,
-              ),
-            ),
-          ),
+          constraints: _constraints(style, maxWidth, maxHeight),
+          child: widget.resizable
+              ? Stack(
+                  children: [
+                    panel,
+                    for (final edge in _Edge.values)
+                      _handle(edge, style.mutedColor),
+                  ],
+                )
+              : panel,
         ),
+      ),
+    );
+  }
+}
+
+/// One edge or corner of the bar that resizes it. Invisible until hovered,
+/// then a short grip shows where to drag. Double-click goes back to the
+/// theme's size.
+class _ResizeHandle extends StatefulWidget {
+  const _ResizeHandle({
+    required this.cursor,
+    required this.color,
+    required this.grip,
+    required this.onDrag,
+    required this.onEnd,
+    required this.onReset,
+  });
+
+  final MouseCursor cursor;
+  final Color color;
+
+  /// Direction of the grip shown on hover; none for a corner.
+  final Axis? grip;
+  final ValueChanged<Offset> onDrag;
+  final VoidCallback onEnd;
+  final VoidCallback onReset;
+
+  @override
+  State<_ResizeHandle> createState() => _ResizeHandleState();
+}
+
+class _ResizeHandleState extends State<_ResizeHandle> {
+  bool _hovered = false;
+
+  void _setHovered(bool hovered) {
+    if (_hovered != hovered) setState(() => _hovered = hovered);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final grip = widget.grip;
+    return MouseRegion(
+      cursor: widget.cursor,
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanUpdate: (details) => widget.onDrag(details.delta),
+        onPanEnd: (_) => widget.onEnd(),
+        onDoubleTap: widget.onReset,
+        child: grip == null
+            ? const SizedBox.expand()
+            : Center(
+                child: AnimatedOpacity(
+                  opacity: _hovered ? 1 : 0,
+                  duration: const Duration(milliseconds: 120),
+                  child: Container(
+                    width: grip == Axis.vertical ? 3 : 36,
+                    height: grip == Axis.vertical ? 36 : 3,
+                    decoration: BoxDecoration(
+                      color: widget.color,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
       ),
     );
   }

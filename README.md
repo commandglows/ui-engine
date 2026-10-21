@@ -45,6 +45,16 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   `highlightIndicatorColor` adds a leading bar to the highlighted row.
 - `CommandBarTile`: the bar's row, for command suggestions an app lists in
   its own surface (under a search field).
+- Resizing: the side and bottom edges (and bottom corners) drag the bar to
+  another size; a grip shows on hover, double-click restores the theme's
+  size. Kept in a `CommandBarSizeStore` (memory by default,
+  `CallbackCommandBarSize` for the app's storage); `resizable: false` turns
+  it off.
+- Opt-in behaviours (`CommandBarBehavior`, all off by default; the scope
+  takes a builder read at each opening, so app settings can drive it):
+  `fuzzyMatch` (letters in order, ranked last), `sortSectionsByMatch`,
+  `tappablePrefixHints`. `CommandBarFilter.requiresSpace: false` applies a
+  symbol prefix without a space (`>foo`).
 - Other engines (floating window, native relay): `CommandBarEntry.toJson` /
   `fromJson` (icons by code point through an app table), `CommandBarView` and
   `showCommandBar` with your own `CommandBarSource`.

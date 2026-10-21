@@ -58,9 +58,11 @@ class CommandBarQuery {
 
 /// Splits [raw] into a [CommandBarQuery] using [filters].
 ///
-/// A prefix counts only at the very start and only when a space follows it:
+/// A prefix counts only at the very start and, unless its filter has
+/// [CommandBarFilter.requiresSpace] off, only when a space follows it:
 /// `n idea` selects the `n` filter, while `n` alone, or `z idea` with an
-/// unknown letter, is plain text. A leading space selects the filter whose
+/// unknown letter, is plain text. A filter without the space applies as soon
+/// as its prefix is typed (`>foo`). A leading space selects the filter whose
 /// prefix is a space, if there is one.
 CommandBarQuery parseCommandBarQuery(
   String raw,
@@ -73,10 +75,24 @@ CommandBarQuery parseCommandBarQuery(
       }
     }
   }
+  final lowered = raw.toLowerCase();
+  for (final filter in filters) {
+    if (filter.prefix != ' ' &&
+        !filter.requiresSpace &&
+        filter.prefix.isNotEmpty &&
+        lowered.startsWith(filter.prefix.toLowerCase())) {
+      return CommandBarQuery(
+        filter: filter,
+        text: raw.substring(filter.prefix.length).trim(),
+      );
+    }
+  }
   if (raw.length >= 2 && raw[1] == ' ') {
     final typed = raw[0].toLowerCase();
     for (final filter in filters) {
-      if (filter.prefix != ' ' && filter.prefix.toLowerCase() == typed) {
+      if (filter.prefix != ' ' &&
+          filter.requiresSpace &&
+          filter.prefix.toLowerCase() == typed) {
         return CommandBarQuery(filter: filter, text: raw.substring(2).trim());
       }
     }
@@ -84,19 +100,36 @@ CommandBarQuery parseCommandBarQuery(
   return CommandBarQuery(text: raw);
 }
 
-/// Returns the [entries] matching every word of [query], best matches first.
+/// Rank of a match whose words were only found as letters in order.
+const int _fuzzyRank = 3;
+
+/// Whether the letters of [word] appear in order in [text].
+bool _isSubsequence(String word, String text) {
+  var at = 0;
+  for (var i = 0; i < text.length && at < word.length; i++) {
+    if (text[i] == word[at]) at++;
+  }
+  return at == word.length;
+}
+
+/// The [entries] matching every word of [query] with their rank, best
+/// matches first.
 ///
-/// An empty query returns all entries in their original order. A label that
-/// starts with the first word ranks above one that contains it, which ranks
-/// above a match found only in the keywords.
-List<T> rankCommandEntries<T>(
+/// Rank 0: the label starts with the first word; 1: the label contains it;
+/// 2: found only in the keywords; 3 ([fuzzy] only): a word of two letters or
+/// more was found only as letters in order in the label. An empty query
+/// returns all entries at rank 0, in their original order.
+List<({T entry, int rank})> scoreCommandEntries<T>(
   List<T> entries,
   String query, {
   required String Function(T entry) labelOf,
   required List<String> Function(T entry) keywordsOf,
+  bool fuzzy = false,
 }) {
   final tokens = commandSearchTokens(query);
-  if (tokens.isEmpty) return List<T>.of(entries);
+  if (tokens.isEmpty) {
+    return [for (final entry in entries) (entry: entry, rank: 0)];
+  }
 
   final ranked = <({int rank, int index, T entry})>[];
   for (var index = 0; index < entries.length; index++) {
@@ -106,9 +139,22 @@ List<T> rankCommandEntries<T>(
       label,
       ...keywordsOf(entry).map(normalizeCommandText),
     ].join(' ');
-    if (!tokens.every(haystack.contains)) continue;
+    var fuzzyOnly = false;
+    var matches = true;
+    for (final token in tokens) {
+      if (haystack.contains(token)) continue;
+      if (fuzzy && token.length >= 2 && _isSubsequence(token, label)) {
+        fuzzyOnly = true;
+        continue;
+      }
+      matches = false;
+      break;
+    }
+    if (!matches) continue;
     final first = tokens.first;
-    final rank = label.startsWith(first)
+    final rank = fuzzyOnly
+        ? _fuzzyRank
+        : label.startsWith(first)
         ? 0
         : label.contains(first)
         ? 1
@@ -120,31 +166,63 @@ List<T> rankCommandEntries<T>(
         ? a.rank.compareTo(b.rank)
         : a.index.compareTo(b.index),
   );
-  return [for (final match in ranked) match.entry];
+  return [for (final match in ranked) (entry: match.entry, rank: match.rank)];
+}
+
+/// Returns the [entries] matching every word of [query], best matches first.
+/// See [scoreCommandEntries] for the order.
+List<T> rankCommandEntries<T>(
+  List<T> entries,
+  String query, {
+  required String Function(T entry) labelOf,
+  required List<String> Function(T entry) keywordsOf,
+  bool fuzzy = false,
+}) => [
+  for (final match in scoreCommandEntries(
+    entries,
+    query,
+    labelOf: labelOf,
+    keywordsOf: keywordsOf,
+    fuzzy: fuzzy,
+  ))
+    match.entry,
+];
+
+/// Entries matching [query] with their rank (see [scoreCommandEntries]),
+/// best matches first, disabled ones after the enabled ones.
+List<({CommandBarEntry entry, int rank})> scoreCommandBarMatches(
+  Iterable<CommandBarEntry> entries,
+  CommandBarQuery query, {
+  bool fuzzy = false,
+}) {
+  final filter = query.filter;
+  final scoped = [
+    for (final entry in entries)
+      if (filter == null || filter.matches(entry)) entry,
+  ];
+  final ranked = scoreCommandEntries<CommandBarEntry>(
+    scoped,
+    query.text,
+    labelOf: (entry) => entry.label,
+    keywordsOf: (entry) => entry.keywords,
+    fuzzy: fuzzy,
+  );
+  return [
+    ...ranked.where((match) => match.entry.enabled),
+    ...ranked.where((match) => !match.entry.enabled),
+  ];
 }
 
 /// Entries matching [query], best matches first, disabled ones after the
 /// enabled ones.
 List<CommandBarEntry> commandBarMatches(
   Iterable<CommandBarEntry> entries,
-  CommandBarQuery query,
-) {
-  final filter = query.filter;
-  final scoped = [
-    for (final entry in entries)
-      if (filter == null || filter.matches(entry)) entry,
-  ];
-  final ranked = rankCommandEntries<CommandBarEntry>(
-    scoped,
-    query.text,
-    labelOf: (entry) => entry.label,
-    keywordsOf: (entry) => entry.keywords,
-  );
-  return [
-    ...ranked.where((entry) => entry.enabled),
-    ...ranked.where((entry) => !entry.enabled),
-  ];
-}
+  CommandBarQuery query, {
+  bool fuzzy = false,
+}) => [
+  for (final match in scoreCommandBarMatches(entries, query, fuzzy: fuzzy))
+    match.entry,
+];
 
 const List<LogicalKeyboardKey> _topRowDigits = <LogicalKeyboardKey>[
   LogicalKeyboardKey.digit1,

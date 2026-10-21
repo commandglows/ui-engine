@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import 'behavior.dart';
 import 'command.dart';
 import 'query.dart';
 import 'strings.dart';
@@ -42,6 +43,7 @@ class CommandBarView extends StatefulWidget {
     this.strings = CommandBarStrings.en,
     this.autofocus = true,
     this.refresh,
+    this.behavior = const CommandBarBehavior(),
   });
 
   /// Where the entries come from.
@@ -50,6 +52,9 @@ class CommandBarView extends StatefulWidget {
   /// Notifies when [source] changed while the bar is open (entries loaded
   /// after opening), so the list is built again.
   final Listenable? refresh;
+
+  /// Optional search and listing behaviours, all off by default.
+  final CommandBarBehavior behavior;
 
   /// Called with the entry the user chose.
   final ValueChanged<CommandBarChoice> onChoose;
@@ -180,6 +185,14 @@ class _CommandBarViewState extends State<CommandBarView> {
       return;
     }
     setState(() => _highlight = 0);
+  }
+
+  /// Applies [filter] from its prefix hint, keeping the typed words.
+  void _applyFilter(CommandBarFilter filter) {
+    setState(() {
+      _filter = filter;
+      _highlight = 0;
+    });
   }
 
   void _clearFilter() {
@@ -321,21 +334,31 @@ class _CommandBarViewState extends State<CommandBarView> {
     }
 
     if (query.filter == null) {
-      final recents = commandBarMatches([
-        for (final id in widget.source.recentIds)
-          if (byId[id] case final entry?) entry,
-      ], query);
+      final recents = commandBarMatches(
+        [
+          for (final id in widget.source.recentIds)
+            if (byId[id] case final entry?) entry,
+        ],
+        query,
+        fuzzy: widget.behavior.fuzzyMatch,
+      );
       if (recents.isNotEmpty) {
         rows.add(_HeaderRow(widget.strings.recentSection));
         recents.forEach(addItem);
       }
     }
 
+    final behavior = widget.behavior;
     final typed = query.text.trim().isNotEmpty;
-    final matches = commandBarMatches([
-      for (final entry in entries)
-        if (typed || !entry.searchOnly) entry,
-    ], query);
+    final scored = scoreCommandBarMatches(
+      [
+        for (final entry in entries)
+          if (typed || !entry.searchOnly) entry,
+      ],
+      query,
+      fuzzy: behavior.fuzzyMatch,
+    );
+    final matches = [for (final match in scored) match.entry];
     final titles = <String, String>{
       for (final section in widget.sections) section.id: section.title,
     };
@@ -348,6 +371,22 @@ class _CommandBarViewState extends State<CommandBarView> {
       for (final entry in matches)
         if (!titles.containsKey(entry.section)) entry.section,
     ];
+    if (behavior.sortSectionsByMatch && typed && query.filter == null) {
+      // Best rank of each section; the app order breaks ties (stable sort).
+      final best = <String, int>{};
+      for (final match in scored) {
+        final section = match.entry.section;
+        final rank = best[section];
+        if (rank == null || match.rank < rank) best[section] = match.rank;
+      }
+      final position = {
+        for (var i = 0; i < order.length; i++) order[i]: i,
+      };
+      order.sort((a, b) {
+        final byRank = (best[a] ?? 1 << 30).compareTo(best[b] ?? 1 << 30);
+        return byRank != 0 ? byRank : position[a]!.compareTo(position[b]!);
+      });
+    }
     final seen = <String>{};
     for (final sectionId in order) {
       if (!seen.add(sectionId)) continue;
@@ -442,7 +481,14 @@ class _CommandBarViewState extends State<CommandBarView> {
           if (showPrefixHint)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(_prefixHint(), style: mutedStyle),
+              child: widget.behavior.tappablePrefixHints
+                  ? _TappablePrefixHints(
+                      filters: widget.filters,
+                      strings: strings,
+                      style: mutedStyle,
+                      onApply: _applyFilter,
+                    )
+                  : Text(_prefixHint(), style: mutedStyle),
             ),
           Flexible(
             child: layout.items.isEmpty
@@ -687,6 +733,58 @@ class CommandBarTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The prefix hint line, with one button per filter.
+class _TappablePrefixHints extends StatelessWidget {
+  const _TappablePrefixHints({
+    required this.filters,
+    required this.strings,
+    required this.style,
+    required this.onApply,
+  });
+
+  final List<CommandBarFilter> filters;
+  final CommandBarStrings strings;
+  final TextStyle? style;
+  final ValueChanged<CommandBarFilter> onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(strings.prefixesHint, style: style),
+        for (final filter in filters)
+          Tooltip(
+            message:
+                (filter.requiresSpace
+                        ? strings.prefixTooltip
+                        : strings.prefixTooltipNoSpace)
+                    .replaceAll(
+                      '{prefix}',
+                      filter.prefix == ' ' ? strings.spaceKey : filter.prefix,
+                    ),
+            child: TextButton(
+              onPressed: () => onApply(filter),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 28),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text(
+                '${filter.prefix == ' ' ? strings.spaceKey : filter.prefix} '
+                '${filter.label.toLowerCase()}',
+                style: style,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -298,10 +298,16 @@ class CommandBarFilter {
     required this.label,
     required this.emptyText,
     required this.matches,
+    this.requiresSpace = true,
   });
 
   /// One character typed before a space, compared case-insensitively.
   final String prefix;
+
+  /// Whether a space must follow [prefix]. When false the filter applies as
+  /// soon as the prefix is typed (`>foo`): meant for symbols, which never
+  /// start a word.
+  final bool requiresSpace;
 
   /// Localized name shown in the chip, such as « Notes ».
   final String label;

@@ -17,6 +17,8 @@ class CommandBarStrings {
     required this.secondary,
     required this.close,
     required this.openCommandBar,
+    this.prefixTooltip = 'Type « {prefix} » then Space',
+    this.prefixTooltipNoSpace = 'Type « {prefix} »',
   });
 
   /// English texts.
@@ -49,6 +51,8 @@ class CommandBarStrings {
     secondary: 'autre action',
     close: 'fermer',
     openCommandBar: 'Ouvrir la barre de commandes',
+    prefixTooltip: 'Tape « {prefix} » puis Espace',
+    prefixTooltipNoSpace: 'Tape « {prefix} »',
   );
 
   /// Accessible name of the dialog.
@@ -87,6 +91,12 @@ class CommandBarStrings {
   /// Label of the hotkey in a shortcuts help list.
   final String openCommandBar;
 
+  /// Tooltip of a tappable prefix hint; `{prefix}` is the prefix.
+  final String prefixTooltip;
+
+  /// Tooltip of a tappable prefix hint whose filter needs no space.
+  final String prefixTooltipNoSpace;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -101,6 +111,8 @@ class CommandBarStrings {
     String? secondary,
     String? close,
     String? openCommandBar,
+    String? prefixTooltip,
+    String? prefixTooltipNoSpace,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -114,5 +126,7 @@ class CommandBarStrings {
     secondary: secondary ?? this.secondary,
     close: close ?? this.close,
     openCommandBar: openCommandBar ?? this.openCommandBar,
+    prefixTooltip: prefixTooltip ?? this.prefixTooltip,
+    prefixTooltipNoSpace: prefixTooltipNoSpace ?? this.prefixTooltipNoSpace,
   );
 }
