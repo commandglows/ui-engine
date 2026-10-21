@@ -20,10 +20,18 @@ const int _colorNone = 0xFFFFFFFE;
 /// `DWMWA_COLOR_DEFAULT`: lets Windows pick the border color again.
 const int _colorDefault = 0xFFFFFFFF;
 
-typedef _SetAttributeNative =
-    Int32 Function(IntPtr hwnd, Uint32 attribute, Pointer<Void> value, Uint32 size);
-typedef _SetAttribute =
-    int Function(int hwnd, int attribute, Pointer<Void> value, int size);
+typedef _SetAttributeNative = Int32 Function(
+  IntPtr hwnd,
+  Uint32 attribute,
+  Pointer<Void> value,
+  Uint32 size,
+);
+typedef _SetAttribute = int Function(
+  int hwnd,
+  int attribute,
+  Pointer<Void> value,
+  int size,
+);
 
 _SetAttribute? _setAttribute;
 
@@ -43,9 +51,7 @@ void applyDwmFrame(
   try {
     value.value = systemCorners ? _round : _doNotRound;
     setAttribute(hwnd, _cornerPreference, value.cast(), sizeOf<Uint32>());
-    value.value = systemCorners
-        ? borderColorRef ?? _colorDefault
-        : _colorNone;
+    value.value = systemCorners ? borderColorRef ?? _colorDefault : _colorNone;
     setAttribute(hwnd, _borderColor, value.cast(), sizeOf<Uint32>());
   } finally {
     calloc.free(value);

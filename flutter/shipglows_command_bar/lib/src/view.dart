@@ -46,6 +46,7 @@ class CommandBarView extends StatefulWidget {
     this.refresh,
     this.behavior = const CommandBarBehavior(),
     this.onSearchDoubleTap,
+    this.footerBuilder,
   });
 
   /// Where the entries come from.
@@ -79,6 +80,10 @@ class CommandBarView extends StatefulWidget {
   /// Called when the user double-clicks the search field. The field still
   /// selects the word under the pointer.
   final VoidCallback? onSearchDoubleTap;
+
+  /// Wraps the footer strip of key hints, which holds nothing to click: a
+  /// frameless window can make it its drag area.
+  final Widget Function(BuildContext context, Widget footer)? footerBuilder;
 
   @override
   State<CommandBarView> createState() => _CommandBarViewState();
@@ -435,6 +440,9 @@ class _CommandBarViewState extends State<CommandBarView> {
     return '${widget.strings.prefixesHint} ${parts.join(' · ')}';
   }
 
+  Widget _wrapFooter(BuildContext context, Widget footer) =>
+      widget.footerBuilder?.call(context, footer) ?? footer;
+
   @override
   Widget build(BuildContext context) {
     final style = CommandBarThemeData.of(context);
@@ -555,26 +563,32 @@ class _CommandBarViewState extends State<CommandBarView> {
                   ),
           ),
           Divider(height: 1, color: style.borderColor),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ExcludeSemantics(
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _FooterHint(keys: const ['↑', '↓'], label: strings.navigate),
-                  _FooterHint(
-                    keys: const ['Enter'],
-                    label: highlighted?.primaryLabel ?? strings.open,
-                  ),
-                  if (highlighted != null && highlighted.hasSecondary)
+          _wrapFooter(
+            context,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ExcludeSemantics(
+                child: Wrap(
+                  spacing: 16,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
                     _FooterHint(
-                      keys: const ['Shift', 'Enter'],
-                      label: highlighted.secondaryLabel ?? strings.secondary,
+                      keys: const ['↑', '↓'],
+                      label: strings.navigate,
                     ),
-                  _FooterHint(keys: const ['Esc'], label: strings.close),
-                ],
+                    _FooterHint(
+                      keys: const ['Enter'],
+                      label: highlighted?.primaryLabel ?? strings.open,
+                    ),
+                    if (highlighted != null && highlighted.hasSecondary)
+                      _FooterHint(
+                        keys: const ['Shift', 'Enter'],
+                        label: highlighted.secondaryLabel ?? strings.secondary,
+                      ),
+                    _FooterHint(keys: const ['Esc'], label: strings.close),
+                  ],
+                ),
               ),
             ),
           ),

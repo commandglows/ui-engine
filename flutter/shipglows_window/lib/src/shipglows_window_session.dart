@@ -142,7 +142,12 @@ class ShipglowsWindowSession with WindowListener, WidgetsBindingObserver {
   }
 
   Rect? _readBounds() {
-    final values = [_state['x'], _state['y'], _state['width'], _state['height']];
+    final values = [
+      _state['x'],
+      _state['y'],
+      _state['width'],
+      _state['height'],
+    ];
     if (values.any((value) => value is! num)) return null;
     final [x, y, width, height] = values.cast<num>();
     if (width <= 0 || height <= 0) return null;

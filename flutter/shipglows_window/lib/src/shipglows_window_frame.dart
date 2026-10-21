@@ -14,6 +14,7 @@ class ShipglowsWindowFrame extends StatefulWidget {
     super.key,
     required this.child,
     this.enabled = true,
+    this.showTitleBar = true,
     this.style,
     this.leading,
     this.title,
@@ -28,6 +29,11 @@ class ShipglowsWindowFrame extends StatefulWidget {
 
   /// Whether to draw the bar; lets an app limit it to some desktop targets.
   final bool enabled;
+
+  /// Whether the title bar sits above [child]. False keeps the corners and
+  /// the resize edges only, for a compact surface that moves through a
+  /// [ShipglowsWindowDragArea] of its own.
+  final bool showTitleBar;
 
   /// Visual tokens; defaults to the current theme.
   final ShipglowsTitleBarStyle? style;
@@ -83,8 +89,7 @@ class _ShipglowsWindowFrameState extends State<ShipglowsWindowFrame>
 
   Future<void> _syncEdgeToEdge() async {
     final edgeToEdge =
-        await windowManager.isMaximized() ||
-        await windowManager.isFullScreen();
+        await windowManager.isMaximized() || await windowManager.isFullScreen();
     if (!mounted || edgeToEdge == _edgeToEdge) return;
     setState(() => _edgeToEdge = edgeToEdge);
   }
@@ -117,16 +122,17 @@ class _ShipglowsWindowFrameState extends State<ShipglowsWindowFrame>
     final framed = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ShipglowsTitleBar(
-          style: widget.style,
-          leading: widget.leading,
-          title: widget.title,
-          actions: widget.actions,
-        ),
+        if (widget.showTitleBar)
+          ShipglowsTitleBar(
+            style: widget.style,
+            leading: widget.leading,
+            title: widget.title,
+            actions: widget.actions,
+          ),
         Expanded(
           child: MediaQuery.removePadding(
             context: context,
-            removeTop: true,
+            removeTop: widget.showTitleBar,
             child: widget.child,
           ),
         ),
