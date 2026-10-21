@@ -27,6 +27,20 @@ enum OverlayPlacement {
   foregroundMonitorCenter,
 }
 
+/// What a click outside an overlay (another window becoming active) does.
+/// Windows the overlay owns, such as a file dialog, never count as outside.
+enum OverlayOutsideClick {
+  /// Goes just behind the window clicked; back on top once reactivated.
+  background,
+
+  /// Hides (command bars).
+  close,
+
+  /// Nothing: an [ShipglowsOverlayOptions.alwaysOnTop] overlay stays above
+  /// every window.
+  none,
+}
+
 /// Window behaviour of a [ShipglowsOverlayWindow], fixed at creation.
 @immutable
 class ShipglowsOverlayOptions {
@@ -37,7 +51,7 @@ class ShipglowsOverlayOptions {
     this.appFolder,
     this.alwaysOnTop = true,
     this.showInTaskbar = false,
-    this.hideOnDeactivate = false,
+    this.outsideClick = OverlayOutsideClick.background,
     this.excludeFromCapture = false,
     this.resizable = true,
     this.doubleClickMaximizes = true,
@@ -71,8 +85,8 @@ class ShipglowsOverlayOptions {
   /// Own taskbar button and Alt+Tab entry; otherwise a tool window.
   final bool showInTaskbar;
 
-  /// Hides itself when another window becomes active (command bars).
-  final bool hideOnDeactivate;
+  /// What a click outside the overlay does.
+  final OverlayOutsideClick outsideClick;
 
   /// Invisible in screenshots and screen recordings.
   final bool excludeFromCapture;
@@ -119,7 +133,7 @@ class ShipglowsOverlayOptions {
     'appFolder': ?appFolder,
     'alwaysOnTop': alwaysOnTop,
     'showInTaskbar': showInTaskbar,
-    'hideOnDeactivate': hideOnDeactivate,
+    'outsideClick': outsideClick.name,
     'excludeFromCapture': excludeFromCapture,
     'resizable': resizable,
     'doubleClickMaximizes': doubleClickMaximizes,

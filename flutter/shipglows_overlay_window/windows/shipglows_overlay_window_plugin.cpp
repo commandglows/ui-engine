@@ -87,7 +87,6 @@ OverlayConfig ConfigFrom(const flutter::EncodableValue* arguments) {
   ReadInt(options, "cornerRadius", &config.corner_radius);
   ReadBool(options, "alwaysOnTop", &config.always_on_top);
   ReadBool(options, "showInTaskbar", &config.show_in_taskbar);
-  ReadBool(options, "hideOnDeactivate", &config.hide_on_deactivate);
   ReadBool(options, "excludeFromCapture", &config.exclude_from_capture);
   ReadBool(options, "resizable", &config.resizable);
   ReadBool(options, "doubleClickMaximizes", &config.double_click_maximizes);
@@ -97,6 +96,14 @@ OverlayConfig ConfigFrom(const flutter::EncodableValue* arguments) {
   if (memory == "none") config.size_memory = SizeMemory::kNone;
   if (memory == "session") config.size_memory = SizeMemory::kSession;
   if (memory == "persistent") config.size_memory = SizeMemory::kPersistent;
+  const std::string outside_click = StringField(options, "outsideClick");
+  if (outside_click == "background") {
+    config.outside_click = OutsideClick::kBackground;
+  } else if (outside_click == "close") {
+    config.outside_click = OutsideClick::kClose;
+  } else if (outside_click == "none") {
+    config.outside_click = OutsideClick::kNone;
+  }
   const std::string placement = StringField(options, "placement");
   if (placement == "cursorMonitorCenter") {
     config.placement = Placement::kCursorMonitorCenter;

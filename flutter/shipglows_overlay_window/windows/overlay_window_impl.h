@@ -74,6 +74,12 @@ class OverlayWindowImpl : public OverlayWindow {
   void StartPresentation();
   void Reveal(int64_t generation);
   void HideWindow(bool restore_focus);
+  // Applies |OverlayConfig::outside_click| when another window becomes
+  // active, and puts a backgrounded overlay back on top when it is active
+  // again. Runs before the runner's message hook, which cannot skip it.
+  void OnActivate(WPARAM wparam);
+  // Places the overlay just behind the window now in front.
+  void SendBehindForeground();
   // Alt+F4, Escape or the system close command: the overlay decides once it
   // is ready, otherwise the window just hides.
   void RequestClose();
@@ -104,6 +110,8 @@ class OverlayWindowImpl : public OverlayWindow {
   // True while the overlay activates itself; its own focus changes are not a
   // deactivation.
   bool activating_ = false;
+  // Lost its topmost place after a click outside (OutsideClick::kBackground).
+  bool sent_back_ = false;
   int64_t generation_ = 0;
   flutter::EncodableValue pending_data_;
   // Remembered position (physical) and size (logical) of the next opening.

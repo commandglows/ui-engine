@@ -22,6 +22,9 @@ constexpr char kHostChannel[] = "shipglows_overlay_window/host";
 // Posted by the engine's next-frame callback to reveal the overlay. Away
 // from the low WM_APP range that runner hooks commonly use.
 constexpr UINT kRevealMessage = WM_APP + 0x2F0;
+// Posted on deactivation: the window clicked is in front only once the
+// activation change completes.
+constexpr UINT kSendBackMessage = WM_APP + 0x2F1;
 // Resource ID of the app icon in Flutter's Windows runner template.
 constexpr int kAppIconResource = 101;
 // Undocumented: the visual-styles engine sends these to repaint the caption
@@ -351,6 +354,49 @@ void OverlayWindowImpl::RequestClose() {
     InvokeHost("requestClose", nullptr);
   } else {
     Hide();
+  }
+}
+
+void OverlayWindowImpl::OnActivate(WPARAM wparam) {
+  if (LOWORD(wparam) != WA_INACTIVE) {
+    if (sent_back_ && config_.always_on_top) {
+      SetWindowPos(window_, HWND_TOPMOST, 0, 0, 0, 0,
+                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+    sent_back_ = false;
+    return;
+  }
+  if (!visible_ || activating_) return;
+  switch (config_.outside_click) {
+    case OutsideClick::kClose:
+      HideWindow(false);
+      break;
+    case OutsideClick::kBackground:
+      PostMessageW(window_, kSendBackMessage, 0, 0);
+      break;
+    case OutsideClick::kNone:
+      break;
+  }
+}
+
+void OverlayWindowImpl::SendBehindForeground() {
+  if (!window_ || !visible_ || GetActiveWindow() == window_) return;
+  const HWND foreground = GetForegroundWindow();
+  // A window the overlay owns (a file dialog) belongs to it.
+  if (foreground &&
+      (foreground == window_ ||
+       GetAncestor(foreground, GA_ROOTOWNER) == window_)) {
+    return;
+  }
+  sent_back_ = true;
+  SetWindowPos(window_, HWND_NOTOPMOST, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  // Inserting after a topmost window would make the overlay topmost again:
+  // leaving the topmost band is then enough.
+  if (foreground &&
+      !(GetWindowLongPtrW(foreground, GWL_EXSTYLE) & WS_EX_TOPMOST)) {
+    SetWindowPos(window_, GetAncestor(foreground, GA_ROOT), 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
   }
 }
 
@@ -852,6 +898,11 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
   if (const auto handled = HandleFrameMessage(hwnd, message, wparam, lparam)) {
     return *handled;
   }
+  if (message == WM_ACTIVATE) OnActivate(wparam);
+  if (message == kSendBackMessage) {
+    SendBehindForeground();
+    return 0;
+  }
   if (config_.message_hook) {
     if (const auto handled =
             config_.message_hook(hwnd, message, wparam, lparam)) {
@@ -914,11 +965,8 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
         flutter_result = controller_->HandleTopLevelWindowProc(
             hwnd, message, wparam, lparam);
       }
-      if (LOWORD(wparam) == WA_INACTIVE) {
-        if (config_.hide_on_deactivate && visible_ && !activating_) {
-          HideWindow(false);
-        }
-      } else if (view_visible_ && HIWORD(wparam) == 0) {
+      if (LOWORD(wparam) != WA_INACTIVE && view_visible_ &&
+          HIWORD(wparam) == 0) {
         SetFocus(view());
       }
       return flutter_result ? *flutter_result : 0;

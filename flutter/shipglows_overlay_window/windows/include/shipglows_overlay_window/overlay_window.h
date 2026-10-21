@@ -36,6 +36,17 @@ enum class Placement {
   kForegroundMonitorCenter,
 };
 
+// What a click outside the overlay (another window becoming active) does.
+// Windows the overlay owns, such as a file dialog, never count as outside.
+enum class OutsideClick {
+  // Goes just behind the window clicked; back on top once reactivated.
+  kBackground,
+  // Hides (command bars).
+  kClose,
+  // Nothing: an always-on-top overlay stays above every window.
+  kNone,
+};
+
 struct OverlayConfig {
   // Unique per process; also the key of the saved position and size.
   std::string id;
@@ -62,8 +73,7 @@ struct OverlayConfig {
   bool always_on_top = true;
   // Own taskbar button and Alt+Tab entry; otherwise a tool window.
   bool show_in_taskbar = false;
-  // Hides itself when another window becomes active (command bars).
-  bool hide_on_deactivate = false;
+  OutsideClick outside_click = OutsideClick::kBackground;
   // Invisible in screenshots and screen recordings.
   bool exclude_from_capture = false;
   // The edges can be dragged (startResize) and resetSize restores the size.

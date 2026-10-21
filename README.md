@@ -132,6 +132,10 @@ Independent desktop overlay windows (Windows; no-op elsewhere): each runs its
 own Flutter engine in its own window.
 
 - Always on top by default (`alwaysOnTop`), taskbar button optional.
+- A click outside (`outsideClick`) sends it just behind the window clicked
+  by default (`background`), back on top when reactivated; `close` hides it,
+  `none` keeps it above everything. Windows it owns (file dialogs) are not
+  outside.
 - Showing it never shows, raises or activates the main window; focus goes
   back to the previous window when it hides.
 - Revealed only after Dart has drawn the data passed to `show`.
