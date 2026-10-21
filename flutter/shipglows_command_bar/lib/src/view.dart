@@ -44,6 +44,7 @@ class CommandBarView extends StatefulWidget {
     this.autofocus = true,
     this.refresh,
     this.behavior = const CommandBarBehavior(),
+    this.onSearchDoubleTap,
   });
 
   /// Where the entries come from.
@@ -73,6 +74,10 @@ class CommandBarView extends StatefulWidget {
 
   /// Whether the search field takes the focus when the bar opens.
   final bool autofocus;
+
+  /// Called when the user double-clicks the search field. The field still
+  /// selects the word under the pointer.
+  final VoidCallback? onSearchDoubleTap;
 
   @override
   State<CommandBarView> createState() => _CommandBarViewState();
@@ -132,6 +137,9 @@ class _CommandBarViewState extends State<CommandBarView> {
   CommandBarFilter? _filter;
   int _highlight = 0;
   _BarLayout _layout = _BarLayout.empty;
+
+  /// Last primary press on the search field, to spot a double-click.
+  PointerDownEvent? _lastSearchDown;
 
   @override
   void initState() {
@@ -248,6 +256,23 @@ class _CommandBarViewState extends State<CommandBarView> {
       if (rowContext == null) return;
       unawaited(Scrollable.ensureVisible(rowContext, alignmentPolicy: policy));
     });
+  }
+
+  /// Spots a double-click from raw presses, so the text field keeps its own
+  /// tap and selection gestures.
+  void _onSearchPointerDown(PointerDownEvent event) {
+    final onDoubleTap = widget.onSearchDoubleTap;
+    if (onDoubleTap == null || event.buttons != kPrimaryButton) return;
+    final previous = _lastSearchDown;
+    if (previous != null &&
+        previous.kind == event.kind &&
+        event.timeStamp - previous.timeStamp <= kDoubleTapTimeout &&
+        (event.position - previous.position).distance <= kDoubleTapSlop) {
+      _lastSearchDown = null;
+      onDoubleTap();
+      return;
+    }
+    _lastSearchDown = event;
   }
 
   void _chooseItem(int itemIndex, {required bool secondary}) {
@@ -379,9 +404,7 @@ class _CommandBarViewState extends State<CommandBarView> {
         final rank = best[section];
         if (rank == null || match.rank < rank) best[section] = match.rank;
       }
-      final position = {
-        for (var i = 0; i < order.length; i++) order[i]: i,
-      };
+      final position = {for (var i = 0; i < order.length; i++) order[i]: i};
       order.sort((a, b) {
         final byRank = (best[a] ?? 1 << 30).compareTo(best[b] ?? 1 << 30);
         return byRank != 0 ? byRank : position[a]!.compareTo(position[b]!);
@@ -456,21 +479,26 @@ class _CommandBarViewState extends State<CommandBarView> {
                   ),
                 ),
               Expanded(
-                child: TextField(
-                  controller: _controller,
-                  autofocus: widget.autofocus,
-                  onChanged: _onChanged,
-                  style: textTheme.bodyLarge?.copyWith(color: style.textColor),
-                  decoration: InputDecoration(
-                    hintText: strings.searchHint,
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
+                child: Listener(
+                  onPointerDown: _onSearchPointerDown,
+                  child: TextField(
+                    controller: _controller,
+                    autofocus: widget.autofocus,
+                    onChanged: _onChanged,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: style.textColor,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: strings.searchHint,
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -512,14 +540,15 @@ class _CommandBarViewState extends State<CommandBarView> {
                       child: switch (layout.rows[row]) {
                         _HeaderRow(:final title) => _SectionHeader(title),
                         _EntryRow(:final entry, :final itemIndex) =>
-                            CommandBarTile(
-                          entry: entry,
-                          highlighted: itemIndex == highlight,
-                          number: showNumbers && itemIndex < _numberedRows
-                              ? itemIndex + 1
-                              : null,
-                          onTap: () => _chooseItem(itemIndex, secondary: false),
-                        ),
+                          CommandBarTile(
+                            entry: entry,
+                            highlighted: itemIndex == highlight,
+                            number: showNumbers && itemIndex < _numberedRows
+                                ? itemIndex + 1
+                                : null,
+                            onTap: () =>
+                                _chooseItem(itemIndex, secondary: false),
+                          ),
                       },
                     ),
                   ),
@@ -568,10 +597,8 @@ class _SectionHeader extends StatelessWidget {
         header: true,
         child: Text(
           title,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: style.mutedColor,
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(context).textTheme.labelSmall
+              ?.copyWith(color: style.mutedColor, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -806,9 +833,8 @@ class _Badge extends StatelessWidget {
       child: Text(
         text,
         maxLines: 1,
-        style: Theme.of(
-          context,
-        ).textTheme.labelSmall?.copyWith(color: style.mutedColor),
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: style.mutedColor),
       ),
     );
   }
@@ -830,9 +856,8 @@ class _FooterHint extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: style.mutedColor,
-          ),
+          style: Theme.of(context).textTheme.labelSmall
+              ?.copyWith(color: style.mutedColor),
         ),
       ],
     );

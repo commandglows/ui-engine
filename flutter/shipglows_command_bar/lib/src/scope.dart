@@ -26,8 +26,9 @@ List<String> commandBarHotkeyKeys() => [commandBarPrimaryModifierLabel(), 'K'];
 /// it for the in-app bar. [refresh] rebuilds the list when [source] changes
 /// while open. When [resizable], the side and bottom edges drag the bar to
 /// another size, kept in [sizeStore]; double-clicking an edge restores the
-/// theme's size. [onRoute] receives the dialog route, so the caller can close
-/// it.
+/// theme's size. When [expandable], double-clicking the search field fills the
+/// screen with the bar, and again brings it back; the stored size is kept.
+/// [onRoute] receives the dialog route, so the caller can close it.
 Future<CommandBarChoice?> showCommandBar(
   BuildContext context, {
   required CommandBarSource source,
@@ -36,6 +37,7 @@ Future<CommandBarChoice?> showCommandBar(
   CommandBarStrings strings = CommandBarStrings.en,
   Listenable? refresh,
   bool resizable = true,
+  bool expandable = false,
   CommandBarSizeStore? sizeStore,
   CommandBarBehavior behavior = const CommandBarBehavior(),
   ValueChanged<Route<CommandBarChoice>>? onRoute,
@@ -66,6 +68,7 @@ Future<CommandBarChoice?> showCommandBar(
       strings: strings,
       refresh: refresh,
       resizable: resizable,
+      expandable: expandable,
       sizeStore: sizeStore,
       behavior: behavior,
       onChoose: finish,
@@ -175,6 +178,7 @@ class CommandBarScope extends StatefulWidget {
     this.onError,
     this.refresh,
     this.resizable = true,
+    this.expandable = false,
     this.sizeStore,
     this.behavior,
   });
@@ -211,6 +215,9 @@ class CommandBarScope extends StatefulWidget {
 
   /// Whether the user can drag the bar's edges to resize it.
   final bool resizable;
+
+  /// Whether double-clicking the search field toggles the bar to full screen.
+  final bool expandable;
 
   /// Where the size the user dragged the bar to is kept; in memory when null.
   final CommandBarSizeStore? sizeStore;
@@ -321,6 +328,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
       strings: widget.strings,
       refresh: Listenable.merge([registry, ?widget.refresh]),
       resizable: widget.resizable,
+      expandable: widget.expandable,
       sizeStore: widget.sizeStore ?? _memorySize,
       behavior: widget.behavior?.call(context) ?? const CommandBarBehavior(),
       onRoute: (route) => _route = route,
@@ -387,7 +395,10 @@ class _CommandBarScopeState extends State<CommandBarScope>
 }
 
 class _CommandBarScopeMarker extends InheritedWidget {
-  const _CommandBarScopeMarker({required this.controller, required super.child});
+  const _CommandBarScopeMarker({
+    required this.controller,
+    required super.child,
+  });
 
   final CommandBarController controller;
 
@@ -421,8 +432,7 @@ class CommandBarContribution extends StatefulWidget {
   final Widget child;
 
   @override
-  State<CommandBarContribution> createState() =>
-      _CommandBarContributionState();
+  State<CommandBarContribution> createState() => _CommandBarContributionState();
 }
 
 class _CommandBarContributionState extends State<CommandBarContribution> {
@@ -506,6 +516,7 @@ class _CommandBarDialog extends StatefulWidget {
     required this.strings,
     required this.refresh,
     required this.resizable,
+    required this.expandable,
     required this.sizeStore,
     required this.behavior,
     required this.onChoose,
@@ -518,6 +529,7 @@ class _CommandBarDialog extends StatefulWidget {
   final List<CommandBarFilter> filters;
   final CommandBarStrings strings;
   final bool resizable;
+  final bool expandable;
   final CommandBarSizeStore? sizeStore;
   final CommandBarBehavior behavior;
   final ValueChanged<CommandBarChoice> onChoose;
@@ -532,6 +544,11 @@ class _CommandBarDialogState extends State<_CommandBarDialog> {
 
   /// Size the user dragged the bar to, or null for the theme's size.
   Size? _size;
+
+  /// Whether the bar fills the screen, over [_size] without replacing it.
+  bool _expanded = false;
+
+  void _toggleExpanded() => setState(() => _expanded = !_expanded);
 
   @override
   void initState() {
@@ -640,6 +657,7 @@ class _CommandBarDialogState extends State<_CommandBarDialog> {
     final style = CommandBarThemeData.of(context);
     final screen = MediaQuery.sizeOf(context);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final expanded = widget.expandable && _expanded;
     final top = screen.height < 600 ? 16.0 : screen.height * 0.12;
     final maxWidth = math.max(0.0, screen.width - 32);
     final maxHeight = math.max(0.0, screen.height - top - keyboard - 16);
@@ -647,12 +665,14 @@ class _CommandBarDialogState extends State<_CommandBarDialog> {
     final panel = Material(
       key: _panelKey,
       color: style.backgroundColor,
-      elevation: 12,
+      elevation: expanded ? 0 : 12,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(style.radius),
-        side: BorderSide(color: style.borderColor),
-      ),
+      shape: expanded
+          ? const RoundedRectangleBorder()
+          : RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(style.radius),
+              side: BorderSide(color: style.borderColor),
+            ),
       child: Semantics(
         scopesRoute: true,
         namesRoute: true,
@@ -667,9 +687,19 @@ class _CommandBarDialogState extends State<_CommandBarDialog> {
           behavior: widget.behavior,
           onChoose: widget.onChoose,
           onClose: widget.onClose,
+          onSearchDoubleTap: widget.expandable ? _toggleExpanded : null,
         ),
       ),
     );
+
+    if (expanded) {
+      // Leaves the system bars and the keyboard their room.
+      final insets = MediaQuery.paddingOf(context);
+      return Padding(
+        padding: insets.copyWith(bottom: math.max(insets.bottom, keyboard)),
+        child: SizedBox.expand(child: panel),
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, top, 16, 16 + keyboard),
