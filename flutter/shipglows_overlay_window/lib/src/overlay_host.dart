@@ -159,9 +159,11 @@ class ShipglowsOverlayHost extends ChangeNotifier {
         await onShow?.call(arguments['data']);
         _setVisible(true);
         // The window appears only after a frame with this data was drawn.
-        WidgetsBinding.instance.scheduleFrame();
+        _renderFrame();
         await WidgetsBinding.instance.endOfFrame;
         await _call<void>('presented', arguments['generation']);
+        // The window has armed its reveal on the next frame.
+        _renderFrame();
       case 'hidden':
         _setVisible(false);
         onHide?.call();
@@ -175,6 +177,17 @@ class ShipglowsOverlayHost extends ChangeNotifier {
         await requestClose();
     }
     return null;
+  }
+
+  // A preloaded overlay's view is hidden, so Flutter reports the app hidden
+  // and ignores scheduleFrame; a warm-up frame is drawn anyway.
+  void _renderFrame() {
+    final binding = WidgetsBinding.instance;
+    if (binding.framesEnabled) {
+      binding.scheduleFrame();
+    } else {
+      binding.scheduleWarmUpFrame();
+    }
   }
 
   void _setVisible(bool value) {
