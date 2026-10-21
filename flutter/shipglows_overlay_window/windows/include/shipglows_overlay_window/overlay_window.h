@@ -79,6 +79,9 @@ struct OverlayConfig {
   // Dark DWM frame and 1 px border color (Windows 11).
   bool dark_frame = true;
   std::optional<COLORREF> border_color;
+  // Painted under the view: the strip Windows may expose when a resize step
+  // outruns the engine's frame. None: left to the system (black).
+  std::optional<COLORREF> background_color;
 
   // Registers the plugins the overlay engine needs. None by default: an
   // engine that registers a process-wide plugin twice can break it.

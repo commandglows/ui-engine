@@ -4,6 +4,7 @@
 #include <flutter/flutter_view_controller.h>
 #include <flutter/method_channel.h>
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -63,6 +64,12 @@ class OverlayWindowImpl : public OverlayWindow {
   std::optional<POINT> LoadPosition() const;
   RECT ClampedBounds(const RECT& anchor, int width, int height) const;
   void FitViewToClient();
+  // Sizes the view; blocks until the engine drew a frame of that size.
+  void FitView(int width, int height);
+  // Programmatic bounds change, eased like a system animation.
+  void MoveTo(const RECT& bounds);
+  void StepAnimation();
+  void StopAnimation();
   void UpdateRegion();
   void StartPresentation();
   void Reveal(int64_t generation);
@@ -103,6 +110,13 @@ class OverlayWindowImpl : public OverlayWindow {
   std::optional<POINT> position_;
   std::optional<SIZE> size_;
   SIZE size_before_move_{};
+  // Eased move or resize in progress (resetSize), stepped by a timer.
+  struct Animation {
+    RECT from;
+    RECT to;
+    std::chrono::steady_clock::time_point start;
+  };
+  std::optional<Animation> animation_;
   // Last opening size requested, used by resetSize.
   int default_width_ = 0;
   int default_height_ = 0;

@@ -110,6 +110,11 @@ OverlayConfig ConfigFrom(const flutter::EncodableValue* arguments) {
     config.border_color = RGB((value >> 16) & 0xFF, (value >> 8) & 0xFF,
                               value & 0xFF);
   }
+  if (const auto argb = IntField(options, "backgroundColor")) {
+    const auto value = static_cast<uint32_t>(*argb);
+    config.background_color = RGB((value >> 16) & 0xFF, (value >> 8) & 0xFF,
+                                  value & 0xFF);
+  }
   return config;
 }
 

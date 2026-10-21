@@ -136,8 +136,13 @@ own Flutter engine in its own window.
   back to the previous window when it hides.
 - Revealed only after Dart has drawn the data passed to `show`.
 - Drag to move; edges resize (`resizable`); double-click on an edge restores
-  the default size; double-click on the drag area maximizes
-  (`doubleClickMaximizes`).
+  the default size (eased, unless Windows animations are off); double-click
+  on the drag area maximizes (`doubleClickMaximizes`).
+- Live resize without flicker: the view draws its frame at the new size
+  during `WM_NCCALCSIZE`, before Windows resizes the window, and nothing of
+  the old client area is blitted (`WVR_VALIDRECTS`), so the content never
+  jumps when the left or top edge is dragged. `backgroundColor` paints what a
+  step the engine could not follow in time (over 100 ms) would expose.
 - Position and size remembered (`sizeMemory`: none, session, persistent) in
   `%APPDATA%\<appFolder>\overlay_windows.json`, clamped to the screen;
   per-monitor DPI.

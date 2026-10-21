@@ -5,6 +5,8 @@
 #include <flutter_windows.h>
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <map>
 #include <set>
 #include <utility>
@@ -28,6 +30,9 @@ constexpr int kAppIconResource = 101;
 // area that covers the whole window here.
 constexpr UINT kNcUahDrawCaption = 0x00AE;
 constexpr UINT kNcUahDrawFrame = 0x00AF;
+// Timer of a programmatic move or resize (resetSize).
+constexpr UINT_PTR kAnimationTimer = 1;
+constexpr std::chrono::milliseconds kAnimationDuration{180};
 
 std::set<std::string>& ReservedIds() {
   static std::set<std::string> ids;
@@ -189,6 +194,7 @@ bool OverlayWindowImpl::CreateOverlay() {
 }
 
 void OverlayWindowImpl::DestroyOverlay() {
+  StopAnimation();
   ready_ = false;
   frame_ready_ = false;
   visible_ = false;
@@ -352,6 +358,7 @@ void OverlayWindowImpl::HideWindow(bool restore_focus) {
   if (!window_) return;
   if (!visible_ && !reveal_pending_ && !IsWindowVisible(window_)) return;
   const bool was_visible = visible_;
+  StopAnimation();
   visible_ = false;
   reveal_pending_ = false;
   activate_on_reveal_ = false;
@@ -463,11 +470,57 @@ void OverlayWindowImpl::ResetSize() {
   size_.reset();
   SessionSizes().erase(config_.id);
   if (IsZoomed(window_)) ShowWindow(window_, SW_RESTORE);
-  const RECT bounds = BoundsAround(default_width_, default_height_);
-  SetWindowPos(window_, nullptr, bounds.left, bounds.top,
-               bounds.right - bounds.left, bounds.bottom - bounds.top,
-               SWP_NOZORDER | SWP_NOACTIVATE);
-  SaveBounds(false);
+  MoveTo(BoundsAround(default_width_, default_height_));
+}
+
+void OverlayWindowImpl::MoveTo(const RECT& bounds) {
+  StopAnimation();
+  RECT from{};
+  GetWindowRect(window_, &from);
+  BOOL animate = TRUE;
+  SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animate, 0);
+  // Immediate when the user turned animations off, or when nothing shows.
+  if (!animate || !IsWindowVisible(window_) || EqualRect(&from, &bounds)) {
+    SetWindowPos(window_, nullptr, bounds.left, bounds.top,
+                 bounds.right - bounds.left, bounds.bottom - bounds.top,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+    SaveBounds(false);
+    return;
+  }
+  animation_ = Animation{from, bounds, std::chrono::steady_clock::now()};
+  SetTimer(window_, kAnimationTimer, USER_TIMER_MINIMUM, nullptr);
+  StepAnimation();
+}
+
+void OverlayWindowImpl::StepAnimation() {
+  if (!animation_ || !window_) return;
+  const std::chrono::duration<double, std::milli> elapsed =
+      std::chrono::steady_clock::now() - animation_->start;
+  const double t = std::clamp(elapsed.count() / kAnimationDuration.count(),
+                              0.0, 1.0);
+  // Ease-out cubic: fast start, soft landing.
+  const double eased = 1 - (1 - t) * (1 - t) * (1 - t);
+  const auto lerp = [eased](LONG a, LONG b) {
+    return a + static_cast<LONG>(std::lround((b - a) * eased));
+  };
+  const RECT& from = animation_->from;
+  const RECT& to = animation_->to;
+  const RECT now{lerp(from.left, to.left), lerp(from.top, to.top),
+                 lerp(from.right, to.right), lerp(from.bottom, to.bottom)};
+  // Each step draws the view at its new size before the window changes
+  // (WM_NCCALCSIZE), so the animation stays whole.
+  SetWindowPos(window_, nullptr, now.left, now.top, now.right - now.left,
+               now.bottom - now.top, SWP_NOZORDER | SWP_NOACTIVATE);
+  if (t >= 1.0) {
+    StopAnimation();
+    SaveBounds(false);
+  }
+}
+
+void OverlayWindowImpl::StopAnimation() {
+  if (!animation_) return;
+  animation_.reset();
+  if (window_) KillTimer(window_, kAnimationTimer);
 }
 
 void OverlayWindowImpl::ToggleMaximize() {
@@ -568,12 +621,23 @@ RECT OverlayWindowImpl::ClampedBounds(const RECT& anchor, int width,
 }
 
 void OverlayWindowImpl::FitViewToClient() {
+  RECT client{};
+  if (!window_ || !GetClientRect(window_, &client)) return;
+  FitView(client.right - client.left, client.bottom - client.top);
+}
+
+void OverlayWindowImpl::FitView(int width, int height) {
   const HWND view_window = view();
   if (view_window == nullptr) return;
-  RECT client{};
-  GetClientRect(window_, &client);
-  MoveWindow(view_window, 0, 0, client.right - client.left,
-             client.bottom - client.top, TRUE);
+  RECT current{};
+  if (GetClientRect(view_window, &current) && current.right == width &&
+      current.bottom == height) {
+    return;
+  }
+  // The engine blocks here until a frame of the new size is on screen (up to
+  // a hundred milliseconds): the window is only ever seen with content that
+  // matches its size.
+  MoveWindow(view_window, 0, 0, width, height, FALSE);
 }
 
 void OverlayWindowImpl::UpdateRegion() {
@@ -699,22 +763,59 @@ std::optional<LRESULT> OverlayWindowImpl::HandleFrameMessage(HWND hwnd,
       // or Escape do nothing. Alt+Space (system menu) is unchanged.
       if ((wparam & 0xFFF0) == SC_KEYMENU && lparam == 0) return 0;
       return std::nullopt;
-    case WM_NCCALCSIZE:
-      if (!wparam) return std::nullopt;
-      // Borderless. Maximized, Windows places the frame outside the monitor:
-      // keep the content inside.
+    case WM_NCCALCSIZE: {
+      // Borderless: the client area is the whole window.
+      if (!wparam) return 0;
+      auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+      const RECT old_client = params->rgrc[2];
+      RECT& client = params->rgrc[0];
+      // Maximized, Windows places the frame outside the monitor: keep the
+      // content inside.
       if (IsZoomed(hwnd)) {
-        auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
         const UINT dpi = GetDpiForWindow(hwnd);
         const int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
         const int frame_x = GetSystemMetricsForDpi(SM_CXFRAME, dpi) + padding;
         const int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi) + padding;
-        params->rgrc[0].left += frame_x;
-        params->rgrc[0].right -= frame_x;
-        params->rgrc[0].top += frame_y;
-        params->rgrc[0].bottom -= frame_y;
+        client.left += frame_x;
+        client.right -= frame_x;
+        client.top += frame_y;
+        client.bottom -= frame_y;
       }
-      return 0;
+      // Live resizing the professional way: the view draws its frame at the
+      // new size now, before Windows touches the window, so every step shows
+      // finished content at the right place (never the old frame stretched,
+      // never a bare strip).
+      if (view_visible_) {
+        FitView(client.right - client.left, client.bottom - client.top);
+      }
+      // Nothing of the old client area is copied into the new one. Left to
+      // itself, Windows blits it to the top-left corner, which makes the
+      // content jump when the left or top edge is dragged: one pixel copied
+      // onto itself instead.
+      RECT keep{};
+      if (IntersectRect(&keep, &old_client, &client)) {
+        keep.right = keep.left + 1;
+        keep.bottom = keep.top + 1;
+      }
+      params->rgrc[1] = keep;
+      params->rgrc[2] = keep;
+      return WVR_VALIDRECTS;
+    }
+    case WM_ERASEBKGND:
+      // The view covers the client area. What Windows may still expose for a
+      // frame (a resize step the engine could not follow in time) takes the
+      // overlay's background rather than black.
+      if (config_.background_color) {
+        RECT client{};
+        if (GetClientRect(hwnd, &client)) {
+          if (const HBRUSH brush =
+                  CreateSolidBrush(*config_.background_color)) {
+            FillRect(reinterpret_cast<HDC>(wparam), &client, brush);
+            DeleteObject(brush);
+          }
+        }
+      }
+      return 1;
     case WM_NCACTIVATE:
       // Never DefWindowProc: it paints the legacy caption over the client
       // area whenever DWM is not rendering this window's frame, even with
@@ -770,7 +871,15 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
         return 0;
       }
       break;
+    case WM_TIMER:
+      if (wparam == kAnimationTimer) {
+        StepAnimation();
+        return 0;
+      }
+      break;
     case WM_ENTERSIZEMOVE: {
+      // The user took over from a programmatic move.
+      StopAnimation();
       RECT bounds{};
       GetWindowRect(hwnd, &bounds);
       size_before_move_ = {bounds.right - bounds.left,

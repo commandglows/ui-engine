@@ -48,6 +48,7 @@ class ShipglowsOverlayOptions {
     this.cornerRadius = 12,
     this.darkFrame = true,
     this.borderColor,
+    this.backgroundColor,
   });
 
   /// Default size in logical pixels, scaled to the monitor's DPI.
@@ -104,6 +105,11 @@ class ShipglowsOverlayOptions {
   /// 1 px border color drawn by Windows 11. Null: the system color.
   final Color? borderColor;
 
+  /// Painted by the window under the Flutter view: the strip Windows may
+  /// expose for a frame when a resize step outruns the engine. Give it the
+  /// overlay's background color. Null: left to the system (black).
+  final Color? backgroundColor;
+
   Map<String, Object?> toMap() => {
     'width': size.width.round(),
     'height': size.height.round(),
@@ -124,5 +130,7 @@ class ShipglowsOverlayOptions {
     'cornerRadius': cornerRadius.round(),
     'darkFrame': darkFrame,
     if (borderColor case final color?) 'borderColor': color.toARGB32(),
+    if (backgroundColor case final color?)
+      'backgroundColor': color.toARGB32(),
   };
 }
