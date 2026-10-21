@@ -337,7 +337,6 @@ void OverlayWindowImpl::HideWindow(bool restore_focus) {
   activate_on_reveal_ = false;
   ++generation_;
   InvokeHost("hidden", nullptr);
-  SetViewVisible(false, false);
   const HWND previous = previous_foreground_;
   previous_foreground_ = nullptr;
   // Give focus back only while the overlay still held it: a user who has
@@ -346,7 +345,10 @@ void OverlayWindowImpl::HideWindow(bool restore_focus) {
       previous != window_ && IsWindow(previous) && IsWindowVisible(previous)) {
     SetForegroundWindow(previous);
   }
+  // Hide the window before its view: a window without its view shows, for a
+  // frame, the caption buttons DWM draws under it.
   ShowWindow(window_, SW_HIDE);
+  SetViewVisible(false, false);
   if (was_visible) NotifyVisibility(false);
 }
 
