@@ -572,9 +572,10 @@ void OverlayWindowImpl::UpdateRegion() {
   if (!window_ || !frame_ready_) return;
   // DWM already rounds the corners on Windows 11: no region at all.
   if (native_corners_ || IsZoomed(window_)) {
-    if (GetWindowRgn(window_, nullptr) != ERROR) {
-      SetWindowRgn(window_, nullptr, FALSE);
-    }
+    const HRGN probe = CreateRectRgn(0, 0, 0, 0);
+    const bool has_region = probe && GetWindowRgn(window_, probe) != ERROR;
+    if (probe) DeleteObject(probe);
+    if (has_region) SetWindowRgn(window_, nullptr, FALSE);
     return;
   }
   RECT rect{};
@@ -705,6 +706,11 @@ std::optional<LRESULT> OverlayWindowImpl::HandleFrameMessage(HWND hwnd,
       // lParam -1. TRUE lets the activation change proceed.
       return TRUE;
     case WM_NCPAINT:
+      // DefWindowProc, always: a window that swallows WM_NCPAINT is handled
+      // by Windows 11 as a legacy-framed window (DWM frame rendering off, a
+      // rounded region installed, the classic caption painted on
+      // activation). With an empty non-client area it paints nothing.
+      return DefWindowProcW(hwnd, message, wparam, lparam);
     case kNcUahDrawCaption:
     case kNcUahDrawFrame:
       return 0;
