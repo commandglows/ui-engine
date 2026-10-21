@@ -27,6 +27,7 @@ class CommandBarEntry {
     this.disabledReason,
     this.secondaryLabel,
     this.hasSecondary = false,
+    this.searchOnly = false,
   });
 
   /// Restores an entry from [json], as produced by [toJson].
@@ -59,6 +60,7 @@ class CommandBarEntry {
       disabledReason: _optionalString(json['disabledReason']),
       secondaryLabel: _optionalString(json['secondaryLabel']),
       hasSecondary: json['hasSecondary'] == true,
+      searchOnly: json['searchOnly'] == true,
     );
   }
 
@@ -103,6 +105,10 @@ class CommandBarEntry {
   /// « Reactivate » on an archived project).
   final bool hasSecondary;
 
+  /// Whether the entry stays hidden until something is typed, so a long list
+  /// of items (songs, notes) never buries the commands. Recents still show it.
+  final bool searchOnly;
+
   /// JSON-safe map with the same keys [CommandBarEntry.fromJson] reads.
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -117,6 +123,7 @@ class CommandBarEntry {
     'disabledReason': disabledReason,
     'secondaryLabel': secondaryLabel,
     'hasSecondary': hasSecondary,
+    'searchOnly': searchOnly,
   };
 
   @override
@@ -133,7 +140,8 @@ class CommandBarEntry {
       other.enabled == enabled &&
       other.disabledReason == disabledReason &&
       other.secondaryLabel == secondaryLabel &&
-      other.hasSecondary == hasSecondary;
+      other.hasSecondary == hasSecondary &&
+      other.searchOnly == searchOnly;
 
   @override
   int get hashCode => Object.hash(
@@ -149,6 +157,7 @@ class CommandBarEntry {
     disabledReason,
     secondaryLabel,
     hasSecondary,
+    searchOnly,
   );
 }
 
@@ -169,6 +178,7 @@ class CommandBarCommand {
     this.disabledReason,
     this.secondaryLabel,
     this.runSecondary,
+    this.searchOnly = false,
   });
 
   /// See [CommandBarEntry.id].
@@ -210,6 +220,9 @@ class CommandBarCommand {
   /// Secondary action, run with Shift+Enter. Null when there is none.
   final CommandBarRun? runSecondary;
 
+  /// See [CommandBarEntry.searchOnly].
+  final bool searchOnly;
+
   /// Display data of this command, without its callbacks.
   CommandBarEntry get entry => CommandBarEntry(
     id: id,
@@ -224,6 +237,7 @@ class CommandBarCommand {
     disabledReason: disabledReason,
     secondaryLabel: secondaryLabel,
     hasSecondary: runSecondary != null && secondaryLabel != null,
+    searchOnly: searchOnly,
   );
 }
 

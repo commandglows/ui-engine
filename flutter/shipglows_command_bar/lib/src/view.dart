@@ -262,7 +262,8 @@ class _CommandBarViewState extends State<CommandBarView> {
   }
 
   /// Rows for the current query: recents (without a filter only), then one
-  /// block per section, each in ranking order.
+  /// block per section, each in ranking order. Search-only entries need typed
+  /// words, except among the recents.
   _BarLayout _layoutFor() {
     final query = CommandBarQuery(filter: _filter, text: _controller.text);
     final entries = widget.source.entries;
@@ -290,7 +291,11 @@ class _CommandBarViewState extends State<CommandBarView> {
       }
     }
 
-    final matches = commandBarMatches(entries, query);
+    final typed = query.text.trim().isNotEmpty;
+    final matches = commandBarMatches([
+      for (final entry in entries)
+        if (typed || !entry.searchOnly) entry,
+    ], query);
     final titles = <String, String>{
       for (final section in widget.sections) section.id: section.title,
     };
@@ -415,7 +420,8 @@ class _CommandBarViewState extends State<CommandBarView> {
                       key: _keyOfRow(row),
                       child: switch (layout.rows[row]) {
                         _HeaderRow(:final title) => _SectionHeader(title),
-                        _EntryRow(:final entry, :final itemIndex) => _EntryTile(
+                        _EntryRow(:final entry, :final itemIndex) =>
+                            CommandBarTile(
                           entry: entry,
                           highlighted: itemIndex == highlight,
                           number: showNumbers && itemIndex < _numberedRows
@@ -478,19 +484,34 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _EntryTile extends StatelessWidget {
-  const _EntryTile({
+/// One row of the bar: icon, label, second line, shortcuts and row number.
+///
+/// Public so an app can list commands in its own surface (suggestions under a
+/// search field) with the same row as the bar.
+class CommandBarTile extends StatelessWidget {
+  const CommandBarTile({
+    super.key,
     required this.entry,
     required this.highlighted,
-    required this.number,
     required this.onTap,
+    this.number,
+    this.trailingLabel,
   });
 
+  /// The entry shown.
   final CommandBarEntry entry;
+
+  /// Whether the row is the one Enter runs.
   final bool highlighted;
 
   /// Row number reachable with Ctrl/⌘+n, or null when it has none.
   final int? number;
+
+  /// Muted text before the shortcuts, such as the section title in a list
+  /// without section headers.
+  final String? trailingLabel;
+
+  /// Called on tap, unless the entry is disabled.
   final VoidCallback onTap;
 
   @override
@@ -500,19 +521,23 @@ class _EntryTile extends StatelessWidget {
     final disabled = !entry.enabled;
     // A disabled row explains why in its second line; otherwise the subtitle.
     final secondLine = disabled ? entry.disabledReason : entry.subtitle;
-    final spoken = [entry.label, ?secondLine].join(', ');
+    final trailingLabel = this.trailingLabel;
+    final spoken = [entry.label, ?secondLine, ?trailingLabel].join(', ');
     final iconColor = disabled
         ? style.mutedColor
         : highlighted
         ? style.highlightedIconColor
         : style.iconColor;
     final number = this.number;
+    final indicator = highlighted ? style.highlightIndicatorColor : null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       child: Material(
         color: highlighted ? style.highlightColor : Colors.transparent,
         borderRadius: BorderRadius.circular(style.rowRadius),
+        // Keeps the indicator inside the rounded corners.
+        clipBehavior: indicator == null ? Clip.none : Clip.antiAlias,
         child: InkWell(
           borderRadius: BorderRadius.circular(style.rowRadius),
           onTap: disabled ? null : onTap,
@@ -525,6 +550,13 @@ class _EntryTile extends StatelessWidget {
             child: Container(
               constraints: BoxConstraints(minHeight: style.rowMinHeight),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: indicator == null
+                  ? null
+                  : BoxDecoration(
+                      border: BorderDirectional(
+                        start: BorderSide(color: indicator, width: 3),
+                      ),
+                    ),
               child: Row(
                 children: [
                   Icon(
@@ -563,6 +595,15 @@ class _EntryTile extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (trailingLabel != null) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      trailingLabel,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: style.mutedColor,
+                      ),
+                    ),
+                  ],
                   for (final shortcut in entry.shortcuts) ...[
                     const SizedBox(width: 8),
                     CommandBarKeys(keys: commandShortcutKeys(shortcut)),

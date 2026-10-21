@@ -26,6 +26,7 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 - Search: every word must match the label or keywords, accents folded
   (« ecran » finds « Écran »); label prefix ranks first, disabled entries
   last.
+  `searchOnly` entries (songs, notes) stay hidden until something is typed.
 - Sections in the order the app gives, recents first (`CommandBarRecentsStore`,
   memory by default; back it with `SharedPreferences` through
   `CallbackCommandBarRecents`).
@@ -36,6 +37,9 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 - Texts: `CommandBarStrings.en`, `.fr`, or the app's own.
 - Look: `CommandBarThemeData` theme extension, every value falls back on the
   `ColorScheme`; `keycapBuilder` for app-drawn keycaps.
+  `highlightIndicatorColor` adds a leading bar to the highlighted row.
+- `CommandBarTile`: the bar's row, for command suggestions an app lists in
+  its own surface (under a search field).
 - Other engines (floating window, native relay): `CommandBarEntry.toJson` /
   `fromJson` (icons by code point through an app table), `CommandBarView` and
   `showCommandBar` with your own `CommandBarSource`.

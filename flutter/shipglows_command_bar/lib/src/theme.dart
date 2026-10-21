@@ -22,6 +22,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     this.mutedColor,
     this.iconColor,
     this.highlightedIconColor,
+    this.highlightIndicatorColor,
     this.radius,
     this.rowRadius,
     this.rowMinHeight,
@@ -54,6 +55,10 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
   /// Icon of the highlighted row.
   final Color? highlightedIconColor;
 
+  /// Bar drawn along the leading edge of the highlighted row, so the
+  /// highlight does not rest on its fill alone. No bar when null.
+  final Color? highlightIndicatorColor;
+
   /// Corner radius of the dialog.
   final double? radius;
 
@@ -82,6 +87,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     Color? mutedColor,
     Color? iconColor,
     Color? highlightedIconColor,
+    Color? highlightIndicatorColor,
     double? radius,
     double? rowRadius,
     double? rowMinHeight,
@@ -97,6 +103,8 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     mutedColor: mutedColor ?? this.mutedColor,
     iconColor: iconColor ?? this.iconColor,
     highlightedIconColor: highlightedIconColor ?? this.highlightedIconColor,
+    highlightIndicatorColor:
+        highlightIndicatorColor ?? this.highlightIndicatorColor,
     radius: radius ?? this.radius,
     rowRadius: rowRadius ?? this.rowRadius,
     rowMinHeight: rowMinHeight ?? this.rowMinHeight,
@@ -119,6 +127,11 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       highlightedIconColor: Color.lerp(
         highlightedIconColor,
         other.highlightedIconColor,
+        t,
+      ),
+      highlightIndicatorColor: Color.lerp(
+        highlightIndicatorColor,
+        other.highlightIndicatorColor,
         t,
       ),
       radius: lerpDouble(radius, other.radius, t),
@@ -148,6 +161,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       iconColor: data.iconColor ?? scheme.onSurfaceVariant,
       highlightedIconColor:
           data.highlightedIconColor ?? scheme.onSecondaryContainer,
+      highlightIndicatorColor: data.highlightIndicatorColor,
       radius: data.radius ?? 16,
       rowRadius: data.rowRadius ?? 10,
       rowMinHeight: data.rowMinHeight ?? 44,
@@ -172,6 +186,7 @@ class ResolvedCommandBarTheme {
     required this.mutedColor,
     required this.iconColor,
     required this.highlightedIconColor,
+    required this.highlightIndicatorColor,
     required this.radius,
     required this.rowRadius,
     required this.rowMinHeight,
@@ -188,6 +203,7 @@ class ResolvedCommandBarTheme {
   final Color mutedColor;
   final Color iconColor;
   final Color highlightedIconColor;
+  final Color? highlightIndicatorColor;
   final double radius;
   final double rowRadius;
   final double rowMinHeight;
