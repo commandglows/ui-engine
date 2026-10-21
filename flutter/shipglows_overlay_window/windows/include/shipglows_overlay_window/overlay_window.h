@@ -94,7 +94,8 @@ struct OverlayConfig {
   // messages of the top-level window before the overlay's own handling;
   // returning a value consumes it. The borderless frame messages
   // (WM_NCCALCSIZE, WM_NCACTIVATE, WM_NCPAINT, caption repaints, WM_SETTEXT,
-  // WM_SETICON) are handled before it and never reach it.
+  // WM_SETICON, and the menu mode of Alt alone) are handled before it and
+  // never reach it.
   std::function<void(HWND window)> on_created;
   std::function<std::optional<LRESULT>(HWND, UINT, WPARAM, LPARAM)>
       message_hook;

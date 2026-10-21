@@ -692,6 +692,13 @@ std::optional<LRESULT> OverlayWindowImpl::HandleFrameMessage(HWND hwnd,
                                                              WPARAM wparam,
                                                              LPARAM lparam) {
   switch (message) {
+    case WM_SYSCOMMAND:
+      // Alt alone (lParam 0) asks for the menu bar. An overlay has none, yet
+      // the invisible menu mode would swallow the next key: releasing Alt
+      // after an Alt+key hotkey that opened the overlay made the first Tab
+      // or Escape do nothing. Alt+Space (system menu) is unchanged.
+      if ((wparam & 0xFFF0) == SC_KEYMENU && lparam == 0) return 0;
+      return std::nullopt;
     case WM_NCCALCSIZE:
       if (!wparam) return std::nullopt;
       // Borderless. Maximized, Windows places the frame outside the monitor:
