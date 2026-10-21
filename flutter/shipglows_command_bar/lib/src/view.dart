@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'command.dart';
@@ -26,7 +27,8 @@ class CommandBarChoice {
 /// is up to the owner, so the same widget serves the in-app dialog and a
 /// floating bar.
 ///
-/// Keys: ↑/↓ move, Enter chooses, Shift+Enter chooses the secondary action,
+/// Keys: ↑/↓ move, Enter chooses, Shift+Enter or Ctrl/⌘+Enter chooses the
+/// secondary action,
 /// Ctrl/⌘+1…9 chooses row n, Backspace on an empty field removes the filter,
 /// Escape removes the filter first, then closes, and Ctrl/⌘+K closes.
 class CommandBarView extends StatefulWidget {
@@ -39,10 +41,15 @@ class CommandBarView extends StatefulWidget {
     this.filters = const <CommandBarFilter>[],
     this.strings = CommandBarStrings.en,
     this.autofocus = true,
+    this.refresh,
   });
 
   /// Where the entries come from.
   final CommandBarSource source;
+
+  /// Notifies when [source] changed while the bar is open (entries loaded
+  /// after opening), so the list is built again.
+  final Listenable? refresh;
 
   /// Called with the entry the user chose.
   final ValueChanged<CommandBarChoice> onChoose;
@@ -122,7 +129,37 @@ class _CommandBarViewState extends State<CommandBarView> {
   _BarLayout _layout = _BarLayout.empty;
 
   @override
+  void initState() {
+    super.initState();
+    widget.refresh?.addListener(_onSourceChanged);
+  }
+
+  @override
+  void didUpdateWidget(CommandBarView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refresh != widget.refresh) {
+      oldWidget.refresh?.removeListener(_onSourceChanged);
+      widget.refresh?.addListener(_onSourceChanged);
+    }
+  }
+
+  /// Rebuilds for new entries. A source may change during a build (a screen
+  /// publishing its commands), so the rebuild then waits for the next frame.
+  void _onSourceChanged() {
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+      return;
+    }
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    widget.refresh?.removeListener(_onSourceChanged);
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
@@ -239,7 +276,10 @@ class _CommandBarViewState extends State<CommandBarView> {
         key == LogicalKeyboardKey.numpadEnter) {
       // Holding Enter must not run a command again and again.
       if (event is KeyRepeatEvent) return KeyEventResult.handled;
-      _chooseItem(_effectiveHighlight, secondary: keyboard.isShiftPressed);
+      _chooseItem(
+        _effectiveHighlight,
+        secondary: keyboard.isShiftPressed || hasCommandModifier,
+      );
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.backspace &&
@@ -299,6 +339,10 @@ class _CommandBarViewState extends State<CommandBarView> {
     final titles = <String, String>{
       for (final section in widget.sections) section.id: section.title,
     };
+    final limits = <String, int>{
+      for (final section in widget.sections)
+        if (section.limit case final limit?) section.id: limit,
+    };
     final order = <String>[
       for (final section in widget.sections) section.id,
       for (final entry in matches)
@@ -312,8 +356,9 @@ class _CommandBarViewState extends State<CommandBarView> {
           if (entry.section == sectionId) entry,
       ];
       if (section.isEmpty) continue;
+      final limit = query.filter == null ? limits[sectionId] : null;
       rows.add(_HeaderRow(titles[sectionId] ?? sectionId));
-      section.forEach(addItem);
+      (limit == null ? section : section.take(limit)).forEach(addItem);
     }
     return _BarLayout(rows: rows, items: items, rowOfItem: rowOfItem);
   }
@@ -443,7 +488,10 @@ class _CommandBarViewState extends State<CommandBarView> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _FooterHint(keys: const ['↑', '↓'], label: strings.navigate),
-                  _FooterHint(keys: const ['Enter'], label: strings.open),
+                  _FooterHint(
+                    keys: const ['Enter'],
+                    label: highlighted?.primaryLabel ?? strings.open,
+                  ),
                   if (highlighted != null && highlighted.hasSecondary)
                     _FooterHint(
                       keys: const ['Shift', 'Enter'],
@@ -522,7 +570,13 @@ class CommandBarTile extends StatelessWidget {
     // A disabled row explains why in its second line; otherwise the subtitle.
     final secondLine = disabled ? entry.disabledReason : entry.subtitle;
     final trailingLabel = this.trailingLabel;
-    final spoken = [entry.label, ?secondLine, ?trailingLabel].join(', ');
+    final badge = entry.badge;
+    final spoken = [
+      entry.label,
+      ?badge,
+      ?secondLine,
+      ?trailingLabel,
+    ].join(', ');
     final iconColor = disabled
         ? style.mutedColor
         : highlighted
@@ -570,18 +624,28 @@ class CommandBarTile extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          entry.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: disabled
-                                ? style.mutedColor
-                                : style.textColor,
-                            fontWeight: highlighted
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                entry.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: disabled
+                                      ? style.mutedColor
+                                      : style.textColor,
+                                  fontWeight: highlighted
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (badge != null) ...[
+                              const SizedBox(width: 8),
+                              _Badge(badge),
+                            ],
+                          ],
                         ),
                         if (secondLine != null)
                           Text(
@@ -622,6 +686,31 @@ class CommandBarTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CommandBarThemeData.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: style.borderColor),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: style.mutedColor),
       ),
     );
   }

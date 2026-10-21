@@ -21,14 +21,16 @@ List<String> commandBarHotkeyKeys() => [commandBarPrimaryModifierLabel(), 'K'];
 /// chose, once the dialog is gone, or null when it was closed.
 ///
 /// Use it for a bar whose entries come from elsewhere; [CommandBarScope] calls
-/// it for the in-app bar. [onRoute] receives the dialog route, so the caller
-/// can close it.
+/// it for the in-app bar. [refresh] rebuilds the list when [source] changes
+/// while open. [onRoute] receives the dialog route, so the caller can close
+/// it.
 Future<CommandBarChoice?> showCommandBar(
   BuildContext context, {
   required CommandBarSource source,
   List<CommandBarSection> sections = const <CommandBarSection>[],
   List<CommandBarFilter> filters = const <CommandBarFilter>[],
   CommandBarStrings strings = CommandBarStrings.en,
+  Listenable? refresh,
   ValueChanged<Route<CommandBarChoice>>? onRoute,
 }) {
   final style = CommandBarThemeData.of(context);
@@ -55,6 +57,7 @@ Future<CommandBarChoice?> showCommandBar(
       sections: sections,
       filters: filters,
       strings: strings,
+      refresh: refresh,
       onChoose: finish,
       onClose: finish,
     ),
@@ -70,7 +73,7 @@ Future<CommandBarChoice?> showCommandBar(
 ///
 /// Each [CommandBarContribution] owns one entry, so a screen that unmounts
 /// takes its commands with it. A publish can happen during a build: listeners
-/// must not rebuild synchronously.
+/// must not rebuild synchronously (the open bar waits for the next frame).
 class CommandBarRegistry extends ChangeNotifier {
   final Map<Object, _Contribution> _byOwner = <Object, _Contribution>{};
 
@@ -160,6 +163,7 @@ class CommandBarScope extends StatefulWidget {
     this.recents,
     this.hotkey = true,
     this.onError,
+    this.refresh,
   });
 
   /// App-wide commands, built with the scope's context.
@@ -186,6 +190,11 @@ class CommandBarScope extends StatefulWidget {
   /// Receives a command or recents failure. Reported to [FlutterError] when
   /// null.
   final void Function(Object error, StackTrace stackTrace)? onError;
+
+  /// Notifies when [commands] would return something new while the bar is
+  /// open, such as items loaded after opening. Contributions refresh it
+  /// on their own.
+  final Listenable? refresh;
 
   /// The controller of the nearest scope, or null when there is none.
   static CommandBarController? maybeOf(BuildContext context) => context
@@ -286,6 +295,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
       sections: widget.sections,
       filters: widget.filters,
       strings: widget.strings,
+      refresh: Listenable.merge([registry, ?widget.refresh]),
       onRoute: (route) => _route = route,
     );
     _route = null;
@@ -434,11 +444,13 @@ class _CommandBarDialog extends StatelessWidget {
     required this.sections,
     required this.filters,
     required this.strings,
+    required this.refresh,
     required this.onChoose,
     required this.onClose,
   });
 
   final CommandBarSource source;
+  final Listenable? refresh;
   final List<CommandBarSection> sections;
   final List<CommandBarFilter> filters;
   final CommandBarStrings strings;
@@ -479,6 +491,7 @@ class _CommandBarDialog extends StatelessWidget {
                 sections: sections,
                 filters: filters,
                 strings: strings,
+                refresh: refresh,
                 onChoose: onChoose,
                 onClose: onClose,
               ),

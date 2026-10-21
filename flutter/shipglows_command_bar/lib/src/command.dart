@@ -28,6 +28,8 @@ class CommandBarEntry {
     this.secondaryLabel,
     this.hasSecondary = false,
     this.searchOnly = false,
+    this.primaryLabel,
+    this.badge,
   });
 
   /// Restores an entry from [json], as produced by [toJson].
@@ -61,6 +63,8 @@ class CommandBarEntry {
       secondaryLabel: _optionalString(json['secondaryLabel']),
       hasSecondary: json['hasSecondary'] == true,
       searchOnly: json['searchOnly'] == true,
+      primaryLabel: _optionalString(json['primaryLabel']),
+      badge: _optionalString(json['badge']),
     );
   }
 
@@ -109,6 +113,14 @@ class CommandBarEntry {
   /// of items (songs, notes) never buries the commands. Recents still show it.
   final bool searchOnly;
 
+  /// What Enter does on this row (« Paste », « Run »), shown in the footer.
+  /// The bar's generic « open » when null.
+  final String? primaryLabel;
+
+  /// Short state shown in a muted pill after the label and read aloud, such
+  /// as « Asleep » or a snippet trigger.
+  final String? badge;
+
   /// JSON-safe map with the same keys [CommandBarEntry.fromJson] reads.
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -124,6 +136,8 @@ class CommandBarEntry {
     'secondaryLabel': secondaryLabel,
     'hasSecondary': hasSecondary,
     'searchOnly': searchOnly,
+    'primaryLabel': primaryLabel,
+    'badge': badge,
   };
 
   @override
@@ -141,7 +155,9 @@ class CommandBarEntry {
       other.disabledReason == disabledReason &&
       other.secondaryLabel == secondaryLabel &&
       other.hasSecondary == hasSecondary &&
-      other.searchOnly == searchOnly;
+      other.searchOnly == searchOnly &&
+      other.primaryLabel == primaryLabel &&
+      other.badge == badge;
 
   @override
   int get hashCode => Object.hash(
@@ -158,6 +174,8 @@ class CommandBarEntry {
     secondaryLabel,
     hasSecondary,
     searchOnly,
+    primaryLabel,
+    badge,
   );
 }
 
@@ -179,6 +197,8 @@ class CommandBarCommand {
     this.secondaryLabel,
     this.runSecondary,
     this.searchOnly = false,
+    this.primaryLabel,
+    this.badge,
   });
 
   /// See [CommandBarEntry.id].
@@ -217,11 +237,18 @@ class CommandBarCommand {
   /// See [CommandBarEntry.secondaryLabel].
   final String? secondaryLabel;
 
-  /// Secondary action, run with Shift+Enter. Null when there is none.
+  /// Secondary action, run with Shift+Enter or Ctrl/⌘+Enter. Null when there
+  /// is none.
   final CommandBarRun? runSecondary;
 
   /// See [CommandBarEntry.searchOnly].
   final bool searchOnly;
+
+  /// See [CommandBarEntry.primaryLabel].
+  final String? primaryLabel;
+
+  /// See [CommandBarEntry.badge].
+  final String? badge;
 
   /// Display data of this command, without its callbacks.
   CommandBarEntry get entry => CommandBarEntry(
@@ -238,6 +265,8 @@ class CommandBarCommand {
     secondaryLabel: secondaryLabel,
     hasSecondary: runSecondary != null && secondaryLabel != null,
     searchOnly: searchOnly,
+    primaryLabel: primaryLabel,
+    badge: badge,
   );
 }
 
@@ -245,13 +274,18 @@ class CommandBarCommand {
 /// them; entries of an unknown section come last, titled by their id.
 @immutable
 class CommandBarSection {
-  const CommandBarSection({required this.id, required this.title});
+  const CommandBarSection({required this.id, required this.title, this.limit});
 
   /// Value of [CommandBarEntry.section] listed under this title.
   final String id;
 
   /// Localized title.
   final String title;
+
+  /// Most rows the section shows while no [CommandBarFilter] is active, best
+  /// matches first. Filtering on the category lists them all; recents are
+  /// never cut. No limit when null.
+  final int? limit;
 }
 
 /// Restricts the bar to one category when the query starts with [prefix] and

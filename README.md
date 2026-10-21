@@ -32,8 +32,13 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   `CallbackCommandBarRecents`).
 - One-letter filters (`CommandBarFilter`): `n idea` becomes a « Notes » chip;
   Backspace on an empty field removes it.
-- Keys: ↑/↓, Enter, Shift+Enter (secondary action, also on disabled rows),
-  Ctrl/⌘+1…9 (hidden under 600 px), Esc (filter first, then close).
+- Keys: ↑/↓, Enter, Shift+Enter or Ctrl/⌘+Enter (secondary action, also on
+  disabled rows), Ctrl/⌘+1…9 (hidden under 600 px), Esc (filter first, then
+  close). `primaryLabel` names what Enter does on a row in the footer.
+- Rows: `badge` shows a short state in a pill after the label;
+  `CommandBarSection.limit` caps a section while no filter is active.
+- Entries loaded after opening: pass a `refresh` listenable (scope,
+  `showCommandBar`, `CommandBarView`); contributions refresh on their own.
 - Texts: `CommandBarStrings.en`, `.fr`, or the app's own.
 - Look: `CommandBarThemeData` theme extension, every value falls back on the
   `ColorScheme`; `keycapBuilder` for app-drawn keycaps.
