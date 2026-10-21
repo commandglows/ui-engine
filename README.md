@@ -142,6 +142,10 @@ own Flutter engine in its own window.
   `%APPDATA%\<appFolder>\overlay_windows.json`, clamped to the screen;
   per-monitor DPI.
 - Windows 11 rounded corners, border color and shadow (DWM).
+- Alt+F4 and a plain Escape ask the overlay to close (`onRequestClose`,
+  default: hide), whichever window holds the keyboard; `closeOnEscape = false`
+  for an overlay with its own Escape handling. A dialog or menu above the
+  first route keeps Escape.
 
 ```dart
 // Main engine

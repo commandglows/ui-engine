@@ -67,6 +67,9 @@ class OverlayWindowImpl : public OverlayWindow {
   void StartPresentation();
   void Reveal(int64_t generation);
   void HideWindow(bool restore_focus);
+  // Alt+F4, Escape or the system close command: the overlay decides once it
+  // is ready, otherwise the window just hides.
+  void RequestClose();
   void SaveBounds(bool size_changed);
   void StartResize(const std::string& edge);
   void ResetSize();

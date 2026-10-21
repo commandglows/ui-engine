@@ -340,6 +340,14 @@ void OverlayWindowImpl::Reveal(int64_t generation) {
 
 void OverlayWindowImpl::Hide() { HideWindow(true); }
 
+void OverlayWindowImpl::RequestClose() {
+  if (ready_) {
+    InvokeHost("requestClose", nullptr);
+  } else {
+    Hide();
+  }
+}
+
 void OverlayWindowImpl::HideWindow(bool restore_focus) {
   if (!window_) return;
   if (!visible_ && !reveal_pending_ && !IsWindowVisible(window_)) return;
@@ -799,14 +807,23 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
       }
       return flutter_result ? *flutter_result : 0;
     }
+    case WM_KEYDOWN:
+      // A plain Escape closes like Alt+F4. It reaches the frame only while
+      // the frame itself holds the keyboard (before the view took it, or
+      // after Windows gave it back): the view handles its own keys through
+      // ShipglowsOverlayHost.
+      if (wparam == VK_ESCAPE && !(lparam & (1 << 30)) &&
+          !(GetKeyState(VK_CONTROL) & 0x8000) &&
+          !(GetKeyState(VK_SHIFT) & 0x8000) &&
+          !(GetKeyState(VK_MENU) & 0x8000)) {
+        RequestClose();
+        return 0;
+      }
+      break;
     case WM_CLOSE:
       // Alt+F4: the overlay decides (it may confirm); it stays alive for the
       // next opening.
-      if (ready_) {
-        InvokeHost("requestClose", nullptr);
-      } else {
-        Hide();
-      }
+      RequestClose();
       return 0;
     default:
       if (message == kRevealMessage) {

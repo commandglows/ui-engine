@@ -48,14 +48,22 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   /// Called after the overlay was hidden.
   VoidCallback? onHide;
 
-  /// Alt+F4 or the system close command. By default the overlay hides; set
-  /// this to confirm first, then call [hide].
+  /// Alt+F4, a plain Escape (see [closeOnEscape]) or the system close
+  /// command. By default the overlay hides; set this to confirm first, then
+  /// call [hide].
   FutureOr<void> Function()? onRequestClose;
+
+  /// Whether a plain Escape (no modifier) closes the overlay like Alt+F4,
+  /// through [requestClose]. A dialog or menu open above the overlay's
+  /// first route keeps Escape for itself. Overlays with their own Escape
+  /// handling set this to false before [ready].
+  bool closeOnEscape = true;
 
   String? _id;
   bool _resizable = false;
   bool _doubleClickMaximizes = false;
   bool _visible = false;
+  bool _listeningKeys = false;
 
   /// Id of the overlay, once [ready] completed.
   String? get id => _id;
@@ -75,6 +83,10 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   /// Tells the window this engine can draw. Call once, after `runApp`.
   Future<void> ready() async {
     _channel.setMethodCallHandler(_handle);
+    if (!_listeningKeys) {
+      _listeningKeys = true;
+      HardwareKeyboard.instance.addHandler(_handleKey);
+    }
     final info = await _call<Map<Object?, Object?>>('ready');
     if (info == null) return;
     _id = info['id'] as String?;
@@ -85,6 +97,42 @@ class ShipglowsOverlayHost extends ChangeNotifier {
 
   /// Hides the overlay; focus goes back to the window in front before it.
   Future<void> hide() => _call<void>('hide');
+
+  /// Closes as Alt+F4 does: [onRequestClose] decides, else [hide].
+  Future<void> requestClose() async {
+    final handler = onRequestClose;
+    if (handler == null) {
+      await hide();
+    } else {
+      await handler();
+    }
+  }
+
+  // Keyboard handlers run whatever has focus, so Escape also works while
+  // nothing in the overlay is focused (Flutter parks the focus on the root
+  // scope after the window lost and regained it).
+  bool _handleKey(KeyEvent event) {
+    if (!closeOnEscape ||
+        !_visible ||
+        event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.escape) {
+      return false;
+    }
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isControlPressed ||
+        keyboard.isShiftPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isMetaPressed) {
+      return false;
+    }
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context != null && context.mounted) {
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isFirst) return false;
+    }
+    unawaited(requestClose());
+    return true;
+  }
 
   /// Sends a message to [ShipglowsOverlayWindow.messages] in the app.
   Future<void> send(String method, [Object? arguments]) =>
@@ -124,12 +172,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
           _messages.add(ShipglowsOverlayMessage(method, arguments['arguments']));
         }
       case 'requestClose':
-        final handler = onRequestClose;
-        if (handler == null) {
-          await hide();
-        } else {
-          await handler();
-        }
+        await requestClose();
     }
     return null;
   }
