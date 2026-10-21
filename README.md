@@ -125,3 +125,46 @@ FlutterZoomViewport(
 ```
 
 Each app passes its own brand tokens through `ShipglowsTitleBarStyle`.
+
+## `flutter/shipglows_overlay_window`
+
+Independent desktop overlay windows (Windows; no-op elsewhere): each runs its
+own Flutter engine in its own window.
+
+- Always on top by default (`alwaysOnTop`), taskbar button optional.
+- Showing it never shows, raises or activates the main window; focus goes
+  back to the previous window when it hides.
+- Revealed only after Dart has drawn the data passed to `show`.
+- Drag to move; edges resize (`resizable`); double-click on an edge restores
+  the default size; double-click on the drag area maximizes
+  (`doubleClickMaximizes`).
+- Position and size remembered (`sizeMemory`: none, session, persistent) in
+  `%APPDATA%\<appFolder>\overlay_windows.json`, clamped to the screen;
+  per-monitor DPI.
+- Windows 11 rounded corners, border color and shadow (DWM).
+
+```dart
+// Main engine
+final palette = ShipglowsOverlayWindow(
+  id: 'palette',
+  entrypoint: 'paletteOverlayMain',
+  options: const ShipglowsOverlayOptions(appFolder: 'MyApp'),
+);
+await palette.show(data: {'query': ''});
+palette.messages.listen((message) { /* from the overlay */ });
+
+// Overlay engine
+@pragma('vm:entry-point')
+void paletteOverlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  ShipglowsOverlayHost.instance.onShow = (data) { /* load data */ };
+  runApp(const ShipglowsOverlayFrame(child: PaletteApp()));
+  ShipglowsOverlayHost.instance.ready();
+}
+```
+
+Overlay engines register no plugin unless the runner calls
+`ShipglowsOverlayWindowSetPluginRegistrant`. Runners can also create an
+overlay natively (`ShipglowsOverlayWindowCreate`, see
+`windows/include/shipglows_overlay_window/overlay_window.h`), with a message
+hook for native content and their own position store.
