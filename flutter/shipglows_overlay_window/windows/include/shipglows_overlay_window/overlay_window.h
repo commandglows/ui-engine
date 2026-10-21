@@ -90,8 +90,11 @@ struct OverlayConfig {
   std::function<void(POINT)> save_position;
 
   // Runner extension points. |on_created| runs once the window and its
-  // engine exist, before any message from Dart. |message_hook| sees every
-  // message of the top-level window first; returning a value consumes it.
+  // engine exist, before any message from Dart. |message_hook| sees the
+  // messages of the top-level window before the overlay's own handling;
+  // returning a value consumes it. The borderless frame messages
+  // (WM_NCCALCSIZE, WM_NCACTIVATE, WM_NCPAINT, caption repaints, WM_SETTEXT,
+  // WM_SETICON) are handled before it and never reach it.
   std::function<void(HWND window)> on_created;
   std::function<std::optional<LRESULT>(HWND, UINT, WPARAM, LPARAM)>
       message_hook;

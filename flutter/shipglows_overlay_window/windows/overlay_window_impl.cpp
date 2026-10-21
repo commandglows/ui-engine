@@ -22,6 +22,12 @@ constexpr char kHostChannel[] = "shipglows_overlay_window/host";
 constexpr UINT kRevealMessage = WM_APP + 0x2F0;
 // Resource ID of the app icon in Flutter's Windows runner template.
 constexpr int kAppIconResource = 101;
+// Undocumented: the visual-styles engine sends these to repaint the caption
+// and frame (on activation changes, caption hover, text or icon changes).
+// DefWindowProc paints them with GDI straight into the window, over a client
+// area that covers the whole window here.
+constexpr UINT kNcUahDrawCaption = 0x00AE;
+constexpr UINT kNcUahDrawFrame = 0x00AF;
 
 std::set<std::string>& ReservedIds() {
   static std::set<std::string> ids;
@@ -664,17 +670,13 @@ LRESULT CALLBACK OverlayWindowImpl::WndProc(HWND hwnd, UINT message,
   return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
-LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
-                                         WPARAM wparam, LPARAM lparam) {
-  if (config_.message_hook) {
-    if (const auto handled =
-            config_.message_hook(hwnd, message, wparam, lparam)) {
-      return *handled;
-    }
-  }
+std::optional<LRESULT> OverlayWindowImpl::HandleFrameMessage(HWND hwnd,
+                                                             UINT message,
+                                                             WPARAM wparam,
+                                                             LPARAM lparam) {
   switch (message) {
     case WM_NCCALCSIZE:
-      if (!wparam) break;
+      if (!wparam) return std::nullopt;
       // Borderless. Maximized, Windows places the frame outside the monitor:
       // keep the content inside.
       if (IsZoomed(hwnd)) {
@@ -690,9 +692,41 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
       }
       return 0;
     case WM_NCACTIVATE:
+      // -1: record the state change without repainting the caption.
       return DefWindowProcW(hwnd, message, wparam, -1);
     case WM_NCPAINT:
+    case kNcUahDrawCaption:
+    case kNcUahDrawFrame:
       return 0;
+    case WM_SETTEXT:
+    case WM_SETICON: {
+      // The default handling stores the text or icon, then paints the
+      // caption: hide the window from it for the call.
+      const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+      if (!(style & WS_VISIBLE)) return std::nullopt;
+      SetWindowLongPtrW(hwnd, GWL_STYLE, style & ~WS_VISIBLE);
+      const LRESULT result = DefWindowProcW(hwnd, message, wparam, lparam);
+      SetWindowLongPtrW(hwnd, GWL_STYLE, style);
+      return result;
+    }
+  }
+  return std::nullopt;
+}
+
+LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
+                                         WPARAM wparam, LPARAM lparam) {
+  // The borderless frame comes first: a host hook can neither replace it nor
+  // send these messages on to DefWindowProc.
+  if (const auto handled = HandleFrameMessage(hwnd, message, wparam, lparam)) {
+    return *handled;
+  }
+  if (config_.message_hook) {
+    if (const auto handled =
+            config_.message_hook(hwnd, message, wparam, lparam)) {
+      return *handled;
+    }
+  }
+  switch (message) {
     case WM_NCLBUTTONDBLCLK:
       if (!config_.double_click_maximizes) return 0;
       break;

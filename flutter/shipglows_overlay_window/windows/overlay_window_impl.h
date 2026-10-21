@@ -47,6 +47,9 @@ class OverlayWindowImpl : public OverlayWindow {
                                   LPARAM lparam) noexcept;
   LRESULT HandleMessage(HWND hwnd, UINT message, WPARAM wparam,
                         LPARAM lparam);
+  // Keeps the window borderless; runs before |message_hook|.
+  std::optional<LRESULT> HandleFrameMessage(HWND hwnd, UINT message,
+                                            WPARAM wparam, LPARAM lparam);
   bool CreateOverlay();
   void DestroyOverlay();
   void HandleHostCall(
