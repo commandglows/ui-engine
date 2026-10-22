@@ -23,6 +23,12 @@ class CommandBarStrings {
     this.shortcutsPage = 'On this page',
     this.shortcutsEverywhere = 'Everywhere',
     this.shortcutsClose = 'Close',
+    this.shortcutsSearchHint = 'Search shortcuts',
+    this.shortcutsNoMatch = 'No matching shortcut',
+    this.shortcutsOr = 'or',
+    this.shortcutsThen = 'then',
+    this.shortcutsTypingNote =
+        'Shortcuts without Ctrl or Alt pause while you type in a field.',
   });
 
   /// English texts.
@@ -61,6 +67,13 @@ class CommandBarStrings {
     shortcutsPage: 'Sur cette page',
     shortcutsEverywhere: 'Partout',
     shortcutsClose: 'Fermer',
+    shortcutsSearchHint: 'Rechercher un raccourci',
+    shortcutsNoMatch: 'Aucun raccourci ne correspond',
+    shortcutsOr: 'ou',
+    shortcutsThen: 'puis',
+    shortcutsTypingNote:
+        'Les raccourcis sans Ctrl ni Alt sont en pause pendant la saisie '
+        'dans un champ.',
   );
 
   /// Accessible name of the dialog.
@@ -117,6 +130,21 @@ class CommandBarStrings {
   /// Shortcuts sheet: close button.
   final String shortcutsClose;
 
+  /// Shortcuts sheet: placeholder of the search field.
+  final String shortcutsSearchHint;
+
+  /// Shortcuts sheet: shown when the search matches nothing.
+  final String shortcutsNoMatch;
+
+  /// Shortcuts sheet: word between alternatives (`Ctrl+Z` or `Ctrl+Y`).
+  final String shortcutsOr;
+
+  /// Shortcuts sheet: word between the keys of a sequence (`G` then `F`).
+  final String shortcutsThen;
+
+  /// Shortcuts sheet: note under the list.
+  final String shortcutsTypingNote;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -137,6 +165,11 @@ class CommandBarStrings {
     String? shortcutsPage,
     String? shortcutsEverywhere,
     String? shortcutsClose,
+    String? shortcutsSearchHint,
+    String? shortcutsNoMatch,
+    String? shortcutsOr,
+    String? shortcutsThen,
+    String? shortcutsTypingNote,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -156,5 +189,10 @@ class CommandBarStrings {
     shortcutsPage: shortcutsPage ?? this.shortcutsPage,
     shortcutsEverywhere: shortcutsEverywhere ?? this.shortcutsEverywhere,
     shortcutsClose: shortcutsClose ?? this.shortcutsClose,
+    shortcutsSearchHint: shortcutsSearchHint ?? this.shortcutsSearchHint,
+    shortcutsNoMatch: shortcutsNoMatch ?? this.shortcutsNoMatch,
+    shortcutsOr: shortcutsOr ?? this.shortcutsOr,
+    shortcutsThen: shortcutsThen ?? this.shortcutsThen,
+    shortcutsTypingNote: shortcutsTypingNote ?? this.shortcutsTypingNote,
   );
 }

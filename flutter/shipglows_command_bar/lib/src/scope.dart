@@ -292,7 +292,8 @@ class CommandBarScope extends StatefulWidget {
   final CommandBarOpener? opener;
 
   /// App-wide keys that are not commands (Space plays or pauses), listed
-  /// last in the shortcuts sheet. Screens add theirs with
+  /// last in the shortcuts sheet; their [CommandBarShortcutHint.bindings] run
+  /// while nothing covers the scope. Screens add theirs with
   /// [CommandBarShortcuts].
   final List<CommandBarShortcutGroup> Function(BuildContext context)?
   shortcuts;
@@ -358,7 +359,18 @@ class _CommandBarScopeState extends State<CommandBarScope>
   }
 
   bool _onKey(KeyEvent event) {
-    if (!mounted || event is! KeyDownEvent) return false;
+    if (!mounted) return false;
+    if (event is KeyDownEvent && _onBarKey(event)) return true;
+    // App-wide bindings ([shortcuts]), while nothing covers the app.
+    final shortcuts = widget.shortcuts;
+    if (shortcuts == null || !(ModalRoute.of(context)?.isCurrent ?? true)) {
+      return false;
+    }
+    return runCommandBarShortcutBindings(shortcuts(context), event);
+  }
+
+  /// The sheet's keys and Ctrl/⌘+K.
+  bool _onBarKey(KeyDownEvent event) {
     if (_isShortcutsKey(event)) {
       if (_shortcutsRoute != null) {
         _closeShortcuts();
@@ -402,9 +414,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
     // « ? » is text in a field.
     return widget.shortcutsOnQuestionMark &&
         event.character == '?' &&
-        FocusManager.instance.primaryFocus?.context
-                ?.findAncestorWidgetOfExactType<EditableText>() ==
-            null;
+        !commandBarIsTyping();
   }
 
   List<String> get _shortcutsKeys => [
@@ -437,18 +447,32 @@ class _CommandBarScopeState extends State<CommandBarScope>
     ];
   }
 
+  /// Order of the sheet: the screen's commands and keys, the bar's own keys
+  /// with the app-wide commands of no known section, one group per section
+  /// of the bar, then the scope's [CommandBarScope.shortcuts].
   @override
   List<CommandBarShortcutGroup> shortcutGroups() {
-    CommandBarShortcutHint? hintOf(CommandBarCommand command) =>
-        command.shortcuts.isEmpty
-        ? null
-        : CommandBarShortcutHint(
-            shortcuts: command.shortcuts,
-            label: command.label,
-          );
+    final sections = {
+      for (final section in widget.sections) section.id: section,
+    };
+    CommandBarShortcutHint? hintOf(CommandBarCommand command) {
+      if (command.shortcuts.isEmpty) return null;
+      final template = sections[command.section]?.shortcutLabel;
+      return CommandBarShortcutHint(
+        shortcuts: command.shortcuts,
+        label: template == null
+            ? command.label
+            : template.replaceAll('{label}', command.label),
+      );
+    }
+
     final strings = widget.strings;
     final page = registry.commands;
     final pageIds = {for (final command in page) command.id};
+    final appWide = [
+      for (final command in widget.commands(context))
+        if (!pageIds.contains(command.id)) command,
+    ];
     final groups = [
       CommandBarShortcutGroup(
         title: strings.shortcutsPage,
@@ -468,10 +492,18 @@ class _CommandBarScopeState extends State<CommandBarScope>
               shortcuts: _shortcutsKeys,
               label: strings.shortcutsTitle,
             ),
-          for (final command in widget.commands(context))
-            if (!pageIds.contains(command.id)) ?hintOf(command),
+          for (final command in appWide)
+            if (!sections.containsKey(command.section)) ?hintOf(command),
         ],
       ),
+      for (final section in widget.sections)
+        CommandBarShortcutGroup(
+          title: section.title,
+          hints: [
+            for (final command in appWide)
+              if (command.section == section.id) ?hintOf(command),
+          ],
+        ),
       ...?widget.shortcuts?.call(context),
     ];
     return [

@@ -74,25 +74,45 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 - Shortcuts sheet, built from the same registry, so it follows the current
   screen and teaches its keys: « On this page » (the contributed commands
   that have `shortcuts`), the screen's other keys (`CommandBarShortcuts`
-  around it, groups of `CommandBarShortcutHint`), then « Everywhere »
-  (Ctrl/⌘+K, the sheet's own keys, app-wide commands) and the scope's
-  `shortcuts:` groups (Space plays or pauses). Opened with
-  `CommandBarController.showShortcuts()`, F1 (`shortcutsOnF1`) or « ? »
-  outside text fields (`shortcutsOnQuestionMark`), both off by default;
-  `shortcutsCommandSection` adds a « Keyboard shortcuts » entry to the bar.
-  With a floating bar, list `commandBarShortcutsCommandId` as an entry that
-  brings the main window forward and call `showShortcuts()` when chosen.
-  `showCommandBarShortcuts` shows a list built elsewhere.
+  around it, groups of `CommandBarShortcutHint`), « Everywhere » (Ctrl/⌘+K,
+  the sheet's own keys), one group per bar section for the app-wide
+  commands (`CommandBarSection.shortcutLabel: 'Aller à {label}'` renames
+  them), then the scope's `shortcuts:` groups (Space plays or pauses).
+  - One declaration for the key and its row: a hint's `bindings`
+    (`ShortcutActivator` → callback) run while its screen is on top (or the
+    scope, for `shortcuts:`), so the sheet cannot drift from the keys.
+    Bindings without Ctrl, Alt or Meta pause while a text field has focus
+    (`commandBarIsTyping`), which the sheet's footer says.
+  - Search field (accents folded, keys and notes included) and an empty
+    state; « or » between alternatives, « then » inside a sequence (`G N`).
+  - `keysText` for what is not a key (« Glisser-déposer », « Q S D F… »),
+    `note` for muted words after the keys (« dans la bibliothèque »).
+  - Opened with `CommandBarController.showShortcuts()`, F1
+    (`shortcutsOnF1`) or « ? » outside text fields
+    (`shortcutsOnQuestionMark`), both off by default;
+    `shortcutsCommandSection` adds a « Keyboard shortcuts » entry to the bar.
+    With a floating bar, list `commandBarShortcutsCommandId` as an entry that
+    brings the main window forward and call `showShortcuts()` when chosen.
+    `showCommandBarShortcuts` shows a list built elsewhere.
 
 ```dart
 CommandBarScope(
   commands: appCommands,
   strings: CommandBarStrings.fr,
+  sections: const [
+    CommandBarSection(id: 'screens', title: 'Navigation', shortcutLabel: 'Aller à {label}'),
+    CommandBarSection(id: 'actions', title: 'Actions'),
+  ],
   shortcutsOnF1: true,
   shortcutsCommandSection: 'actions',
   shortcuts: (context) => [
     CommandBarShortcutGroup(title: 'Lecture', hints: [
-      CommandBarShortcutHint(shortcuts: ['Space'], label: 'Lecture ou pause'),
+      CommandBarShortcutHint(
+        shortcuts: ['Space'],
+        label: 'Lecture ou pause',
+        bindings: {const SingleActivator(LogicalKeyboardKey.space): player.toggle},
+      ),
+      const CommandBarShortcutHint(keysText: 'Glisser-déposer', label: 'Importer des fichiers'),
     ]),
   ],
   child: shell,
@@ -102,8 +122,19 @@ CommandBarScope(
 CommandBarShortcuts(
   groups: [
     CommandBarShortcutGroup(title: 'Écoute et tablature', hints: [
-      CommandBarShortcutHint(shortcuts: ['Ctrl+←', 'Ctrl+→'], label: 'Reculer ou avancer de 5 secondes'),
-      CommandBarShortcutHint(shortcuts: ['[', ']'], label: 'Poser le début (A) ou la fin (B) de la boucle'),
+      CommandBarShortcutHint(
+        shortcuts: ['Ctrl+←', 'Ctrl+→'],
+        label: 'Reculer ou avancer de 5 secondes',
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): () => seek(-5),
+          const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): () => seek(5),
+        },
+      ),
+      CommandBarShortcutHint(
+        shortcuts: ['['],
+        label: 'Poser le début (A) de la boucle',
+        bindings: {const CharacterActivator('['): loop.setStart},
+      ),
     ]),
   ],
   child: CommandBarContribution(commands: screenCommands, child: screen),

@@ -274,7 +274,12 @@ class CommandBarCommand {
 /// them; entries of an unknown section come last, titled by their id.
 @immutable
 class CommandBarSection {
-  const CommandBarSection({required this.id, required this.title, this.limit});
+  const CommandBarSection({
+    required this.id,
+    required this.title,
+    this.limit,
+    this.shortcutLabel,
+  });
 
   /// Value of [CommandBarEntry.section] listed under this title.
   final String id;
@@ -286,6 +291,11 @@ class CommandBarSection {
   /// matches first. Filtering on the category lists them all; recents are
   /// never cut. No limit when null.
   final int? limit;
+
+  /// How the shortcuts sheet names a command of this section, `{label}`
+  /// being its label: « Go to {label} » for screens. The label alone when
+  /// null.
+  final String? shortcutLabel;
 }
 
 /// Restricts the bar to one category when the query starts with [prefix] and
