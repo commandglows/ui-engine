@@ -125,7 +125,8 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     started_ = false;
     DetachSecondInstanceHandler(this);
     registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_id_);
-    channel_->SetMethodCallHandler(nullptr);
+    // No SetMethodCallHandler(nullptr): plugins go away with the engine,
+    // whose messenger is already released (access violation on quit).
   }
 
  private:
