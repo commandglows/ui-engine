@@ -1503,10 +1503,9 @@ class _FilterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = CommandBarThemeData.of(context);
-    final textTheme = Theme.of(context).textTheme;
     final prefix = this.prefix;
-    // One plain text, the prefix then the label; the active one stands out
-    // like the highlighted row.
+    // One keycap like the footer's, holding the prefix then the label; the
+    // active one is fully opaque, like the highlighted row's number.
     final button = Semantics(
       button: true,
       selected: selected,
@@ -1515,21 +1514,13 @@ class _FilterButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: selected ? style.highlightColor : null,
-              borderRadius: BorderRadius.circular(8),
-            ),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
             child: Opacity(
-              opacity: selected ? 1 : 0.6,
-              child: Text(
+              opacity: selected ? 1 : 0.5,
+              child: style.keycapBuilder(
+                context,
                 prefix == null ? label : '$prefix $label',
-                maxLines: 1,
-                style: textTheme.labelMedium?.copyWith(
-                  color: selected ? style.textColor : style.mutedColor,
-                  fontWeight: selected ? FontWeight.w600 : null,
-                ),
               ),
             ),
           ),
