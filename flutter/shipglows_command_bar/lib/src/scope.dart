@@ -141,15 +141,21 @@ bool _sameDisplay(List<CommandBarCommand> a, List<CommandBarCommand> b) {
   return true;
 }
 
+/// Opens a command bar that replaces the in-app one, such as a floating
+/// window. [toggle] is true for the hotkey: the bar closes when it is open.
+typedef CommandBarOpener = Future<void> Function({required bool toggle});
+
 /// Controls the command bar of the nearest [CommandBarScope].
 abstract interface class CommandBarController {
-  /// Whether the bar is open.
+  /// Whether the in-app bar is open; a bar shown by [CommandBarScope.opener]
+  /// does not count.
   bool get isOpen;
 
   /// Commands contributed by the mounted screens.
   CommandBarRegistry get registry;
 
-  /// Opens the bar, unless it is open already.
+  /// Opens the bar, unless it is open already. Asks the scope's
+  /// [CommandBarScope.opener] instead when it has one.
   Future<void> open();
 
   /// Closes the bar, if it is open.
@@ -164,7 +170,8 @@ abstract interface class CommandBarController {
 /// add their own through [CommandBarContribution].
 ///
 /// The hotkey works even while a text field has focus, and stays inactive
-/// while another dialog covers the scope.
+/// while another dialog covers the scope. With an [opener], the hotkey and
+/// [CommandBarController.open] go to it and the in-app bar never opens.
 class CommandBarScope extends StatefulWidget {
   const CommandBarScope({
     super.key,
@@ -181,6 +188,7 @@ class CommandBarScope extends StatefulWidget {
     this.expandable = false,
     this.sizeStore,
     this.behavior,
+    this.opener,
   });
 
   /// App-wide commands, built with the scope's context.
@@ -226,6 +234,13 @@ class CommandBarScope extends StatefulWidget {
   /// an app can follow its own settings. All off when null.
   final CommandBarBehavior Function(BuildContext context)? behavior;
 
+  /// Opens another bar in place of the in-app one (the floating window, for
+  /// instance), for Ctrl/⌘+K and every [CommandBarController.open]. Read at
+  /// each call, so it can be set after the first build; an open in-app bar
+  /// closes when it is set. The registry, the recents and the commands stay
+  /// the scope's. The in-app bar when null.
+  final CommandBarOpener? opener;
+
   /// The controller of the nearest scope, or null when there is none.
   static CommandBarController? maybeOf(BuildContext context) => context
       .getInheritedWidgetOfExactType<_CommandBarScopeMarker>()
@@ -264,6 +279,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
     } else {
       _browserGuard.remove();
     }
+    if (widget.opener != null) close();
   }
 
   @override
@@ -290,7 +306,8 @@ class _CommandBarScopeState extends State<CommandBarScope>
       return true;
     }
     if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
-    unawaited(open());
+    final opener = widget.opener;
+    unawaited(opener != null ? _ask(opener, toggle: true) : open());
     return true;
   }
 
@@ -320,6 +337,8 @@ class _CommandBarScopeState extends State<CommandBarScope>
   @override
   Future<void> open() async {
     if (isOpen || !mounted) return;
+    final opener = widget.opener;
+    if (opener != null) return _ask(opener, toggle: false);
     final choice = await showCommandBar(
       context,
       source: this,
@@ -346,6 +365,14 @@ class _CommandBarScopeState extends State<CommandBarScope>
       owner.pop();
     } else {
       owner.removeRoute(route);
+    }
+  }
+
+  Future<void> _ask(CommandBarOpener opener, {required bool toggle}) async {
+    try {
+      await opener(toggle: toggle);
+    } catch (error, stackTrace) {
+      _report(error, stackTrace);
     }
   }
 

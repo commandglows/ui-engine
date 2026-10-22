@@ -152,6 +152,13 @@ class ShipglowsCommandBarWindow {
     return open(previousForeground: previousForeground);
   }
 
+  /// Opens this bar in place of the in-app one:
+  /// `CommandBarScope(opener: bar.scopeOpener)`. The hotkey ([toggle]) closes
+  /// it when it is open.
+  Future<void> scopeOpener({required bool toggle}) async {
+    await (toggle ? this.toggle() : open());
+  }
+
   /// Closes the window and stops the bar's engine.
   Future<void> dispose() async {
     await _subscription.cancel();

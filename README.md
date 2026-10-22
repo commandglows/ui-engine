@@ -20,6 +20,11 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   fields), inactive while another dialog is open; commands run with the
   scope's context, so routing works from them. On the web it cancels the
   browser's own Ctrl/⌘+K (address bar search).
+- `opener` replaces the in-app bar by another one (the floating window):
+  Ctrl/⌘+K (as a toggle) and every `CommandBarController.open()` go to it,
+  so two bars never open together. The registry, recents and commands stay
+  the scope's. It is read at each call, so it can be set after the first
+  build (an open in-app bar then closes).
 - `CommandBarContribution` around a screen: its commands are listed under
   their section while it is mounted and its route is on top. A screen kept
   alive offstage (indexed stack tab) passes `isActive`.
@@ -236,6 +241,8 @@ on close. Escape and a click outside close it.
   or shadow of its own, so only that surface shows over the desktop; keep a
   margin in the surface for the shadow and as a drag handle.
 - Window options: `ShipglowsCommandBarWindow.defaultOptions(appFolder: …)`.
+- In-app bar replaced: `CommandBarScope(opener: bar.scopeOpener, …)`, so
+  Ctrl/⌘+K and the app's `open()` calls show only the floating bar.
 
 ```yaml
 dependencies:
