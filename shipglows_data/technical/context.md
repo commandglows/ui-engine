@@ -4,7 +4,7 @@ metadata_schema_version: "1.0"
 artifact_version: "1.0.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
-updated: "2026-10-22"
+updated: "2026-10-23"
 status: active
 source_skill: sg-docs
 scope: package-map
@@ -45,6 +45,7 @@ do nothing or fall back to plain Flutter.
 | `shipglows_diagnostics` | Crash net: `FlutterError.onError` + `PlatformDispatcher.onError` chained, masked event buffer, « Copier le diagnostic » report, optional `crash.log` (256 KB, `.1` rotation, engine label); Sentry stays in the app via `onReport` | no | BeatGlows |
 | `shipglows_settings` | Typed user settings (`SettingKey`, `SettingsSchema` + migrations), device-first `SettingsController`, per-field push, per-account device copies, retry with backoff, `SyncStatus`, `SettingsSyncChip`; remote and storage are ports | no | none yet |
 | `shipglows_settings_firestore` | `SettingsRemote` over one Firestore document per account (`users/{uid}/settings/profile`) | via plugin dep | none yet |
+| `shipglows_guide` | In-app guidance: tours across routes, coach marks on a `GuideTarget` (spotlight, « try it »), one-step tips, first-visit `GuideTrigger`, progress in a `GuideStore`, navigation through app or scope callbacks; extracted from the ContentGlows guided tour | no | ContentGlows (publish tour, legacy `inapp_tour_*` keys), ReplayGlows (Feed coach marks) |
 
 ## Cross-Package Contracts
 
