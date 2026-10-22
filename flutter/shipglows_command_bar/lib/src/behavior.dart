@@ -36,12 +36,13 @@ class CommandBarBehavior {
   /// that applies its filter.
   final bool tappablePrefixHints;
 
-  /// Whether the bar opens with the last search that led to a command, fully
+  /// Whether the bar opens with the last search typed, run or not, fully
   /// selected: typing replaces it, Enter runs it again.
   final bool restoreLastQuery;
 
-  /// Whether the searches that led to a command are listed under an empty
-  /// field, after the recent commands; choosing one puts it back in the field.
+  /// Whether the past searches are listed under an empty field (after the
+  /// recent commands) and under the restored last search (after its matches);
+  /// choosing one puts it back in the field.
   final bool showQueryHistory;
 
   @override

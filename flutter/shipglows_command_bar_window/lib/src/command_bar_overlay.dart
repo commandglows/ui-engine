@@ -135,7 +135,6 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
   bool _visible = false;
   int _session = 0;
   (bool, Color, Color)? _frame;
-  String? _usedQuery;
 
   /// Last snapshot received, null before the first one.
   ShipglowsCommandBarSnapshot? get snapshot => _snapshot;
@@ -187,9 +186,11 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
   /// Past searches the app published, most recent first.
   List<String> get queryHistory => _snapshot?.queryHistory ?? const <String>[];
 
-  /// Keeps the search that leads to the next [choose], for the app's
-  /// history. The bar calls it just before the choice.
-  void useQuery(String query) => _usedQuery = query;
+  /// Gives what was typed to the app, for its search history. The bar calls
+  /// it once per opening: before a choice, or when it closes.
+  void useQuery(String query) {
+    unawaited(host.send(queryMessage, <String, Object?>{'query': query}));
+  }
 
   /// Hides the bar, reports [choice] to the app and lets it run the entry.
   /// A disabled entry never runs; its secondary action runs if it has one.
@@ -201,8 +202,6 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
         break;
       }
     }
-    final query = _usedQuery;
-    _usedQuery = null;
     if (entry == null) return;
     final allowed = choice.secondary ? entry.hasSecondary : entry.enabled;
     if (!allowed) return;
@@ -215,7 +214,6 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
       'id': entry.id,
       'secondary': choice.secondary,
       'previousForeground': previous,
-      'query': ?query,
     });
   }
 
@@ -260,7 +258,6 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
 
   void _onShow(Object? data) {
     _apply(data);
-    _usedQuery = null;
     _visible = true;
     _session++;
     notifyListeners();

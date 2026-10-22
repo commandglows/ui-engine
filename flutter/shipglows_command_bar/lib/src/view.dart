@@ -38,8 +38,9 @@ class CommandBarChoice {
 ///
 /// With [CommandBarBehavior.restoreLastQuery] the field opens with the first
 /// of [queryHistory], selected; with [CommandBarBehavior.showQueryHistory]
-/// the past searches are listed under an empty field. [onQueryUsed] receives
-/// the search that led to each choice, so the owner can keep the history.
+/// the past searches are listed under an empty or restored field.
+/// [onQueryUsed] receives what was typed, once per opening (on a choice or
+/// when the bar closes), so the owner can keep the history.
 class CommandBarView extends StatefulWidget {
   const CommandBarView({
     super.key,
@@ -109,12 +110,13 @@ class CommandBarView extends StatefulWidget {
   /// as its content (a dialog).
   final bool fillHeight;
 
-  /// Past searches that led to a choice, most recent first, filter prefix
-  /// included (as passed to [onQueryUsed]).
+  /// Past searches, most recent first, filter prefix included (as passed to
+  /// [onQueryUsed]).
   final List<String> queryHistory;
 
   /// Called with the search, filter prefix included, when an entry is chosen
-  /// after typing words. Not called for a choice made from an empty field.
+  /// or the bar closes with words in the field. Not called for an empty
+  /// field.
   final ValueChanged<String>? onQueryUsed;
 
   /// The app's hotkey for the bar, which closes it too. Null when a native
@@ -198,13 +200,28 @@ class _CommandBarViewState extends State<CommandBarView> {
   /// Selection after the last click released on the search field.
   TextSelection? _selectionAfterClick;
 
+  /// Whether the field still holds the restored last search, untouched: the
+  /// past searches are listed then too.
+  bool _restoredUntouched = false;
+
+  /// Whether this opening already gave its search to [onQueryUsed].
+  bool _queryReported = false;
+
   @override
   void initState() {
     super.initState();
     widget.refresh?.addListener(_onSourceChanged);
     if (widget.behavior.restoreLastQuery && widget.queryHistory.isNotEmpty) {
       _fillQuery(widget.queryHistory.first, selectAll: true);
+      _restoredUntouched = _controller.text.isNotEmpty;
     }
+  }
+
+  /// Gives what was typed to [onQueryUsed], once per opening.
+  void _reportQuery() {
+    if (_queryReported || _controller.text.trim().isEmpty) return;
+    _queryReported = true;
+    widget.onQueryUsed?.call(_rawQuery());
   }
 
   /// Puts the past search [raw] back in the field, its prefix in the chip.
@@ -259,12 +276,15 @@ class _CommandBarViewState extends State<CommandBarView> {
   @override
   void dispose() {
     widget.refresh?.removeListener(_onSourceChanged);
+    // Closed without a choice: the search is kept all the same.
+    _reportQuery();
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   void _onChanged(String raw) {
+    _restoredUntouched = false;
     final parsed = parseCommandBarQuery(raw, widget.filters);
     if (_filter == null && parsed.filter != null) {
       // The prefix moves into the chip; only the words stay in the field.
@@ -412,6 +432,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     if (entry.id.startsWith(_queryRowPrefix)) {
       if (secondary) return;
       setState(() {
+        _restoredUntouched = false;
         _fillQuery(
           entry.id.substring(_queryRowPrefix.length),
           selectAll: false,
@@ -425,9 +446,7 @@ class _CommandBarViewState extends State<CommandBarView> {
       // A disabled entry stays visible but never runs.
       return;
     }
-    if (_controller.text.trim().isNotEmpty) {
-      widget.onQueryUsed?.call(_rawQuery());
-    }
+    _reportQuery();
     widget.onChoose(CommandBarChoice(id: entry.id, secondary: secondary));
   }
 
@@ -502,6 +521,30 @@ class _CommandBarViewState extends State<CommandBarView> {
       rows.add(_EntryRow(entry: entry, itemIndex: items.length - 1));
     }
 
+    // The past searches; choosing one puts it back in the field.
+    void addQueryHistory() {
+      if (!widget.behavior.showQueryHistory) return;
+      final past = widget.queryHistory
+          .where((raw) => raw.trim().isNotEmpty)
+          .take(commandBarQueryHistoryShown)
+          .toList(growable: false);
+      if (past.isEmpty) return;
+      rows.add(_HeaderRow(widget.strings.querySection));
+      for (final raw in past) {
+        final parsed = parseCommandBarQuery(raw, widget.filters);
+        addItem(
+          CommandBarEntry(
+            id: '$_queryRowPrefix$raw',
+            label: parsed.text,
+            section: _queryRowPrefix,
+            icon: Icons.history_rounded,
+            subtitle: parsed.filter?.label,
+            primaryLabel: widget.strings.fillQuery,
+          ),
+        );
+      }
+    }
+
     if (query.filter == null) {
       final recents = commandBarMatches(
         [
@@ -515,28 +558,7 @@ class _CommandBarViewState extends State<CommandBarView> {
         rows.add(_HeaderRow(widget.strings.recentSection));
         recents.forEach(addItem);
       }
-      if (widget.behavior.showQueryHistory && query.text.trim().isEmpty) {
-        final past = widget.queryHistory
-            .where((raw) => raw.trim().isNotEmpty)
-            .take(commandBarQueryHistoryShown)
-            .toList(growable: false);
-        if (past.isNotEmpty) {
-          rows.add(_HeaderRow(widget.strings.querySection));
-          for (final raw in past) {
-            final parsed = parseCommandBarQuery(raw, widget.filters);
-            addItem(
-              CommandBarEntry(
-                id: '$_queryRowPrefix$raw',
-                label: parsed.text,
-                section: _queryRowPrefix,
-                icon: Icons.history_rounded,
-                subtitle: parsed.filter?.label,
-                primaryLabel: widget.strings.fillQuery,
-              ),
-            );
-          }
-        }
-      }
+      if (query.text.trim().isEmpty) addQueryHistory();
     }
 
     final behavior = widget.behavior;
@@ -588,6 +610,8 @@ class _CommandBarViewState extends State<CommandBarView> {
       rows.add(_HeaderRow(titles[sectionId] ?? sectionId));
       (limit == null ? section : section.take(limit)).forEach(addItem);
     }
+    // A restored search keeps the history in view, after its matches.
+    if (_restoredUntouched) addQueryHistory();
     return _BarLayout(rows: rows, items: items, rowOfItem: rowOfItem);
   }
 

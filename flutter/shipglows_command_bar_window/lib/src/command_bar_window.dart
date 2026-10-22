@@ -15,7 +15,6 @@ class ShipglowsCommandBarSelection {
     required this.id,
     this.secondary = false,
     this.previousForeground,
-    this.query,
   });
 
   /// Id of the chosen entry, as in `CommandBarEntry.id`.
@@ -28,11 +27,6 @@ class ShipglowsCommandBarSelection {
   /// which has the keyboard again unless the entry is one of
   /// [ShipglowsCommandBarSnapshot.appWindowIds]: the target of a paste.
   final int? previousForeground;
-
-  /// The search that led to this choice, filter prefix included, or null
-  /// when it was made from an empty field. The app adds it to the history it
-  /// publishes in [ShipglowsCommandBarSnapshot.queryHistory].
-  final String? query;
 }
 
 /// The floating command bar, seen from the app's engine.
@@ -104,11 +98,17 @@ class ShipglowsCommandBarWindow {
 
   final _selections =
       StreamController<ShipglowsCommandBarSelection>.broadcast();
+  final _queries = StreamController<String>.broadcast();
   late final StreamSubscription<ShipglowsOverlayMessage> _subscription;
   ShipglowsCommandBarSnapshot? _snapshot;
 
   /// Entries chosen in the bar. Run them here, in the app's engine.
   Stream<ShipglowsCommandBarSelection> get selections => _selections.stream;
+
+  /// What was typed in the bar, filter prefix included, once per opening (on
+  /// a choice or when it closed). The app adds it to the history it
+  /// publishes in [ShipglowsCommandBarSnapshot.queryHistory].
+  Stream<String> get queries => _queries.stream;
 
   /// Whether the bar is on screen.
   ValueListenable<bool> get visible => overlay.visible;
@@ -169,23 +169,29 @@ class ShipglowsCommandBarWindow {
   Future<void> dispose() async {
     await _subscription.cancel();
     await _selections.close();
+    await _queries.close();
     await overlay.dispose();
   }
 
   void _onMessage(ShipglowsOverlayMessage message) {
-    if (message.method != selectMessage || _selections.isClosed) return;
     final arguments = message.arguments;
+    if (message.method == queryMessage) {
+      final query = arguments is Map ? arguments['query'] : null;
+      if (query is String && query.trim().isNotEmpty && !_queries.isClosed) {
+        _queries.add(query);
+      }
+      return;
+    }
+    if (message.method != selectMessage || _selections.isClosed) return;
     if (arguments is! Map) return;
     final id = arguments['id'];
     if (id is! String) return;
     final previous = arguments['previousForeground'];
-    final query = arguments['query'];
     _selections.add(
       ShipglowsCommandBarSelection(
         id: id,
         secondary: arguments['secondary'] == true,
         previousForeground: previous is int ? previous : null,
-        query: query is String && query.trim().isNotEmpty ? query : null,
       ),
     );
   }
