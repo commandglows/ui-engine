@@ -6,9 +6,12 @@
 - [ ] `shipglows_tray`: wire CommandGlows after its command bar migration; operator to decide whether closing hides to the tray (it quits today).
 - [ ] `shipglows_tray`: wire ContentGlows after its command bar migration; remove the tray part of `resident_shell` and `resident_shell_menu_test.cpp`, keep the hotkeys and the Auth0/shell-task gate.
 - [ ] `shipglows_hotkeys`: no consumer yet.
+- [ ] `shipglows_window` frame theme: in BeatGlows, CommandGlows, ContentGlows and the ShipGlows app, drop the template `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED` in `win32_window.cpp` (the frame already follows the app theme through `ShipglowsWindowFrame`).
 - [ ] `shipglows_diagnostics`: migrate DreamGlows (`path_flutter/lib/src/crash_log.dart`, engine labels main/capture), then ContentGlows, CommandGlows, ReplayGlows (Sentry through `onReport`) and the ShipGlows app; add a « Copier le diagnostic » entry where the app has none.
 
 ## Done
+
+- [x] 2026-10-22: `shipglows_window` frame follows the app theme (audit candidate 3): DWM dark mode, caption and text colors from `ShipglowsWindowFrame`, resent on theme change. DreamGlows pilot drops `ApplyWindowChrome` and `setWindowTheme` (the capture overlay keeps `setCaptureTheme`). Checked through `s` with Windows in dark: app light gives `DWMWA_USE_IMMERSIVE_DARK_MODE` 0 and a light frame, app dark gives 1 and a dark frame. Windows in light not tested (system setting).
 
 - [x] 2026-10-22: `shipglows_diagnostics` package; BeatGlows pilot replaces `lib/core/diagnostics/crash_log.dart` (same `crash.log`), launched through `s start -FlutterDevice windows` (running, debug).
 

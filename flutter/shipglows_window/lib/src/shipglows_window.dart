@@ -44,6 +44,9 @@ abstract final class ShipglowsWindow {
   static bool _frameApplied = false;
   static Color? _frameBorderColor;
   static bool _frameSystemCorners = true;
+  static Brightness? _frameBrightness;
+  static Color? _frameCaptionColor;
+  static Color? _frameCaptionTextColor;
 
   /// Shapes the window frame on Windows 11; no-op elsewhere.
   ///
@@ -52,29 +55,53 @@ abstract final class ShipglowsWindow {
   /// Without it the window turns transparent and the native corners and
   /// border are removed, so the app can clip its own radius (see
   /// [ShipglowsWindowFrame.cornerRadius]). Windows 10 keeps square corners.
+  ///
+  /// A non-null [brightness] makes the native frame follow the app theme
+  /// instead of the Windows one: dark or light frame, caption filled with
+  /// [captionColor] and its text drawn in [captionTextColor] (system colors
+  /// when null). Null leaves the frame to the runner. [force] reapplies
+  /// even unchanged values, after something else (the Flutter runner
+  /// template on a Windows theme change) has overwritten them.
   static Future<void> setFrame({
     Color? borderColor,
     bool systemCorners = true,
+    Brightness? brightness,
+    Color? captionColor,
+    Color? captionTextColor,
+    bool force = false,
   }) async {
     if (!isSupported || defaultTargetPlatform != TargetPlatform.windows) {
       return;
     }
-    if (_frameApplied &&
+    if (!force &&
+        _frameApplied &&
         borderColor == _frameBorderColor &&
-        systemCorners == _frameSystemCorners) {
+        systemCorners == _frameSystemCorners &&
+        brightness == _frameBrightness &&
+        captionColor == _frameCaptionColor &&
+        captionTextColor == _frameCaptionTextColor) {
       return;
     }
     final wasSystemCorners = !_frameApplied || _frameSystemCorners;
     _frameApplied = true;
     _frameBorderColor = borderColor;
     _frameSystemCorners = systemCorners;
+    _frameBrightness = brightness;
+    _frameCaptionColor = captionColor;
+    _frameCaptionTextColor = captionTextColor;
     final hwnd = await windowManager.getId();
     applyDwmFrame(
       hwnd,
       borderColorRef: borderColor == null ? null : _colorRef(borderColor),
       systemCorners: systemCorners,
+      darkMode: brightness == null ? null : brightness == Brightness.dark,
+      captionColorRef: captionColor == null ? null : _colorRef(captionColor),
+      textColorRef: captionTextColor == null
+          ? null
+          : _colorRef(captionTextColor),
     );
     if (!systemCorners) {
+      if (!wasSystemCorners) return;
       // Frameless: no DWM border left to draw a straight line past the
       // rounded corners; ShipglowsWindowFrame brings the resize edges back.
       await windowManager.setAsFrameless();
@@ -84,7 +111,7 @@ abstract final class ShipglowsWindow {
     }
   }
 
-  /// Win32 `COLORREF` (`0x00BBGGRR`); DWM borders have no alpha.
+  /// Win32 `COLORREF` (`0x00BBGGRR`); DWM colors have no alpha.
   static int _colorRef(Color color) {
     int channel(double value) => (value * 255).round() & 0xFF;
     return channel(color.b) << 16 | channel(color.g) << 8 | channel(color.r);

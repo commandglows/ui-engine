@@ -3,4 +3,7 @@ void applyDwmFrame(
   int hwnd, {
   required int? borderColorRef,
   required bool systemCorners,
+  required bool? darkMode,
+  required int? captionColorRef,
+  required int? textColorRef,
 }) {}

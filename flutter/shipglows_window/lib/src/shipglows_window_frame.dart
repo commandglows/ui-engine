@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'shipglows_title_bar.dart';
@@ -22,6 +22,7 @@ class ShipglowsWindowFrame extends StatefulWidget {
     this.borderColor,
     this.outline,
     this.cornerRadius,
+    this.followAppTheme = true,
   });
 
   /// The app content shown under the bar.
@@ -61,6 +62,12 @@ class ShipglowsWindowFrame extends StatefulWidget {
   /// transparent and its content and [outline] are clipped to this radius.
   final double? cornerRadius;
 
+  /// Whether the native Windows frame follows the app theme rather than the
+  /// Windows one: dark frame under a dark theme, caption in the title bar
+  /// [style] colors. Reapplied when the theme changes. False leaves the
+  /// frame to the runner (the Flutter template follows Windows).
+  final bool followAppTheme;
+
   static const double _systemCornerRadius = 8;
 
   @override
@@ -68,7 +75,7 @@ class ShipglowsWindowFrame extends StatefulWidget {
 }
 
 class _ShipglowsWindowFrameState extends State<ShipglowsWindowFrame>
-    with WindowListener {
+    with WindowListener, WidgetsBindingObserver {
   bool _edgeToEdge = false;
 
   bool get _active => widget.enabled && ShipglowsWindow.isSupported;
@@ -78,12 +85,14 @@ class _ShipglowsWindowFrameState extends State<ShipglowsWindowFrame>
     super.initState();
     if (!_active) return;
     windowManager.addListener(this);
+    WidgetsBinding.instance.addObserver(this);
     _syncEdgeToEdge();
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -109,16 +118,44 @@ class _ShipglowsWindowFrameState extends State<ShipglowsWindowFrame>
   @override
   void onWindowLeaveFullScreen() => _syncEdgeToEdge();
 
+  /// Last values sent to DWM, resent as they are after a Windows theme
+  /// change.
+  ShipglowsTitleBarStyle? _frameStyle;
+  Brightness? _frameBrightness;
+
+  /// The Flutter runner template resets the dark frame to the Windows
+  /// theme when it changes; put the app one back once it is done.
+  @override
+  void didChangePlatformBrightness() {
+    if (!widget.followAppTheme) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _applyFrame(force: true);
+    });
+  }
+
+  void _applyFrame({bool force = false}) {
+    ShipglowsWindow.setFrame(
+      borderColor: widget.borderColor,
+      systemCorners: widget.cornerRadius == null,
+      brightness: _frameBrightness,
+      captionColor: _frameStyle?.background,
+      captionTextColor: _frameStyle?.foreground,
+      force: force,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_active) return widget.child;
-    // Deduplicated: only a new color reaches DWM.
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => ShipglowsWindow.setFrame(
-        borderColor: widget.borderColor,
-        systemCorners: widget.cornerRadius == null,
-      ),
-    );
+    final theme = widget.followAppTheme ? Theme.of(context) : null;
+    _frameBrightness = theme?.brightness;
+    _frameStyle = theme == null
+        ? null
+        : widget.style ?? ShipglowsTitleBarStyle.fromTheme(theme);
+    // Deduplicated: only new values reach DWM.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _applyFrame();
+    });
     final framed = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

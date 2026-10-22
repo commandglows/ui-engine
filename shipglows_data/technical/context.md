@@ -37,7 +37,7 @@ do nothing or fall back to plain Flutter.
 | --- | --- | --- | --- |
 | `shipglows_command_bar` | Command palette widget (`CommandBarView`, sections, filters, recents) | no | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ReplayGlows |
 | `shipglows_flutter_zoom` | App-wide zoom (`FlutterZoomViewport`): Ctrl+wheel, pinch, Ctrl+= / Ctrl+- / Ctrl+0; moved from `shipglows-email-engine` | no | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ShipGlows app, email-engine `source_sidebar_flutter` |
-| `shipglows_window` | Custom title bar and window chrome (`window_manager`) | via plugin dep | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ShipGlows app |
+| `shipglows_window` | Custom title bar and window chrome (`window_manager`); the Windows frame (dark mode, caption and text colors) follows the app theme through DWM FFI | via plugin dep, DWM FFI | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ShipGlows app |
 | `shipglows_overlay_window` | Independent always-on-top windows with their own engine | Win32 | ContentGlows (direct), the command bar window |
 | `shipglows_command_bar_window` | The command bar in a floating overlay window | through overlay | BeatGlows, CommandGlows, ContentGlows, DreamGlows |
 | `shipglows_hotkeys` | System-wide hotkeys, saved choices, conflicts reported | Win32 | none yet |
@@ -52,6 +52,13 @@ do nothing or fall back to plain Flutter.
   back to that window when the bar closes.
 - `WM_CLOSE`: `shipglows_tray` decides through Flutter's top-level window
   delegate; a runner's own shutdown handling must run after it.
+- Window frame theme: `ShipglowsWindowFrame` (`followAppTheme`, on by
+  default) sends the app brightness and title bar colors to DWM
+  (`DWMWA_USE_IMMERSIVE_DARK_MODE`, `CAPTION_COLOR`, `TEXT_COLOR`) and
+  resends them on a theme change. The runner must not reset them: drop the
+  Flutter template's `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED`
+  (done in DreamGlows); until then the frame reapplies after a Windows
+  light/dark switch.
 - Zoom: `ShipglowsWindowSession` owns the bounds (`minimumZoom`,
   `maximumZoom`) and the saved zoom; apps pass them to `FlutterZoomViewport`
   with `onZoomChanged: session.saveZoom`.
