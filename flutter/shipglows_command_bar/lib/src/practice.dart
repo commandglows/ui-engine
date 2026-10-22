@@ -51,11 +51,15 @@ class CommandBarShortcutPractice extends StatefulWidget {
       _CommandBarShortcutPracticeState();
 }
 
-enum _Status { waiting, wrong, right, revealed }
+/// Waiting and wrong listen to the keys; paused leaves them to the buttons.
+enum _Status { waiting, wrong, paused, right, revealed }
 
 class _Card {
   _Card(this.group, this.hint)
-    : activators = hint.bindings.keys.toList(),
+    : activators = [
+        for (final activator in hint.bindings.keys)
+          if (!_isPlainEscape(activator)) activator,
+      ],
       sequences = [
         for (final shortcut in hint.shortcuts) ?_parseSequence(shortcut),
       ];
@@ -70,6 +74,15 @@ class _Card {
       activators.isNotEmpty ||
       sequences.any((steps) => !steps.any((chord) => chord.intercepted));
 }
+
+/// Escape pauses the practice, so it cannot be an answer.
+bool _isPlainEscape(ShortcutActivator activator) =>
+    activator is SingleActivator &&
+    activator.trigger == LogicalKeyboardKey.escape &&
+    !activator.control &&
+    !activator.alt &&
+    !activator.shift &&
+    !activator.meta;
 
 List<_Card> _cards(List<CommandBarShortcutGroup> groups) => [
   for (final group in groups)
@@ -140,6 +153,15 @@ class _CommandBarShortcutPracticeState
     _next();
   }
 
+  void _resume() {
+    setState(() {
+      _status = _Status.waiting;
+      _typed = null;
+      _progress = List.filled(_card?.sequences.length ?? 0, 0);
+    });
+    _focus.requestFocus();
+  }
+
   void _reveal() {
     final card = _card;
     if (card == null) return;
@@ -149,12 +171,34 @@ class _CommandBarShortcutPracticeState
     });
   }
 
+  /// Escape climbs one level: a listening card pauses, a paused card shows
+  /// its answer, anything else goes back to the list.
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    final keyboard = HardwareKeyboard.instance;
+    final escape =
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape &&
+        !keyboard.isControlPressed &&
+        !keyboard.isAltPressed &&
+        !keyboard.isShiftPressed &&
+        !keyboard.isMetaPressed;
     final card = _card;
-    if (card == null) return KeyEventResult.ignored;
-    if (_status == _Status.right || _status == _Status.revealed) {
+    final listening =
+        card != null &&
+        card.checkable &&
+        (_status == _Status.waiting || _status == _Status.wrong);
+    if (card == null || !listening) {
+      if (escape) {
+        if (card != null && _status == _Status.paused) {
+          _reveal();
+        } else {
+          widget.onExit();
+        }
+        return KeyEventResult.handled;
+      }
       // Enter goes on; other keys reach the buttons (Tab).
       if (event is KeyDownEvent &&
+          (_status == _Status.right || _status == _Status.revealed) &&
           (event.logicalKey == LogicalKeyboardKey.enter ||
               event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
         _next();
@@ -162,9 +206,12 @@ class _CommandBarShortcutPracticeState
       }
       return KeyEventResult.ignored;
     }
+    if (escape) {
+      setState(() => _status = _Status.paused);
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent) return KeyEventResult.handled;
     if (_isModifier(event.logicalKey)) return KeyEventResult.handled;
-    final keyboard = HardwareKeyboard.instance;
     var matched = card.activators.any(
       (activator) => activator.accepts(event, keyboard),
     );
@@ -218,6 +265,7 @@ class _CommandBarShortcutPracticeState
       _Status.waiting =>
         checkable ? strings.practicePrompt : strings.practiceSelfPrompt,
       _Status.wrong => strings.practiceWrong.replaceAll('{keys}', _typed ?? ''),
+      _Status.paused => strings.practicePaused,
       _Status.right => strings.practiceRight,
       _Status.revealed => null,
     };
@@ -297,12 +345,17 @@ class _CommandBarShortcutPracticeState
                   onPressed: () => _rate(right: true),
                   child: Text(strings.practiceGotIt),
                 ),
-              ] else if (!answered)
+              ] else if (!answered) ...[
+                if (_status == _Status.paused)
+                  TextButton(
+                    onPressed: _resume,
+                    child: Text(strings.practiceResume),
+                  ),
                 TextButton(
                   onPressed: _reveal,
                   child: Text(strings.practiceShowAnswer),
-                )
-              else
+                ),
+              ] else
                 FilledButton(
                   onPressed: _next,
                   child: Text(strings.practiceNext),
@@ -395,7 +448,9 @@ class _Chord {
       (alt && !control && key == LogicalKeyboardKey.tab) ||
       (alt && !control && key == LogicalKeyboardKey.f4) ||
       (control && alt && key == LogicalKeyboardKey.delete) ||
-      (control && !alt && key == LogicalKeyboardKey.escape);
+      (control && !alt && key == LogicalKeyboardKey.escape) ||
+      // Escape alone pauses the practice.
+      (!control && !alt && !shift && !meta && key == LogicalKeyboardKey.escape);
 
   bool accepts(KeyEvent event, HardwareKeyboard keyboard) {
     final character = this.character;

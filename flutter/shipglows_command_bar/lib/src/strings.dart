@@ -31,7 +31,12 @@ class CommandBarStrings {
         'Shortcuts without Ctrl or Alt pause while you type in a field.',
     this.practice = 'Practice',
     this.practiceCard = 'Card {index} of {count}',
-    this.practicePrompt = 'Press the shortcut from memory.',
+    this.practicePrompt =
+        'Press the shortcut from memory. Escape pauses, twice shows the '
+        'answer.',
+    this.practicePaused =
+        'Paused: the keyboard is free. Escape again shows the answer.',
+    this.practiceResume = 'Resume',
     this.practiceSelfPrompt =
         'Windows or the app may catch this one before the practice: try it, '
         'then rate yourself.',
@@ -93,7 +98,11 @@ class CommandBarStrings {
         'dans un champ.',
     practice: "S'entraîner",
     practiceCard: 'Carte {index} / {count}',
-    practicePrompt: 'Tape le raccourci de mémoire.',
+    practicePrompt:
+        'Tape le raccourci de mémoire. Échap : pause, deux fois : la réponse.',
+    practicePaused:
+        'En pause : le clavier est libre. Échap à nouveau affiche la réponse.',
+    practiceResume: 'Reprendre',
     practiceSelfPrompt:
         "Windows ou l'app peut intercepter celui-ci : essaie-le, puis "
         'évalue-toi.',
@@ -188,6 +197,12 @@ class CommandBarStrings {
   /// Practice: what to do on a card.
   final String practicePrompt;
 
+  /// Practice: Escape paused the card.
+  final String practicePaused;
+
+  /// Practice: listens to the keys again after a pause.
+  final String practiceResume;
+
   /// Practice: a card whose keys cannot be checked here.
   final String practiceSelfPrompt;
 
@@ -252,6 +267,8 @@ class CommandBarStrings {
     String? practice,
     String? practiceCard,
     String? practicePrompt,
+    String? practicePaused,
+    String? practiceResume,
     String? practiceSelfPrompt,
     String? practiceRight,
     String? practiceWrong,
@@ -291,6 +308,8 @@ class CommandBarStrings {
     practice: practice ?? this.practice,
     practiceCard: practiceCard ?? this.practiceCard,
     practicePrompt: practicePrompt ?? this.practicePrompt,
+    practicePaused: practicePaused ?? this.practicePaused,
+    practiceResume: practiceResume ?? this.practiceResume,
     practiceSelfPrompt: practiceSelfPrompt ?? this.practiceSelfPrompt,
     practiceRight: practiceRight ?? this.practiceRight,
     practiceWrong: practiceWrong ?? this.practiceWrong,

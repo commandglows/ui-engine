@@ -95,7 +95,11 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
     sequences). Keys Windows takes first (Win, Alt+Tab, Alt+F4, Ctrl+Alt+Del,
     an app's global hotkey) or labels it cannot read ask the user to rate
     themselves. « Afficher la réponse » sends the card to review; the end
-    shows the score and replays the missed cards. While it runs, the scope
+    shows the score and replays the missed cards. Escape climbs one level:
+    once pauses the card (the keyboard reaches the buttons again,
+    « Reprendre » listens anew), twice shows the answer, and from an
+    answered card or the score it goes back to the list; so Escape is never
+    an answer (such a card asks for a self-rating). While it runs, the scope
     leaves every key to it.
   - Opened with `CommandBarController.showShortcuts()`, F1
     (`shortcutsOnF1`) or « ? » outside text fields
