@@ -123,7 +123,14 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
   SyncStatus get status => _status;
 
   /// Loads the device copies (running [importLegacy] on a fresh device).
-  Future<void> open({LegacySettingsImport? importLegacy}) async {
+  ///
+  /// With [restoreLastAccount], the last account shown on this device is
+  /// shown again right away (without syncing), so its theme paints the first
+  /// frame; [setAccount] then confirms it or switches away.
+  Future<void> open({
+    LegacySettingsImport? importLegacy,
+    bool restoreLastAccount = true,
+  }) async {
     final device = await _load(deviceBucket);
     final local = await _load(localAccountBucket);
     if (device == null && local == null && importLegacy != null) {
@@ -143,6 +150,14 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
     } else {
       _device = device ?? _Bucket(deviceBucket);
       _account = local ?? _Bucket(localAccountBucket);
+      final last = _device.lastAccount;
+      if (restoreLastAccount && last != null) {
+        final previous = await _load(accountBucket(last));
+        if (previous != null) {
+          _account = previous;
+          _accountId = last;
+        }
+      }
     }
     _open = true;
     if (observeAppLifecycle) {
@@ -229,6 +244,8 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
     }
     final generation = ++_generation;
     _stopRemote();
+    _device.lastAccount = account?.id;
+    unawaited(_persist(_device, rethrowError: false));
     if (account == null) {
       final local = await _load(localAccountBucket);
       if (generation != _generation) return;
@@ -541,6 +558,9 @@ class _Bucket {
     final pending = data['pending'];
     if (pending is List) bucket.pending.addAll(pending.whereType<String>());
     bucket.seed = data['seed'] == true;
+    bucket.lastAccount = data['lastAccount'] is String
+        ? data['lastAccount'] as String
+        : null;
     bucket.revision = data['revision'] is String ? data['revision'] as String : null;
     bucket.syncedAt = data['syncedAt'] is String
         ? DateTime.tryParse(data['syncedAt'] as String)
@@ -560,12 +580,16 @@ class _Bucket {
   String? revision;
   DateTime? syncedAt;
 
+  /// Device bucket only: the account shown last, restored by `open`.
+  String? lastAccount;
+
   Map<String, Object?> toJson(int version) => {
     'v': version,
     'values': values,
     if (pending.isNotEmpty) 'pending': pending.toList()..sort(),
     if (seed) 'seed': true,
     if (revision != null) 'revision': revision,
+    if (lastAccount != null) 'lastAccount': lastAccount,
     if (syncedAt != null) 'syncedAt': syncedAt!.toUtc().toIso8601String(),
   };
 }
