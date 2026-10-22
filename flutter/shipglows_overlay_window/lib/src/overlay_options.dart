@@ -75,6 +75,7 @@ class ShipglowsOverlayOptions {
     this.margin = 16,
     this.cornerRadius = 12,
     this.darkFrame = true,
+    this.transparent = false,
     this.borderColor,
     this.backgroundColor,
   });
@@ -130,6 +131,11 @@ class ShipglowsOverlayOptions {
   /// Dark window frame (Windows 11 border and shadow).
   final bool darkFrame;
 
+  /// See-through window: no system corners, border, shadow or background.
+  /// The overlay draws its whole shape; its transparent pixels show what is
+  /// behind (a card with its own margin and shadow).
+  final bool transparent;
+
   /// 1 px border color drawn by Windows 11. Null: the system color.
   final Color? borderColor;
 
@@ -157,6 +163,7 @@ class ShipglowsOverlayOptions {
     'margin': margin.round(),
     'cornerRadius': cornerRadius.round(),
     'darkFrame': darkFrame,
+    'transparent': transparent,
     if (borderColor case final color?) 'borderColor': color.toARGB32(),
     if (backgroundColor case final color?)
       'backgroundColor': color.toARGB32(),

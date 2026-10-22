@@ -93,6 +93,7 @@ OverlayConfig ConfigFrom(const flutter::EncodableValue* arguments) {
   ReadBool(options, "doubleClickMaximizes", &config.double_click_maximizes);
   ReadBool(options, "rememberPosition", &config.remember_position);
   ReadBool(options, "darkFrame", &config.dark_frame);
+  ReadBool(options, "transparent", &config.transparent);
   const std::string memory = StringField(options, "sizeMemory");
   if (memory == "none") config.size_memory = SizeMemory::kNone;
   if (memory == "session") config.size_memory = SizeMemory::kSession;

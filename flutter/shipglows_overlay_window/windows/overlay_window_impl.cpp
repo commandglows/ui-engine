@@ -158,12 +158,19 @@ bool OverlayWindowImpl::CreateOverlay() {
   if (created == nullptr) return false;
   window_ = created;
 
-  const DWM_WINDOW_CORNER_PREFERENCE corners = DWMWCP_ROUND;
+  const DWM_WINDOW_CORNER_PREFERENCE corners =
+      config_.transparent ? DWMWCP_DONOTROUND : DWMWCP_ROUND;
   native_corners_ = SUCCEEDED(DwmSetWindowAttribute(
       window_, DWMWA_WINDOW_CORNER_PREFERENCE, &corners, sizeof(corners)));
+  // A transparent overlay draws its own shape: never clipped by a region.
+  if (config_.transparent) native_corners_ = true;
   ApplyFrameStyle();
-  const MARGINS frame{1, 1, 1, 1};  // DWM needs a one-pixel frame.
+  // DWM needs a one-pixel frame for its corners and border; a transparent
+  // overlay has neither, and no frame also means no system shadow.
+  const MARGINS frame = config_.transparent ? MARGINS{0, 0, 0, 0}
+                                            : MARGINS{1, 1, 1, 1};
   DwmExtendFrameIntoClientArea(window_, &frame);
+  if (config_.transparent) MakeTransparent();
   SetWindowPos(window_, nullptr, 0, 0, 0, 0,
                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
                    SWP_FRAMECHANGED);
@@ -210,9 +217,39 @@ void OverlayWindowImpl::ApplyFrameStyle() {
   const BOOL dark = config_.dark_frame ? TRUE : FALSE;
   DwmSetWindowAttribute(window_, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark,
                         sizeof(dark));
-  // DWMWA_COLOR_DEFAULT gives the border back to the system.
-  const COLORREF border = config_.border_color.value_or(0xFFFFFFFF);
+  // DWMWA_COLOR_DEFAULT gives the border back to the system;
+  // DWMWA_COLOR_NONE removes it from a transparent overlay.
+  const COLORREF border = config_.transparent
+                              ? 0xFFFFFFFE
+                              : config_.border_color.value_or(0xFFFFFFFF);
   DwmSetWindowAttribute(window_, DWMWA_BORDER_COLOR, &border, sizeof(border));
+}
+
+// Same composition attribute as window_manager's transparent background:
+// the view's transparent pixels show what is behind the window.
+void OverlayWindowImpl::MakeTransparent() {
+  const HMODULE user32 = GetModuleHandleW(L"user32.dll");
+  if (user32 == nullptr) return;
+  struct AccentPolicy {
+    int state;
+    int flags;
+    int color;
+    int animation_id;
+  };
+  struct CompositionData {
+    int attribute;
+    PVOID data;
+    ULONG size;
+  };
+  using SetCompositionAttribute = BOOL(WINAPI*)(HWND, CompositionData*);
+  const auto set_attribute = reinterpret_cast<SetCompositionAttribute>(
+      GetProcAddress(user32, "SetWindowCompositionAttribute"));
+  if (set_attribute == nullptr) return;
+  constexpr int kAccentTransparentGradient = 2;
+  constexpr int kAccentPolicyAttribute = 19;
+  AccentPolicy policy{kAccentTransparentGradient, 2, 0, 0};
+  CompositionData data{kAccentPolicyAttribute, &policy, sizeof(policy)};
+  set_attribute(window_, &data);
 }
 
 void OverlayWindowImpl::SetFrameStyle(const flutter::EncodableValue* arguments) {
@@ -263,6 +300,8 @@ void OverlayWindowImpl::HandleHostCall(
          flutter::EncodableValue(config_.resizable)},
         {flutter::EncodableValue("doubleClickMaximizes"),
          flutter::EncodableValue(config_.double_click_maximizes)},
+        {flutter::EncodableValue("transparent"),
+         flutter::EncodableValue(config_.transparent)},
     }));
     if (reveal_pending_) StartPresentation();
     return;
@@ -919,7 +958,7 @@ std::optional<LRESULT> OverlayWindowImpl::HandleFrameMessage(HWND hwnd,
       // The view covers the client area. What Windows may still expose for a
       // frame (a resize step the engine could not follow in time) takes the
       // overlay's background rather than black.
-      if (config_.background_color) {
+      if (config_.background_color && !config_.transparent) {
         RECT client{};
         if (GetClientRect(hwnd, &client)) {
           if (const HBRUSH brush =

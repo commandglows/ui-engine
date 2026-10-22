@@ -402,7 +402,10 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
       ),
     );
     return Material(
-      color: style.backgroundColor,
+      // A transparent window shows only what the surface paints.
+      color: controller.host.transparent
+          ? Colors.transparent
+          : style.backgroundColor,
       child: ShipglowsOverlayFrame(
         host: controller.host,
         gripColor: style.mutedColor,

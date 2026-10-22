@@ -63,6 +63,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   String? _id;
   bool _resizable = false;
   bool _doubleClickMaximizes = false;
+  bool _transparent = false;
   bool _visible = false;
   bool _listeningKeys = false;
   int? _previousForeground;
@@ -75,6 +76,10 @@ class ShipglowsOverlayHost extends ChangeNotifier {
 
   /// Whether a double-click on the drag area maximizes the overlay.
   bool get doubleClickMaximizes => _doubleClickMaximizes;
+
+  /// Whether the window is see-through ([ShipglowsOverlayOptions.transparent]):
+  /// the overlay then paints no background of its own.
+  bool get transparent => _transparent;
 
   /// Whether the overlay is on screen.
   bool get visible => _visible;
@@ -98,6 +103,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
     _id = info['id'] as String?;
     _resizable = info['resizable'] == true;
     _doubleClickMaximizes = info['doubleClickMaximizes'] == true;
+    _transparent = info['transparent'] == true;
     notifyListeners();
   }
 

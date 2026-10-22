@@ -56,7 +56,9 @@ class ShipglowsCommandBarWindow {
   /// [appFolder]).
   ///
   /// [backgroundColor] should be the bar's surface color; the bar sets the
-  /// frame colors from its theme once it runs.
+  /// frame colors from its theme once it runs. [transparent] removes the
+  /// window's own background, corners and shadow, for a bar that draws its
+  /// whole surface (`surfaceBuilder`).
   static ShipglowsOverlayOptions defaultOptions({
     String? appFolder,
     String title = '',
@@ -66,6 +68,7 @@ class ShipglowsCommandBarWindow {
     OverlaySizeMemory sizeMemory = OverlaySizeMemory.persistent,
     bool rememberPosition = true,
     bool darkFrame = true,
+    bool transparent = false,
     Color? borderColor,
     Color? backgroundColor,
   }) => ShipglowsOverlayOptions(
@@ -84,6 +87,7 @@ class ShipglowsCommandBarWindow {
     placement: OverlayPlacement.cursorMonitorUpper,
     cornerRadius: 8,
     darkFrame: darkFrame,
+    transparent: transparent,
     borderColor: borderColor,
     backgroundColor: backgroundColor,
   );

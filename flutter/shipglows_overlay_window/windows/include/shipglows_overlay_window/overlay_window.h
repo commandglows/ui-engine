@@ -86,6 +86,10 @@ struct OverlayConfig {
   bool remember_position = true;
   Placement placement = Placement::kCursorMonitorCenter;
 
+  // See-through window: no system corners, border, shadow or background;
+  // the Flutter view draws the whole shape, transparent pixels included.
+  bool transparent = false;
+
   // Dark DWM frame and 1 px border color (Windows 11).
   bool dark_frame = true;
   std::optional<COLORREF> border_color;

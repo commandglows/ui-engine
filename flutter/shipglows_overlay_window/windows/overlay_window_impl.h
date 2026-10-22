@@ -100,6 +100,8 @@ class OverlayWindowImpl : public OverlayWindow {
   void HideWindow(FocusReturn focus);
   // Dark frame and border color (DWM) from |config_|.
   void ApplyFrameStyle();
+  // Lets the view's transparent pixels show through (|config_.transparent|).
+  void MakeTransparent();
   // Host "setFrame": darkFrame, borderColor, backgroundColor (ARGB).
   void SetFrameStyle(const flutter::EncodableValue* arguments);
   // Applies |OverlayConfig::outside_click| when another window becomes

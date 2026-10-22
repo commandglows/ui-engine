@@ -213,7 +213,9 @@ on close. Escape and a click outside close it.
 - The frame (dark mode, border, background) follows the bar's theme
   (`CommandBarThemeData`).
   `surfaceBuilder` wraps the bar in the app's own surface (card outline,
-  margin, hard shadow) inside the window.
+  margin, hard shadow) inside the window; with
+  `defaultOptions(transparent: true)` the window itself has no background,
+  corners or shadow, so only that surface shows.
 - Window options: `ShipglowsCommandBarWindow.defaultOptions(appFolder: …)`.
 
 ```yaml
