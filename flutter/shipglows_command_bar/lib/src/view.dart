@@ -13,17 +13,26 @@ import 'query_history.dart';
 import 'strings.dart';
 import 'theme.dart';
 
-/// What the user chose in the bar: an entry, and whether its secondary action
-/// (Shift+Enter) was asked for. The owner of the bar runs it.
+/// What the user chose in the bar: an entry, whether its secondary action
+/// (Shift+Enter) was asked for, and the typed text it works on. The owner of
+/// the bar runs it.
 @immutable
 class CommandBarChoice {
-  const CommandBarChoice({required this.id, this.secondary = false});
+  const CommandBarChoice({
+    required this.id,
+    this.secondary = false,
+    this.query,
+  });
 
   /// Id of the chosen entry, as in [CommandBarEntry.id].
   final String id;
 
   /// Whether the secondary action was chosen instead of the primary one.
   final bool secondary;
+
+  /// The typed words, filter prefix left out, for an entry that
+  /// [CommandBarEntry.usesQuery]; null for any other.
+  final String? query;
 }
 
 /// The command bar: a search field, a filter chip, a grouped list and a
@@ -447,7 +456,13 @@ class _CommandBarViewState extends State<CommandBarView> {
       return;
     }
     _reportQuery();
-    widget.onChoose(CommandBarChoice(id: entry.id, secondary: secondary));
+    widget.onChoose(
+      CommandBarChoice(
+        id: entry.id,
+        secondary: secondary,
+        query: entry.usesQuery ? _controller.text.trim() : null,
+      ),
+    );
   }
 
   KeyEventResult _onKeyEvent(KeyEvent event, double rowHeight) {
@@ -503,11 +518,24 @@ class _CommandBarViewState extends State<CommandBarView> {
   }
 
   /// Rows for the current query: recents (without a filter only), then one
-  /// block per section, each in ranking order. Search-only entries need typed
-  /// words, except among the recents.
+  /// block per section, each in ranking order, then the actions on the typed
+  /// text. Search-only entries need typed words, except among the recents.
   _BarLayout _layoutFor() {
     final query = CommandBarQuery(filter: _filter, text: _controller.text);
-    final entries = widget.source.entries;
+    final hidden = widget.behavior.hiddenKinds;
+    final shown = [
+      for (final entry in widget.source.entries)
+        if (!hidden.contains(entry.kind?.id)) entry,
+    ];
+    // Actions on the text are never searched: they come last, with the text.
+    final queryActions = [
+      for (final entry in shown)
+        if (entry.usesQuery) entry,
+    ];
+    final entries = [
+      for (final entry in shown)
+        if (!entry.usesQuery) entry,
+    ];
     final byId = <String, CommandBarEntry>{
       for (final entry in entries) entry.id: entry,
     };
@@ -609,6 +637,17 @@ class _CommandBarViewState extends State<CommandBarView> {
       final limit = query.filter == null ? limits[sectionId] : null;
       rows.add(_HeaderRow(titles[sectionId] ?? sectionId));
       (limit == null ? section : section.take(limit)).forEach(addItem);
+    }
+    final text = query.text.trim();
+    if (text.isNotEmpty) {
+      final actions = [
+        for (final entry in queryActions)
+          if (query.filter?.matches(entry) ?? true) entry.withQuery(text),
+      ];
+      if (actions.isNotEmpty) {
+        rows.add(_HeaderRow(widget.strings.queryActionsSection));
+        actions.forEach(addItem);
+      }
     }
     // A restored search keeps the history in view, after its matches.
     if (_restoredUntouched) addQueryHistory();
@@ -739,6 +778,8 @@ class _CommandBarViewState extends State<CommandBarView> {
                         _EntryRow(:final entry, :final itemIndex) =>
                           CommandBarTile(
                             entry: entry,
+                            showKind: widget.behavior.showEntryKinds,
+                            kindLabel: strings.entryKinds[entry.kind?.id],
                             highlighted: itemIndex == highlight,
                             number: showNumbers && itemIndex < _numberedRows
                                 ? itemIndex + 1
@@ -820,6 +861,8 @@ class CommandBarTile extends StatelessWidget {
     required this.onTap,
     this.number,
     this.trailingLabel,
+    this.showKind = false,
+    this.kindLabel,
   });
 
   /// The entry shown.
@@ -835,6 +878,13 @@ class CommandBarTile extends StatelessWidget {
   /// without section headers.
   final String? trailingLabel;
 
+  /// Whether the row shows the marker of its [CommandBarEntry.kind].
+  final bool showKind;
+
+  /// What the kind does ([CommandBarStrings.entryKinds]): the marker's
+  /// tooltip, read aloud with the row.
+  final String? kindLabel;
+
   /// Called on tap, unless the entry is disabled.
   final VoidCallback onTap;
 
@@ -847,10 +897,13 @@ class CommandBarTile extends StatelessWidget {
     final secondLine = disabled ? entry.disabledReason : entry.subtitle;
     final trailingLabel = this.trailingLabel;
     final badge = entry.badge;
+    final kind = showKind ? entry.kind : null;
+    final kindLabel = kind == null ? null : this.kindLabel;
     final spoken = [
       entry.label,
       ?badge,
       ?secondLine,
+      ?kindLabel,
       ?trailingLabel,
     ].join(', ');
     final iconColor = disabled
@@ -943,6 +996,20 @@ class CommandBarTile extends StatelessWidget {
                         color: style.mutedColor,
                       ),
                     ),
+                  ],
+                  if (kind != null) ...[
+                    const SizedBox(width: 8),
+                    if (kindLabel == null)
+                      Icon(kind.icon, size: 16, color: style.mutedColor)
+                    else
+                      Tooltip(
+                        message: kindLabel,
+                        child: Icon(
+                          kind.icon,
+                          size: 16,
+                          color: style.mutedColor,
+                        ),
+                      ),
                   ],
                   for (final shortcut in entry.shortcuts) ...[
                     const SizedBox(width: 8),

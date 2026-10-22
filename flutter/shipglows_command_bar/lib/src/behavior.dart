@@ -11,6 +11,8 @@ class CommandBarBehavior {
     this.tappablePrefixHints = false,
     this.restoreLastQuery = false,
     this.showQueryHistory = false,
+    this.showEntryKinds = false,
+    this.hiddenKinds = const <String>{},
   });
 
   /// Every option on.
@@ -20,6 +22,7 @@ class CommandBarBehavior {
     tappablePrefixHints: true,
     restoreLastQuery: true,
     showQueryHistory: true,
+    showEntryKinds: true,
   );
 
   /// Whether a word that is not part of the label or keywords still matches
@@ -45,6 +48,15 @@ class CommandBarBehavior {
   /// choosing one puts it back in the field.
   final bool showQueryHistory;
 
+  /// Whether each row shows what choosing it does (its
+  /// [CommandBarEntry.kind]): open a screen, act right here, open another
+  /// app.
+  final bool showEntryKinds;
+
+  /// Ids of the [CommandBarEntryKind]s the bar leaves out, such as `open` for
+  /// a user who only wants actions. Entries without a kind always show.
+  final Set<String> hiddenKinds;
+
   /// Copy with the given options replaced, for an app that lets the user
   /// turn some on or off.
   CommandBarBehavior copyWith({
@@ -53,22 +65,28 @@ class CommandBarBehavior {
     bool? tappablePrefixHints,
     bool? restoreLastQuery,
     bool? showQueryHistory,
+    bool? showEntryKinds,
+    Set<String>? hiddenKinds,
   }) => CommandBarBehavior(
     fuzzyMatch: fuzzyMatch ?? this.fuzzyMatch,
     sortSectionsByMatch: sortSectionsByMatch ?? this.sortSectionsByMatch,
     tappablePrefixHints: tappablePrefixHints ?? this.tappablePrefixHints,
     restoreLastQuery: restoreLastQuery ?? this.restoreLastQuery,
     showQueryHistory: showQueryHistory ?? this.showQueryHistory,
+    showEntryKinds: showEntryKinds ?? this.showEntryKinds,
+    hiddenKinds: hiddenKinds ?? this.hiddenKinds,
   );
 
   /// JSON-safe map with the keys [fromJson] reads, for a bar in another
   /// engine.
-  Map<String, bool> toJson() => {
+  Map<String, Object> toJson() => {
     'fuzzyMatch': fuzzyMatch,
     'sortSectionsByMatch': sortSectionsByMatch,
     'tappablePrefixHints': tappablePrefixHints,
     'restoreLastQuery': restoreLastQuery,
     'showQueryHistory': showQueryHistory,
+    'showEntryKinds': showEntryKinds,
+    'hiddenKinds': hiddenKinds.toList(),
   };
 
   /// Restores options from [json], as produced by [toJson]; null when [json]
@@ -81,6 +99,12 @@ class CommandBarBehavior {
       tappablePrefixHints: json['tappablePrefixHints'] == true,
       restoreLastQuery: json['restoreLastQuery'] == true,
       showQueryHistory: json['showQueryHistory'] == true,
+      showEntryKinds: json['showEntryKinds'] == true,
+      hiddenKinds: {
+        if (json['hiddenKinds'] case final List ids)
+          for (final id in ids)
+            if (id is String) id,
+      },
     );
   }
 
@@ -91,7 +115,9 @@ class CommandBarBehavior {
       other.sortSectionsByMatch == sortSectionsByMatch &&
       other.tappablePrefixHints == tappablePrefixHints &&
       other.restoreLastQuery == restoreLastQuery &&
-      other.showQueryHistory == showQueryHistory;
+      other.showQueryHistory == showQueryHistory &&
+      other.showEntryKinds == showEntryKinds &&
+      setEquals(other.hiddenKinds, hiddenKinds);
 
   @override
   int get hashCode => Object.hash(
@@ -100,5 +126,7 @@ class CommandBarBehavior {
     tappablePrefixHints,
     restoreLastQuery,
     showQueryHistory,
+    showEntryKinds,
+    Object.hashAllUnordered(hiddenKinds),
   );
 }

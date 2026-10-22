@@ -15,6 +15,7 @@ class ShipglowsCommandBarSelection {
     required this.id,
     this.secondary = false,
     this.previousForeground,
+    this.query,
   });
 
   /// Id of the chosen entry, as in `CommandBarEntry.id`.
@@ -27,6 +28,10 @@ class ShipglowsCommandBarSelection {
   /// which has the keyboard again unless the entry is one of
   /// [ShipglowsCommandBarSnapshot.appWindowIds]: the target of a paste.
   final int? previousForeground;
+
+  /// The typed text an entry that `CommandBarEntry.usesQuery` works on; null
+  /// for any other entry.
+  final String? query;
 }
 
 /// The floating command bar, seen from the app's engine.
@@ -187,11 +192,13 @@ class ShipglowsCommandBarWindow {
     final id = arguments['id'];
     if (id is! String) return;
     final previous = arguments['previousForeground'];
+    final query = arguments['query'];
     _selections.add(
       ShipglowsCommandBarSelection(
         id: id,
         secondary: arguments['secondary'] == true,
         previousForeground: previous is int ? previous : null,
+        query: query is String ? query : null,
       ),
     );
   }

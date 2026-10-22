@@ -57,6 +57,12 @@ class CommandBarStrings {
     this.hotkeyPress = 'Press the keys…',
     this.hotkeyInvalid = 'Add Ctrl, Alt or Win to the key',
     this.hotkeyReset = 'Restore the default shortcut',
+    this.queryActionsSection = 'With this text',
+    this.entryKinds = const <String, String>{
+      'open': 'Opens a screen of the app',
+      'action': 'Runs right here',
+      'app': 'Opens another app',
+    },
   });
 
   /// English texts.
@@ -129,6 +135,12 @@ class CommandBarStrings {
     hotkeyPress: 'Appuie sur les touches…',
     hotkeyInvalid: 'Ajoute Ctrl, Alt ou Win à la touche',
     hotkeyReset: 'Rétablir le raccourci par défaut',
+    queryActionsSection: 'Avec ce texte',
+    entryKinds: <String, String>{
+      'open': 'Ouvre un écran de l’app',
+      'action': 'S’exécute ici',
+      'app': 'Ouvre une autre app',
+    },
   );
 
   /// Accessible name of the dialog.
@@ -269,6 +281,14 @@ class CommandBarStrings {
   /// Hotkey field: tooltip of the button back to the default.
   final String hotkeyReset;
 
+  /// Title of the actions that use the typed text (see
+  /// [CommandBarEntry.usesQuery]), listed after the matches.
+  final String queryActionsSection;
+
+  /// What each [CommandBarEntryKind] does, by its id: the tooltip of its
+  /// marker, and read aloud with the row. An app adds its own kinds here.
+  final Map<String, String> entryKinds;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -317,6 +337,8 @@ class CommandBarStrings {
     String? hotkeyPress,
     String? hotkeyInvalid,
     String? hotkeyReset,
+    String? queryActionsSection,
+    Map<String, String>? entryKinds,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -364,5 +386,7 @@ class CommandBarStrings {
     hotkeyPress: hotkeyPress ?? this.hotkeyPress,
     hotkeyInvalid: hotkeyInvalid ?? this.hotkeyInvalid,
     hotkeyReset: hotkeyReset ?? this.hotkeyReset,
+    queryActionsSection: queryActionsSection ?? this.queryActionsSection,
+    entryKinds: entryKinds ?? this.entryKinds,
   );
 }

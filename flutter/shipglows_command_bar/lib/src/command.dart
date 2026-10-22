@@ -1,11 +1,61 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
 
 /// Runs a command. [context] is the context of the [CommandBarScope] that
 /// opened the bar, below the app navigator, so routing works from it.
 typedef CommandBarRun = FutureOr<void> Function(BuildContext context);
+
+/// Runs a command on the text typed in the bar ([query], filter prefix
+/// left out), as [CommandBarCommand.query] builds.
+typedef CommandBarQueryRun =
+    FutureOr<void> Function(BuildContext context, String query);
+
+/// Stands for the typed text in the label and subtitle of an entry that
+/// [CommandBarEntry.usesQuery]: `Search « {query} » on the web`.
+const String commandBarQueryPlaceholder = '{query}';
+
+/// What choosing an entry does, shown as a small marker on its row when
+/// [CommandBarBehavior.showEntryKinds] is on, so an action that runs right
+/// in the bar never looks like a way to a screen.
+///
+/// [open], [action] and [app] cover most entries; an app adds its own with
+/// another [id], and names it in [CommandBarStrings.entryKinds].
+@immutable
+class CommandBarEntryKind {
+  const CommandBarEntryKind(this.id, {required this.icon});
+
+  /// Goes to a screen of the app.
+  static const open = CommandBarEntryKind(
+    'open',
+    icon: Icons.north_east_rounded,
+  );
+
+  /// Does the work right from the bar: save, copy, toggle, paste.
+  static const action = CommandBarEntryKind('action', icon: Icons.bolt_rounded);
+
+  /// Opens another application, such as the browser.
+  static const app = CommandBarEntryKind('app', icon: Icons.launch_rounded);
+
+  /// The built-in kinds, which JSON restores by [id] alone.
+  static const builtIn = <CommandBarEntryKind>[open, action, app];
+
+  /// Stable identifier, also the key of [CommandBarStrings.entryKinds] and of
+  /// [CommandBarBehavior.hiddenKinds].
+  final String id;
+
+  /// Marker shown on the row.
+  final IconData icon;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CommandBarEntryKind && other.id == id && other.icon == icon;
+
+  @override
+  int get hashCode => Object.hash(id, icon);
+}
 
 /// Display data of one command, without any callback.
 ///
@@ -30,6 +80,8 @@ class CommandBarEntry {
     this.searchOnly = false,
     this.primaryLabel,
     this.badge,
+    this.kind,
+    this.usesQuery = false,
   });
 
   /// Restores an entry from [json], as produced by [toJson].
@@ -50,6 +102,8 @@ class CommandBarEntry {
     }
     final codePoint = json['iconCodePoint'];
     return CommandBarEntry(
+      kind: _kindFrom(json['kind'], json['kindIconCodePoint'], iconFor),
+      usesQuery: json['usesQuery'] == true,
       id: id,
       label: label,
       section: section,
@@ -121,6 +175,37 @@ class CommandBarEntry {
   /// as « Asleep » or a snippet trigger.
   final String? badge;
 
+  /// What choosing the entry does, marked on its row. No marker when null.
+  final CommandBarEntryKind? kind;
+
+  /// Whether the entry works on the typed text: it is never searched, and is
+  /// listed under [CommandBarStrings.queryActionsSection] once words are
+  /// typed, after the matches or alone when nothing matches.
+  /// [commandBarQueryPlaceholder] in [label] and [subtitle] shows the text.
+  final bool usesQuery;
+
+  /// Copy of this entry with [commandBarQueryPlaceholder] replaced by
+  /// [query] in its label and subtitle.
+  CommandBarEntry withQuery(String query) => CommandBarEntry(
+    id: id,
+    label: label.replaceAll(commandBarQueryPlaceholder, query),
+    section: section,
+    icon: icon,
+    subtitle: subtitle?.replaceAll(commandBarQueryPlaceholder, query),
+    keywords: keywords,
+    shortcuts: shortcuts,
+    tags: tags,
+    enabled: enabled,
+    disabledReason: disabledReason,
+    secondaryLabel: secondaryLabel,
+    hasSecondary: hasSecondary,
+    searchOnly: searchOnly,
+    primaryLabel: primaryLabel,
+    badge: badge,
+    kind: kind,
+    usesQuery: usesQuery,
+  );
+
   /// JSON-safe map with the same keys [CommandBarEntry.fromJson] reads.
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -138,6 +223,9 @@ class CommandBarEntry {
     'searchOnly': searchOnly,
     'primaryLabel': primaryLabel,
     'badge': badge,
+    'kind': kind?.id,
+    'kindIconCodePoint': kind?.icon.codePoint,
+    'usesQuery': usesQuery,
   };
 
   @override
@@ -157,7 +245,9 @@ class CommandBarEntry {
       other.hasSecondary == hasSecondary &&
       other.searchOnly == searchOnly &&
       other.primaryLabel == primaryLabel &&
-      other.badge == badge;
+      other.badge == badge &&
+      other.kind == kind &&
+      other.usesQuery == usesQuery;
 
   @override
   int get hashCode => Object.hash(
@@ -176,6 +266,8 @@ class CommandBarEntry {
     searchOnly,
     primaryLabel,
     badge,
+    kind,
+    usesQuery,
   );
 }
 
@@ -199,7 +291,32 @@ class CommandBarCommand {
     this.searchOnly = false,
     this.primaryLabel,
     this.badge,
-  });
+    this.kind,
+  }) : runQuery = null;
+
+  /// A command on the typed text, listed once words are typed (see
+  /// [CommandBarEntry.usesQuery]): save it as a note, search it on the web.
+  /// [commandBarQueryPlaceholder] in [label] or [subtitle] shows the text.
+  /// Never kept in the recents, which have no text to run on.
+  const CommandBarCommand.query({
+    required this.id,
+    required this.label,
+    required this.section,
+    required CommandBarQueryRun this.runQuery,
+    this.icon,
+    this.subtitle,
+    this.keywords = const <String>[],
+    this.tags = const <String>{},
+    this.enabled = true,
+    this.disabledReason,
+    this.primaryLabel,
+    this.badge,
+    this.kind = CommandBarEntryKind.action,
+  }) : run = _runNothing,
+       shortcuts = const <String>[],
+       secondaryLabel = null,
+       runSecondary = null,
+       searchOnly = false;
 
   /// See [CommandBarEntry.id].
   final String id;
@@ -210,8 +327,16 @@ class CommandBarCommand {
   /// See [CommandBarEntry.section].
   final String section;
 
-  /// Runs the command. Only called while [enabled].
+  /// Runs the command. Only called while [enabled]. Unused by a
+  /// [CommandBarCommand.query], which runs [runQuery].
   final CommandBarRun run;
+
+  /// Runs the command on the typed text; null unless built with
+  /// [CommandBarCommand.query].
+  final CommandBarQueryRun? runQuery;
+
+  /// See [CommandBarEntry.kind].
+  final CommandBarEntryKind? kind;
 
   /// See [CommandBarEntry.icon].
   final IconData? icon;
@@ -267,8 +392,12 @@ class CommandBarCommand {
     searchOnly: searchOnly,
     primaryLabel: primaryLabel,
     badge: badge,
+    kind: kind,
+    usesQuery: runQuery != null,
   );
 }
+
+void _runNothing(BuildContext context) {}
 
 /// A titled group of the list. Sections show in the order the bar receives
 /// them; entries of an unknown section come last, titled by their id.
@@ -351,6 +480,21 @@ List<String> commandShortcutKeys(String shortcut) {
 }
 
 String? _optionalString(Object? value) => value is String ? value : null;
+
+/// A built-in kind from its id; another kind keeps its id and gets its icon
+/// back through [iconFor].
+CommandBarEntryKind? _kindFrom(
+  Object? id,
+  Object? codePoint,
+  IconData? Function(int codePoint)? iconFor,
+) {
+  if (id is! String) return null;
+  for (final kind in CommandBarEntryKind.builtIn) {
+    if (kind.id == id) return kind;
+  }
+  final icon = codePoint is int ? iconFor?.call(codePoint) : null;
+  return icon == null ? null : CommandBarEntryKind(id, icon: icon);
+}
 
 List<String> _stringList(Object? value) {
   if (value is! List) return const <String>[];

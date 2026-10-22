@@ -214,6 +214,7 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
       'id': entry.id,
       'secondary': choice.secondary,
       'previousForeground': previous,
+      'query': choice.query,
     });
   }
 

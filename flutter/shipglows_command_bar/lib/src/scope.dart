@@ -649,6 +649,18 @@ class _CommandBarScopeState extends State<CommandBarScope>
       if (candidate.id == choice.id) command = candidate;
     }
     if (command == null) return;
+    final runQuery = command.runQuery;
+    final query = choice.query;
+    if (runQuery != null) {
+      // No recent: it has no text to run on later.
+      if (query == null || !command.enabled || !mounted) return;
+      try {
+        await runQuery(context, query);
+      } catch (error, stackTrace) {
+        _report(error, stackTrace);
+      }
+      return;
+    }
     final run = choice.secondary
         ? command.runSecondary
         : command.enabled
