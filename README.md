@@ -68,6 +68,9 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   `onSearchDragStart` turns a mouse drag in the field into a window move
   instead of a text selection. Click to place the caret and keyboard
   selection (Shift+arrows, Ctrl/⌘+A) keep working.
+- `CommandBarView.fillHeight`: the bar takes all the height it is given (the
+  list grows, the footer stays at the bottom), for a window of its own; off,
+  it is as tall as its content, as in a dialog.
 
 ## `flutter/shipglows_window`
 
@@ -229,6 +232,7 @@ on close. Escape and a click outside close it.
   icon fonts stay tree-shaken). `initialEntries` fills the bar before the
   first snapshot. `ShipglowsCommandBarOverlayController` and
   `ShipglowsCommandBarOverlayApp` for an app that calls `runApp` itself.
+- The bar fills the window's height (`fillHeight`), maximized included.
 - Drag anywhere to move the window, the search field included; double-click
   on the search field or an empty area maximizes or restores it (`defaultOptions(doubleClickMaximizes:)`,
   on by default).

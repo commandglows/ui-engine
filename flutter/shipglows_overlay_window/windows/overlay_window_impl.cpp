@@ -578,6 +578,7 @@ void OverlayWindowImpl::SetViewVisible(bool shown, bool focus) {
     return;
   }
   EnableWindow(view_window, TRUE);
+  FitViewToClient();
   ShowWindow(view_window, SW_SHOWNOACTIVATE);
   // Readiness is asynchronous: never take focus back from another app.
   if (focus && GetForegroundWindow() == window_) SetFocus(view_window);
@@ -823,10 +824,17 @@ void OverlayWindowImpl::FitViewToClient() {
 void OverlayWindowImpl::FitView(int width, int height) {
   const HWND view_window = view();
   if (view_window == nullptr) return;
+  // The view must sit at the client origin as well: a programmatic resize
+  // that moves the window (maximize, eased size reset) can leave it at its
+  // old screen place, since no client pixel is kept across the change.
   RECT current{};
-  if (GetClientRect(view_window, &current) && current.right == width &&
-      current.bottom == height) {
-    return;
+  if (GetWindowRect(view_window, &current)) {
+    MapWindowPoints(HWND_DESKTOP, window_, reinterpret_cast<POINT*>(&current),
+                    2);
+    if (current.left == 0 && current.top == 0 && current.right == width &&
+        current.bottom == height) {
+      return;
+    }
   }
   // The engine blocks here until a frame of the new size is on screen (up to
   // a hundred milliseconds): the window is only ever seen with content that
@@ -1112,6 +1120,10 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
     case WM_SIZE:
       UpdateRegion();
       // A hidden view keeps the size its runner gave it.
+      if (view_visible_) FitViewToClient();
+      return 0;
+    case WM_MOVE:
+      // Keeps the view at the client origin after a programmatic move.
       if (view_visible_) FitViewToClient();
       return 0;
     case WM_ACTIVATE: {

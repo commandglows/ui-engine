@@ -48,6 +48,7 @@ class CommandBarView extends StatefulWidget {
     this.onSearchDoubleTap,
     this.onSearchDragStart,
     this.footerBuilder,
+    this.fillHeight = false,
   });
 
   /// Where the entries come from.
@@ -92,6 +93,11 @@ class CommandBarView extends StatefulWidget {
   /// Wraps the footer strip of key hints, which holds nothing to click: a
   /// frameless window can make it its drag area.
   final Widget Function(BuildContext context, Widget footer)? footerBuilder;
+
+  /// Whether the bar takes all the height it is given, the list growing and
+  /// the footer at the bottom (a window of its own). Otherwise it is as tall
+  /// as its content (a dialog).
+  final bool fillHeight;
 
   @override
   State<CommandBarView> createState() => _CommandBarViewState();
@@ -530,7 +536,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     return Focus(
       onKeyEvent: (node, event) => _onKeyEvent(event, style.rowMinHeight),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: widget.fillHeight ? MainAxisSize.max : MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
@@ -596,6 +602,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                   : Text(_prefixHint(), style: mutedStyle),
             ),
           Flexible(
+            fit: widget.fillHeight ? FlexFit.tight : FlexFit.loose,
             child: layout.items.isEmpty
                 ? Padding(
                     padding: const EdgeInsets.all(32),

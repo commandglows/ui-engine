@@ -396,6 +396,9 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
           strings: widget.strings,
           behavior: widget.behavior,
           autofocus: controller.visible,
+          // The window sets the height: the list fills it, footer at the
+          // bottom, maximized included.
+          fillHeight: true,
           // The search field moves and maximizes the window like the rest
           // of the bar, rather than selecting text with the mouse.
           onSearchDragStart: () => unawaited(controller.host.startDrag()),
