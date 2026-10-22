@@ -52,8 +52,8 @@ class CommandBarBehavior {
   /// first.
   final bool sortSectionsByMatch;
 
-  /// Whether each prefix of the hint line under an empty field is a button
-  /// that applies its filter.
+  /// Kept for saved settings only: the filter row under the field is always
+  /// made of buttons now.
   final bool tappablePrefixHints;
 
   /// Whether the bar opens with the last search typed, run or not, fully

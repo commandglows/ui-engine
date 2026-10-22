@@ -341,6 +341,33 @@ class _CommandBarViewState extends State<CommandBarView> {
     });
   }
 
+  /// Moves to the previous or next button of the filter row, « All » first,
+  /// wrapping around.
+  void _stepFilter(int delta) {
+    final steps = <CommandBarFilter?>[null, ...widget.filters];
+    // By prefix: the app may rebuild its filters (a new language).
+    final current = steps.indexWhere(
+      (step) => step?.prefix == _filter?.prefix,
+    );
+    final next = steps[(current + delta) % steps.length];
+    if (next == null) {
+      _clearFilter();
+    } else {
+      _applyFilter(next);
+    }
+  }
+
+  /// Whether Left or Right should change the filter: the field is empty, or
+  /// the caret already sits at that edge, so the key would not move it.
+  bool _arrowSwitchesFilter({required bool left}) {
+    if (widget.filters.isEmpty) return false;
+    final text = _controller.text;
+    if (text.isEmpty) return true;
+    final selection = _controller.selection;
+    if (!selection.isValid || !selection.isCollapsed) return false;
+    return selection.baseOffset == (left ? 0 : text.length);
+  }
+
   /// The highlighted entry, kept inside the list when it shrank.
   int get _effectiveHighlight => _layout.items.isEmpty
       ? 0
@@ -632,6 +659,17 @@ class _CommandBarViewState extends State<CommandBarView> {
       _moveHighlight(-1, rowHeight);
       return KeyEventResult.handled;
     }
+    if ((key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.arrowRight) &&
+        !keyboard.isShiftPressed &&
+        !keyboard.isAltPressed &&
+        !hasCommandModifier) {
+      // Elsewhere in the field the arrows move the caret as usual.
+      final left = key == LogicalKeyboardKey.arrowLeft;
+      if (!_arrowSwitchesFilter(left: left)) return KeyEventResult.ignored;
+      _stepFilter(left ? -1 : 1);
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       // Holding Enter must not run a command again and again.
@@ -805,15 +843,6 @@ class _CommandBarViewState extends State<CommandBarView> {
     return _BarLayout(rows: rows, items: items, rowOfItem: rowOfItem);
   }
 
-  String _prefixHint() {
-    final parts = [
-      for (final filter in widget.filters)
-        '${filter.prefix == ' ' ? widget.strings.spaceKey : filter.prefix} '
-            '${filter.label.toLowerCase()}',
-    ];
-    return '${widget.strings.prefixesHint} ${parts.join(' · ')}';
-  }
-
   Widget _wrapFooter(BuildContext context, Widget footer) =>
       widget.footerBuilder?.call(context, footer) ?? footer;
 
@@ -856,17 +885,12 @@ class _CommandBarViewState extends State<CommandBarView> {
   Widget build(BuildContext context) {
     final style = CommandBarThemeData.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final mutedStyle = textTheme.labelSmall?.copyWith(color: style.mutedColor);
     final strings = widget.strings;
 
     final layout = _layoutFor();
     _layout = layout;
     final highlight = _effectiveHighlight;
     final filter = _filter;
-    final showPrefixHint =
-        widget.filters.isNotEmpty &&
-        filter == null &&
-        _controller.text.trim().isEmpty;
     final showNumbers =
         MediaQuery.sizeOf(context).width >= _numberedRowsMinWidth;
     final highlighted = layout.items.isEmpty ? null : layout.items[highlight];
@@ -930,17 +954,16 @@ class _CommandBarViewState extends State<CommandBarView> {
             ],
           ),
           Divider(height: 1, color: style.borderColor),
-          if (showPrefixHint)
+          if (widget.filters.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: widget.behavior.tappablePrefixHints
-                  ? _TappablePrefixHints(
-                      filters: widget.filters,
-                      strings: strings,
-                      style: mutedStyle,
-                      onApply: _applyFilter,
-                    )
-                  : Text(_prefixHint(), style: mutedStyle),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: _FilterRow(
+                filters: widget.filters,
+                active: filter,
+                strings: strings,
+                onApply: _applyFilter,
+                onClear: _clearFilter,
+              ),
             ),
           Flexible(
             fit: widget.fillHeight ? FlexFit.tight : FlexFit.loose,
@@ -1002,6 +1025,11 @@ class _CommandBarViewState extends State<CommandBarView> {
                       keys: const ['↑', '↓'],
                       label: strings.navigate,
                     ),
+                    if (widget.filters.isNotEmpty)
+                      _FooterHint(
+                        keys: const ['←', '→'],
+                        label: strings.switchFilter,
+                      ),
                     _FooterHint(
                       keys: const ['Enter'],
                       label: highlighted?.primaryLabel ?? strings.open,
@@ -1270,55 +1298,118 @@ class CommandBarTile extends StatelessWidget {
   }
 }
 
-/// The prefix hint line, with one button per filter.
-class _TappablePrefixHints extends StatelessWidget {
-  const _TappablePrefixHints({
+/// The filter row: « All », then one button per filter, the active one
+/// highlighted. Left and Right step through it from the edges of the field.
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({
     required this.filters,
+    required this.active,
     required this.strings,
-    required this.style,
     required this.onApply,
+    required this.onClear,
   });
 
   final List<CommandBarFilter> filters;
+  final CommandBarFilter? active;
   final CommandBarStrings strings;
-  final TextStyle? style;
   final ValueChanged<CommandBarFilter> onApply;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 4,
-      runSpacing: 2,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(strings.prefixesHint, style: style),
-        for (final filter in filters)
-          Tooltip(
-            message:
-                (filter.requiresSpace
-                        ? strings.prefixTooltip
-                        : strings.prefixTooltipNoSpace)
-                    .replaceAll(
-                      '{prefix}',
-                      filter.prefix == ' ' ? strings.spaceKey : filter.prefix,
-                    ),
-            child: TextButton(
-              onPressed: () => onApply(filter),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(0, 28),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-              ),
-              child: Text(
-                '${filter.prefix == ' ' ? strings.spaceKey : filter.prefix} '
-                '${filter.label.toLowerCase()}',
-                style: style,
-              ),
-            ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _FilterButton(
+            label: strings.allFilters,
+            selected: active == null,
+            onPressed: onClear,
           ),
-      ],
+          for (final filter in filters) ...[
+            const SizedBox(width: 4),
+            _FilterButton(
+              label: filter.label,
+              prefix: filter.prefix == ' ' ? strings.spaceKey : filter.prefix,
+              tooltip:
+                  (filter.requiresSpace
+                          ? strings.prefixTooltip
+                          : strings.prefixTooltipNoSpace)
+                      .replaceAll(
+                        '{prefix}',
+                        filter.prefix == ' ' ? strings.spaceKey : filter.prefix,
+                      ),
+              selected: active?.prefix == filter.prefix,
+              onPressed: () => onApply(filter),
+            ),
+          ],
+        ],
+      ),
     );
+  }
+}
+
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+    this.prefix,
+    this.tooltip,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  /// The prefix that applies the filter when typed, shown small after the
+  /// label.
+  final String? prefix;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CommandBarThemeData.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final color = selected ? style.highlightedIconColor : style.mutedColor;
+    final prefix = this.prefix;
+    final button = Semantics(
+      selected: selected,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          backgroundColor: selected ? style.highlightColor : null,
+          foregroundColor: color,
+          minimumSize: const Size(0, 30),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: Text.rich(
+          TextSpan(
+            text: label,
+            style: textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: selected ? FontWeight.w600 : null,
+            ),
+            children: [
+              if (prefix != null)
+                TextSpan(
+                  text: '  $prefix',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: style.mutedColor.withValues(alpha: 0.7),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final tooltip = this.tooltip;
+    return tooltip == null ? button : Tooltip(message: tooltip, child: button);
   }
 }
 

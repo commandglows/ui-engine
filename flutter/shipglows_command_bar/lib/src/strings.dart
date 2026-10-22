@@ -19,6 +19,8 @@ class CommandBarStrings {
     required this.openCommandBar,
     this.prefixTooltip = 'Type « {prefix} » then Space',
     this.prefixTooltipNoSpace = 'Type « {prefix} »',
+    this.allFilters = 'All',
+    this.switchFilter = 'change type',
     this.shortcutsTitle = 'Keyboard shortcuts',
     this.shortcutsPage = 'On this page',
     this.shortcutsEverywhere = 'Everywhere',
@@ -70,6 +72,7 @@ class CommandBarStrings {
     },
     this.actions = 'actions',
     this.actionsPanel = 'Actions of « {label} »',
+    this.confirmAction = 'Press again to confirm',
   });
 
   /// English texts.
@@ -104,6 +107,8 @@ class CommandBarStrings {
     openCommandBar: 'Ouvrir la barre de commandes',
     prefixTooltip: 'Tape « {prefix} » puis Espace',
     prefixTooltipNoSpace: 'Tape « {prefix} »',
+    allFilters: 'Tous',
+    switchFilter: 'changer de type',
     shortcutsTitle: 'Raccourcis clavier',
     shortcutsPage: 'Sur cette page',
     shortcutsEverywhere: 'Partout',
@@ -155,6 +160,7 @@ class CommandBarStrings {
     },
     actions: 'actions',
     actionsPanel: 'Actions de « {label} »',
+    confirmAction: 'Appuie encore pour confirmer',
   );
 
   /// Accessible name of the dialog.
@@ -193,11 +199,17 @@ class CommandBarStrings {
   /// Label of the hotkey in a shortcuts help list.
   final String openCommandBar;
 
-  /// Tooltip of a tappable prefix hint; `{prefix}` is the prefix.
+  /// Tooltip of a filter button; `{prefix}` is the prefix.
   final String prefixTooltip;
 
-  /// Tooltip of a tappable prefix hint whose filter needs no space.
+  /// Tooltip of a filter button whose filter needs no space.
   final String prefixTooltipNoSpace;
+
+  /// Filter row: the button that removes the filter.
+  final String allFilters;
+
+  /// Footer: left and right arrows, which step through the filter row.
+  final String switchFilter;
 
   /// Title of the shortcuts sheet, also its entry in the bar.
   final String shortcutsTitle;
@@ -315,6 +327,10 @@ class CommandBarStrings {
   /// entry's label.
   final String actionsPanel;
 
+  /// Replaces the label of a [CommandBarEntryAction.confirm] action once it
+  /// was chosen once in the actions panel: choosing it again runs it.
+  final String confirmAction;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -331,6 +347,8 @@ class CommandBarStrings {
     String? openCommandBar,
     String? prefixTooltip,
     String? prefixTooltipNoSpace,
+    String? allFilters,
+    String? switchFilter,
     String? shortcutsTitle,
     String? shortcutsPage,
     String? shortcutsEverywhere,
@@ -368,6 +386,7 @@ class CommandBarStrings {
     Map<String, String>? entryKindLabels,
     String? actions,
     String? actionsPanel,
+    String? confirmAction,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -383,6 +402,8 @@ class CommandBarStrings {
     openCommandBar: openCommandBar ?? this.openCommandBar,
     prefixTooltip: prefixTooltip ?? this.prefixTooltip,
     prefixTooltipNoSpace: prefixTooltipNoSpace ?? this.prefixTooltipNoSpace,
+    allFilters: allFilters ?? this.allFilters,
+    switchFilter: switchFilter ?? this.switchFilter,
     shortcutsTitle: shortcutsTitle ?? this.shortcutsTitle,
     shortcutsPage: shortcutsPage ?? this.shortcutsPage,
     shortcutsEverywhere: shortcutsEverywhere ?? this.shortcutsEverywhere,
@@ -420,5 +441,6 @@ class CommandBarStrings {
     entryKindLabels: entryKindLabels ?? this.entryKindLabels,
     actions: actions ?? this.actions,
     actionsPanel: actionsPanel ?? this.actionsPanel,
+    confirmAction: confirmAction ?? this.confirmAction,
   );
 }
