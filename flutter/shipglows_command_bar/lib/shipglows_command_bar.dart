@@ -1,4 +1,4 @@
-/// Shared Ctrl/Cmd+K command bar for ShipGlows Flutter apps.
+/// Shared command bar for ShipGlows Flutter apps (Ctrl+Alt+Space by default).
 ///
 /// Wrap the app shell in a [CommandBarScope] to get the global hotkey, or use
 /// [CommandBarView] and [showCommandBar] directly for a bar fed by another
@@ -7,6 +7,8 @@ library;
 
 export 'src/behavior.dart';
 export 'src/command.dart';
+export 'src/hotkey.dart';
+export 'src/hotkey_field.dart';
 export 'src/practice.dart';
 export 'src/query.dart';
 export 'src/query_history.dart';

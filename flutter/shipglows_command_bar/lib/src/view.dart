@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'behavior.dart';
 import 'command.dart';
+import 'hotkey.dart';
 import 'query.dart';
 import 'query_history.dart';
 import 'strings.dart';
@@ -33,7 +34,7 @@ class CommandBarChoice {
 /// Keys: ↑/↓ move, Enter chooses, Shift+Enter or Ctrl/⌘+Enter chooses the
 /// secondary action,
 /// Ctrl/⌘+1…9 chooses row n, Backspace on an empty field removes the filter,
-/// Escape removes the filter first, then closes, and Ctrl/⌘+K closes.
+/// Escape removes the filter first, then closes, and [hotkey] closes.
 ///
 /// With [CommandBarBehavior.restoreLastQuery] the field opens with the first
 /// of [queryHistory], selected; with [CommandBarBehavior.showQueryHistory]
@@ -57,6 +58,7 @@ class CommandBarView extends StatefulWidget {
     this.fillHeight = false,
     this.queryHistory = const <String>[],
     this.onQueryUsed,
+    this.hotkey = CommandBarHotkey.standard,
   });
 
   /// Where the entries come from.
@@ -114,6 +116,10 @@ class CommandBarView extends StatefulWidget {
   /// Called with the search, filter prefix included, when an entry is chosen
   /// after typing words. Not called for a choice made from an empty field.
   final ValueChanged<String>? onQueryUsed;
+
+  /// The app's hotkey for the bar, which closes it too. Null when a native
+  /// shell handles it system-wide (a floating window).
+  final CommandBarHotkey? hotkey;
 
   @override
   State<CommandBarView> createState() => _CommandBarViewState();
@@ -469,7 +475,7 @@ class _CommandBarViewState extends State<CommandBarView> {
       _chooseItem(digit - 1, secondary: false);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyK && hasCommandModifier) {
+    if (widget.hotkey?.matches(event) ?? false) {
       widget.onClose();
       return KeyEventResult.handled;
     }

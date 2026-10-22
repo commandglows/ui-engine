@@ -439,6 +439,9 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
           behavior: widget.behavior,
           queryHistory: controller.queryHistory,
           onQueryUsed: controller.useQuery,
+          // The app registers the hotkey system-wide: it closes the window
+          // from there, never from here.
+          hotkey: null,
           autofocus: controller.visible,
           // The window sets the height: the list fills it, footer at the
           // bottom, maximized included.

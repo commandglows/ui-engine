@@ -53,6 +53,10 @@ class CommandBarStrings {
     this.shiftKey = 'Shift',
     this.querySection = 'Recent searches',
     this.fillQuery = 'search again',
+    this.hotkeyChange = 'Change the shortcut',
+    this.hotkeyPress = 'Press the keys…',
+    this.hotkeyInvalid = 'Add Ctrl, Alt or Win to the key',
+    this.hotkeyReset = 'Restore the default shortcut',
   });
 
   /// English texts.
@@ -121,6 +125,10 @@ class CommandBarStrings {
     shiftKey: 'Maj',
     querySection: 'Recherches récentes',
     fillQuery: 'relancer',
+    hotkeyChange: 'Changer le raccourci',
+    hotkeyPress: 'Appuie sur les touches…',
+    hotkeyInvalid: 'Ajoute Ctrl, Alt ou Win à la touche',
+    hotkeyReset: 'Rétablir le raccourci par défaut',
   );
 
   /// Accessible name of the dialog.
@@ -249,6 +257,18 @@ class CommandBarStrings {
   /// Footer: Enter on a recent search, which puts it back in the field.
   final String fillQuery;
 
+  /// Hotkey field: accessible name of the button that records a new one.
+  final String hotkeyChange;
+
+  /// Hotkey field: shown while it waits for the keys.
+  final String hotkeyPress;
+
+  /// Hotkey field: the keys pressed cannot open the bar.
+  final String hotkeyInvalid;
+
+  /// Hotkey field: tooltip of the button back to the default.
+  final String hotkeyReset;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -293,6 +313,10 @@ class CommandBarStrings {
     String? shiftKey,
     String? querySection,
     String? fillQuery,
+    String? hotkeyChange,
+    String? hotkeyPress,
+    String? hotkeyInvalid,
+    String? hotkeyReset,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -336,5 +360,9 @@ class CommandBarStrings {
     shiftKey: shiftKey ?? this.shiftKey,
     querySection: querySection ?? this.querySection,
     fillQuery: fillQuery ?? this.fillQuery,
+    hotkeyChange: hotkeyChange ?? this.hotkeyChange,
+    hotkeyPress: hotkeyPress ?? this.hotkeyPress,
+    hotkeyInvalid: hotkeyInvalid ?? this.hotkeyInvalid,
+    hotkeyReset: hotkeyReset ?? this.hotkeyReset,
   );
 }

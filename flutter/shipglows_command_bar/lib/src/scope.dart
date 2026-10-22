@@ -9,6 +9,8 @@ import 'behavior.dart';
 import 'browser_guard.dart'
     if (dart.library.js_interop) 'browser_guard_web.dart';
 import 'command.dart';
+import 'hotkey.dart';
+import 'hotkey_field.dart';
 import 'practice.dart';
 import 'query_history.dart';
 import 'recents.dart';
@@ -18,9 +20,10 @@ import 'strings.dart';
 import 'theme.dart';
 import 'view.dart';
 
-/// Keycap labels of the hotkey that opens the bar: `Ctrl K`, or `⌘ K` on
-/// Apple platforms.
-List<String> commandBarHotkeyKeys() => [commandBarPrimaryModifierLabel(), 'K'];
+/// Keycap labels of the default hotkey that opens the bar
+/// ([CommandBarHotkey.standard]). An app with its own setting shows
+/// `hotkey.keys()` instead.
+List<String> commandBarHotkeyKeys() => CommandBarHotkey.standard.keys();
 
 /// Opens the command bar over [context] and completes with what the user
 /// chose, once the dialog is gone, or null when it was closed.
@@ -47,6 +50,7 @@ Future<CommandBarChoice?> showCommandBar(
   CommandBarBehavior behavior = const CommandBarBehavior(),
   List<String> queryHistory = const <String>[],
   ValueChanged<String>? onQueryUsed,
+  CommandBarHotkey? hotkey = CommandBarHotkey.standard,
   ValueChanged<Route<CommandBarChoice>>? onRoute,
 }) {
   final style = CommandBarThemeData.of(context);
@@ -80,6 +84,7 @@ Future<CommandBarChoice?> showCommandBar(
       behavior: behavior,
       queryHistory: queryHistory,
       onQueryUsed: onQueryUsed,
+      hotkey: hotkey,
       onChoose: finish,
       onClose: finish,
     ),
@@ -216,7 +221,8 @@ abstract interface class CommandBarController {
   Future<void> showShortcuts();
 }
 
-/// Gives the subtree a command bar opened with Ctrl/⌘+K.
+/// Gives the subtree a command bar opened with its [hotkey] (Ctrl+Alt+Space
+/// by default).
 ///
 /// Place it below the app navigator, around the shell: commands run with its
 /// context, so routing works from them. [commands] is read each time the bar
@@ -236,7 +242,7 @@ class CommandBarScope extends StatefulWidget {
     this.strings = CommandBarStrings.en,
     this.recents,
     this.queryHistory,
-    this.hotkey = true,
+    this.hotkey = CommandBarHotkey.standard,
     this.onError,
     this.refresh,
     this.resizable = true,
@@ -273,8 +279,11 @@ class CommandBarScope extends StatefulWidget {
   /// [CommandBarBehavior.showQueryHistory].
   final CommandBarQueryHistoryStore? queryHistory;
 
-  /// Whether Ctrl/⌘+K opens and closes the bar.
-  final bool hotkey;
+  /// The combination that opens and closes the bar, the app's single
+  /// setting ([CommandBarHotkeyField]). Null when the app registers it as a
+  /// system-wide hotkey itself (a Windows floating bar): the scope then
+  /// leaves the keys alone, so the two never run together.
+  final CommandBarHotkey? hotkey;
 
   /// Receives a command or recents failure. Reported to [FlutterError] when
   /// null.
@@ -299,7 +308,7 @@ class CommandBarScope extends StatefulWidget {
   final CommandBarBehavior Function(BuildContext context)? behavior;
 
   /// Opens another bar in place of the in-app one (the floating window, for
-  /// instance), for Ctrl/⌘+K and every [CommandBarController.open]. Read at
+  /// instance), for the hotkey and every [CommandBarController.open]. Read at
   /// each call, so it can be set after the first build; an open in-app bar
   /// closes when it is set. The registry, the recents and the commands stay
   /// the scope's. The in-app bar when null.
@@ -373,17 +382,22 @@ class _CommandBarScopeState extends State<CommandBarScope>
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
-    if (widget.hotkey) _browserGuard.install();
+    _syncBrowserGuard();
+  }
+
+  void _syncBrowserGuard() {
+    final hotkey = widget.hotkey;
+    if (hotkey != null) {
+      _browserGuard.install(hotkey);
+    } else {
+      _browserGuard.remove();
+    }
   }
 
   @override
   void didUpdateWidget(CommandBarScope oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.hotkey) {
-      _browserGuard.install();
-    } else {
-      _browserGuard.remove();
-    }
+    _syncBrowserGuard();
     if (widget.opener != null) close();
   }
 
@@ -397,7 +411,11 @@ class _CommandBarScopeState extends State<CommandBarScope>
 
   bool _onKey(KeyEvent event) {
     // The practice checks every key itself.
-    if (!mounted || CommandBarShortcutPractice.isActive) return false;
+    if (!mounted ||
+        CommandBarShortcutPractice.isActive ||
+        CommandBarHotkeyField.isRecording) {
+      return false;
+    }
     if (event is KeyDownEvent && _onBarKey(event)) return true;
     // App-wide bindings ([shortcuts]), while nothing covers the app.
     final shortcuts = widget.shortcuts;
@@ -407,7 +425,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
     return runCommandBarShortcutBindings(shortcuts(context), event);
   }
 
-  /// The sheet's keys and Ctrl/⌘+K.
+  /// The sheet's keys and the bar's [CommandBarScope.hotkey].
   bool _onBarKey(KeyDownEvent event) {
     if (_isShortcutsKey(event)) {
       if (_shortcutsRoute != null) {
@@ -418,15 +436,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
       unawaited(showShortcuts());
       return true;
     }
-    if (!widget.hotkey || event.logicalKey != LogicalKeyboardKey.keyK) {
-      return false;
-    }
-    final keyboard = HardwareKeyboard.instance;
-    if (!(keyboard.isControlPressed || keyboard.isMetaPressed) ||
-        keyboard.isAltPressed ||
-        keyboard.isShiftPressed) {
-      return false;
-    }
+    if (!(widget.hotkey?.matches(event) ?? false)) return false;
     if (isOpen) {
       close();
       return true;
@@ -520,9 +530,9 @@ class _CommandBarScopeState extends State<CommandBarScope>
       CommandBarShortcutGroup(
         title: strings.shortcutsEverywhere,
         hints: [
-          if (widget.hotkey)
+          if (widget.hotkey case final hotkey?)
             CommandBarShortcutHint(
-              shortcuts: [commandBarHotkeyKeys().join('+')],
+              shortcuts: [hotkey.label],
               label: strings.openCommandBar,
             ),
           if (_shortcutsKeys.isNotEmpty)
@@ -606,6 +616,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
       behavior: widget.behavior?.call(context) ?? const CommandBarBehavior(),
       queryHistory: _readQueryHistory(),
       onQueryUsed: (query) => unawaited(_rememberQuery(query)),
+      hotkey: widget.hotkey,
       onRoute: (route) => _route = route,
     );
     _route = null;
@@ -804,6 +815,7 @@ class _CommandBarDialog extends StatefulWidget {
     required this.behavior,
     required this.queryHistory,
     required this.onQueryUsed,
+    required this.hotkey,
     required this.onChoose,
     required this.onClose,
   });
@@ -819,6 +831,7 @@ class _CommandBarDialog extends StatefulWidget {
   final CommandBarBehavior behavior;
   final List<String> queryHistory;
   final ValueChanged<String>? onQueryUsed;
+  final CommandBarHotkey? hotkey;
   final ValueChanged<CommandBarChoice> onChoose;
   final VoidCallback onClose;
 
@@ -974,6 +987,7 @@ class _CommandBarDialogState extends State<_CommandBarDialog> {
           behavior: widget.behavior,
           queryHistory: widget.queryHistory,
           onQueryUsed: widget.onQueryUsed,
+          hotkey: widget.hotkey,
           onChoose: widget.onChoose,
           onClose: widget.onClose,
           onSearchDoubleTap: widget.expandable ? _toggleExpanded : null,
