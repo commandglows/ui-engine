@@ -21,8 +21,9 @@ import 'tray_items.dart';
 /// ShipglowsTray.instance.events.listen((event) { … });
 /// ```
 ///
-/// The standard entries (open, settings, check for updates, quit) are
-/// handled here and not emitted on [events].
+/// The standard entries (settings, check for updates, quit) are handled
+/// here and not emitted on [events]; « Ouvrir » is emitted
+/// (`ShipglowsTrayStandardIds.open`) once the window is in front.
 ///
 /// Windows only; elsewhere every call does nothing, [start] returns false
 /// and [events] stays empty.
@@ -247,7 +248,10 @@ class ShipglowsTray {
     final standard = _config?.standard;
     switch (id) {
       case ShipglowsTrayStandardIds.open:
-        break;
+        // The window is already in front; the app may refresh it.
+        _events.add(
+          ShipglowsTrayItemSelected(id, previousForeground: previousForeground),
+        );
       case ShipglowsTrayStandardIds.settings:
         standard?.onSettings?.call();
       case ShipglowsTrayStandardIds.checkForUpdates:

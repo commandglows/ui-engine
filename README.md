@@ -401,9 +401,11 @@ Single instance, in `windows/runner/main.cpp` before the window is created:
 if (ShipglowsTrayForwardToPrimary(L"contentglows")) return EXIT_SUCCESS;
 ```
 
-A runner that handles `WM_CLOSE` or its own tray icon must drop that code:
-the plugin intercepts `WM_CLOSE` through Flutter's top-level window
-delegate, which runs after the runner's own handling.
+The plugin decides on `WM_CLOSE` through Flutter's top-level window delegate
+(`HandleTopLevelWindowProc`). A runner drops its own tray icon, and runs any
+`WM_CLOSE` handling of its own (an orderly shutdown) after that call: the
+message only reaches it when the app really quits. The icon stays until the
+engine goes away, so a shutdown the runner cancels keeps it.
 
 ## `flutter/shipglows_hotkeys`
 

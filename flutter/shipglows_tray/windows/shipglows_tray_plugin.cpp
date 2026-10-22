@@ -214,17 +214,22 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     ActivateWindowForUser(window, window);
   }
 
+  // Lets the next WM_CLOSE through. The icon stays until the engine goes
+  // away, in case the runner's own shutdown keeps the app open.
   void Quit() {
     const HWND window = MainWindow();
     quitting_ = true;
-    host_.Hide();
     if (window != nullptr) PostMessageW(window, WM_CLOSE, 0, 0);
   }
 
   // Closing the main window while the tray runs.
   std::optional<LRESULT> HandleTopLevelMessage(HWND window, UINT message,
                                                WPARAM, LPARAM) {
-    if (message != WM_CLOSE || !started_ || quitting_) return std::nullopt;
+    if (message != WM_CLOSE || !started_) return std::nullopt;
+    if (quitting_) {
+      quitting_ = false;
+      return std::nullopt;
+    }
     switch (close_behavior_) {
       case CloseBehavior::kHideToTray:
         if (host_.visible()) {
@@ -243,8 +248,6 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
                  flutter::EncodableValue("quitRequested")}});
           return 0;
         }
-        quitting_ = true;
-        host_.Hide();
         return std::nullopt;
     }
     return std::nullopt;
