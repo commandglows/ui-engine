@@ -303,3 +303,82 @@ void commandBarMain() => runShipglowsCommandBarOverlay(
 
 The bar's engine registers no plugin and needs none. Icons travel as code
 points: `iconFor` must know every icon the app's entries use.
+
+## `flutter/shipglows_tray`
+
+Notification area (tray) icon for desktop apps (Windows; no-op on mobile,
+web, macOS and Linux). Native Win32, no third-party plugin.
+
+- Icon (the executable's by default, or an `.ico` asset or file), tooltip
+  (127 characters), both changeable while running (`update`).
+- Standard menu every app completes, with separators and monochrome glyphs
+  (Segoe Fluent Icons, Segoe MDL2 Assets on Windows 10) in the light or dark
+  theme of Windows apps: Ouvrir <app> (bold) │ app entries │ help entries │
+  Version (greyed, read from the executable) · Rechercher une mise à jour ·
+  Paramètres… │ Quitter <app>. Entries without a callback are left out;
+  labels in French or English (`ShipglowsTrayStrings`).
+- App entries: `ShipglowsTrayAction` (glyph, disabled, check mark, shortcut
+  text, `showsMainWindow`), `ShipglowsTrayHeader` (greyed section title),
+  `ShipglowsTraySubmenu`, `ShipglowsTraySeparator`.
+- Click (or Enter on the icon): open the main window (default), the menu,
+  an event, or a menu entry (`ShipglowsTrayClick`). Right click: the menu.
+- Every event carries `previousForeground`, the HWND of the last window in
+  front before the click (taskbar and menus ignored), for
+  `ShipglowsCommandBarWindow.open(previousForeground:)`.
+- Closing the main window: hide to the tray (default; minimize while the
+  icon is missing), minimize, or quit (`ShipglowsTrayCloseBehavior`,
+  `setCloseBehavior` for a setting). Quitting goes through
+  `onQuitRequested` (false keeps the app running).
+- Icon back after an Explorer restart, retried for a minute when the
+  taskbar is not ready at sign-in.
+- Single instance: a later launch hands its command line to the running app
+  (`ShipglowsTraySecondInstance`) and exits; the running app comes to the
+  front.
+
+```yaml
+dependencies:
+  shipglows_tray:
+    path: ../../shipglows-ui-engine/flutter/shipglows_tray
+```
+
+```dart
+await ShipglowsTray.instance.start(ShipglowsTrayConfig(
+  appName: 'ContentGlows',
+  items: const [
+    ShipglowsTrayAction('capture.screenshot', 'Capture d’écran',
+        glyph: ShipglowsTrayGlyph.screenshot),
+    ShipglowsTrayAction('commandBar', 'Barre de commandes',
+        glyph: ShipglowsTrayGlyph.commandBar),
+  ],
+  standard: ShipglowsTrayStandardMenu(
+    onSettings: () => router.go('/settings'),
+    onCheckForUpdates: () => autoUpdater.checkForUpdates(inBackground: false),
+  ),
+  onQuitRequested: () async => saveEverything(),
+));
+
+ShipglowsTray.instance.events.listen((event) {
+  switch (event) {
+    case ShipglowsTrayItemSelected(id: 'commandBar', :final previousForeground):
+      commandBar.open(previousForeground: previousForeground);
+    case ShipglowsTrayItemSelected(:final id):
+      runCommand(id);
+    case ShipglowsTraySecondInstance(:final arguments):
+      handleArguments(arguments); // untrusted: validate
+    case ShipglowsTrayClicked():
+      break;
+  }
+});
+```
+
+Single instance, in `windows/runner/main.cpp` before the window is created:
+
+```cpp
+#include <shipglows_tray/single_instance.h>
+
+if (ShipglowsTrayForwardToPrimary(L"contentglows")) return EXIT_SUCCESS;
+```
+
+A runner that handles `WM_CLOSE` or its own tray icon must drop that code:
+the plugin intercepts `WM_CLOSE` through Flutter's top-level window
+delegate, which runs after the runner's own handling.
