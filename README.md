@@ -137,7 +137,11 @@ own Flutter engine in its own window.
   `none` keeps it above everything. Windows it owns (file dialogs) are not
   outside.
 - Showing it never shows, raises or activates the main window; focus goes
-  back to the previous window when it hides.
+  back to the previous window when it hides. `hide(focus:)` picks another
+  target: `OverlayHideFocus.none`, or `.app` (the app's main window, shown
+  if hidden). `previousForeground` (both sides) is the HWND of the window in
+  front before the opening, for example to paste into it; `show` takes one
+  to override it (a tray menu that activated the app first).
 - Revealed only after Dart has drawn the data passed to `show`.
 - Drag to move; edges resize (`resizable`); double-click on an edge restores
   the default size (eased, unless Windows animations are off); double-click
@@ -151,6 +155,8 @@ own Flutter engine in its own window.
   `%APPDATA%\<appFolder>\overlay_windows.json`, clamped to the screen;
   per-monitor DPI.
 - Windows 11 rounded corners, border color and shadow (DWM).
+  `ShipglowsOverlayHost.setFrame` changes the dark frame, border and
+  background colors while the overlay runs (theme changes).
 - Alt+F4 and a plain Escape ask the overlay to close (`onRequestClose`,
   default: hide), whichever window holds the keyboard; `closeOnEscape = false`
   for an overlay with its own Escape handling. A dialog or menu above the
@@ -181,3 +187,73 @@ Overlay engines register no plugin unless the runner calls
 overlay natively (`ShipglowsOverlayWindowCreate`, see
 `windows/include/shipglows_overlay_window/overlay_window.h`), with a message
 hook for native content and their own position store.
+
+## `flutter/shipglows_command_bar_window`
+
+The shared command bar (`CommandBarView`) in its own floating window, on
+`shipglows_overlay_window`: own engine, always on top, opened in the upper
+part of the cursor's monitor, drag to move, edges to resize (native, no
+flicker), position and size remembered, focus back to the previous window
+on close. Escape and a click outside close it.
+
+- App engine: `ShipglowsCommandBarWindow` publishes a
+  `ShipglowsCommandBarSnapshot` (entries as `CommandBarEntry`, recent ids,
+  brightness, locale), opens, closes or toggles the bar and updates it in
+  place while open. `selections` reports each choice (`id`, `secondary`,
+  `previousForeground` HWND); the bar is already hidden and the app runs the
+  effect itself.
+- `appWindowIds`: entries that open a screen of the app; choosing one brings
+  the main window forward instead of the previous window.
+- Bar engine: `runShipglowsCommandBarOverlay` from the app's
+  `@pragma('vm:entry-point')` function, with its sections, filters, texts
+  (per locale), themes and icon table (code point → constant `IconData`, so
+  icon fonts stay tree-shaken). `initialEntries` fills the bar before the
+  first snapshot. `ShipglowsCommandBarOverlayController` and
+  `ShipglowsCommandBarOverlayApp` for an app that calls `runApp` itself.
+- The frame (dark mode, border, background) follows the bar's theme
+  (`CommandBarThemeData`).
+- Window options: `ShipglowsCommandBarWindow.defaultOptions(appFolder: …)`.
+
+```yaml
+dependencies:
+  shipglows_command_bar_window:
+    path: ../../ui-engine/flutter/shipglows_command_bar_window
+```
+
+```dart
+// App engine
+final bar = ShipglowsCommandBarWindow(
+  entrypoint: 'commandBarMain',
+  options: ShipglowsCommandBarWindow.defaultOptions(appFolder: 'MyApp'),
+);
+bar.selections.listen((selection) {
+  runCommand(selection.id, secondary: selection.secondary);
+});
+await bar.publish(ShipglowsCommandBarSnapshot(
+  entries: [for (final command in commands) command.entry],
+  recentIds: recents,
+  brightness: Brightness.dark,
+  locale: const Locale('fr'),
+  appWindowIds: {'screen:/settings'},
+));
+unawaited(bar.prepare()); // optional, first opening instant
+await bar.toggle(); // from the global hotkey
+
+// Bar engine (same Dart program, own entry point)
+@pragma('vm:entry-point')
+void commandBarMain() => runShipglowsCommandBarOverlay(
+  sections: (locale) => [
+    CommandBarSection(id: 'screens', title: tr(locale, 'Screens')),
+  ],
+  filters: (locale) => myFilters(locale),
+  strings: (locale) =>
+      locale.languageCode == 'fr' ? CommandBarStrings.fr : CommandBarStrings.en,
+  theme: lightTheme,
+  darkTheme: darkTheme,
+  iconFor: (codePoint) => myIcons[codePoint],
+  supportedLocales: const [Locale('en'), Locale('fr')],
+);
+```
+
+The bar's engine registers no plugin and needs none. Icons travel as code
+points: `iconFor` must know every icon the app's entries use.

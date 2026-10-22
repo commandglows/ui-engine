@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'overlay_options.dart';
 import 'overlay_window.dart';
 
 /// Edge or corner of an overlay that a resize starts from.
@@ -64,6 +65,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   bool _doubleClickMaximizes = false;
   bool _visible = false;
   bool _listeningKeys = false;
+  int? _previousForeground;
 
   /// Id of the overlay, once [ready] completed.
   String? get id => _id;
@@ -76,6 +78,10 @@ class ShipglowsOverlayHost extends ChangeNotifier {
 
   /// Whether the overlay is on screen.
   bool get visible => _visible;
+
+  /// Handle (HWND) of the window that was in front before the overlay
+  /// opened, set before [onShow] runs. Null when there was none.
+  int? get previousForeground => _previousForeground;
 
   /// Messages sent with [ShipglowsOverlayWindow.send].
   Stream<ShipglowsOverlayMessage> get messages => _messages.stream;
@@ -95,8 +101,24 @@ class ShipglowsOverlayHost extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Hides the overlay; focus goes back to the window in front before it.
-  Future<void> hide() => _call<void>('hide');
+  /// Hides the overlay; [focus] says which window gets the keyboard (by
+  /// default the one in front before it).
+  Future<void> hide({OverlayHideFocus focus = OverlayHideFocus.previous}) =>
+      _call<void>('hide', focus.name);
+
+  /// Changes the window frame set by [ShipglowsOverlayOptions] while the
+  /// overlay runs, as when it follows the app's theme. Null values keep the
+  /// current one.
+  Future<void> setFrame({
+    bool? darkFrame,
+    Color? borderColor,
+    Color? backgroundColor,
+  }) => _call<void>('setFrame', {
+    'darkFrame': ?darkFrame,
+    if (borderColor case final color?) 'borderColor': color.toARGB32(),
+    if (backgroundColor case final color?)
+      'backgroundColor': color.toARGB32(),
+  });
 
   /// Closes as Alt+F4 does: [onRequestClose] decides, else [hide].
   Future<void> requestClose() async {
@@ -156,6 +178,10 @@ class ShipglowsOverlayHost extends ChangeNotifier {
     switch (call.method) {
       case 'show':
         if (arguments is! Map) return null;
+        final previous = arguments['previousForeground'];
+        _previousForeground = previous is int && previous != 0
+            ? previous
+            : null;
         await onShow?.call(arguments['data']);
         _setVisible(true);
         // The window appears only after a frame with this data was drawn.

@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "include/shipglows_overlay_window/overlay_window.h"
+#include "overlay_window_impl.h"
 
 namespace shipglows_overlay {
 namespace {
@@ -125,12 +126,29 @@ OverlayConfig ConfigFrom(const flutter::EncodableValue* arguments) {
   return config;
 }
 
+// Every overlay of the plugin comes from ShipglowsOverlayWindowCreate.
+OverlayWindowImpl* Impl(OverlayWindow* overlay) {
+  return static_cast<OverlayWindowImpl*>(overlay);
+}
+
+HWND HandleFrom(const flutter::EncodableValue* value, const char* key) {
+  const auto handle = IntField(value, key);
+  return handle ? reinterpret_cast<HWND>(static_cast<intptr_t>(*handle))
+                : nullptr;
+}
+
+flutter::EncodableValue HandleValue(HWND window) {
+  return flutter::EncodableValue(
+      static_cast<int64_t>(reinterpret_cast<intptr_t>(window)));
+}
+
 // One instance per engine that registers the plugin. Overlays created from
 // that engine's Dart code belong to it and report to it.
 class ShipglowsOverlayWindowPlugin : public flutter::Plugin {
  public:
   explicit ShipglowsOverlayWindowPlugin(flutter::PluginRegistrarWindows* registrar)
-      : channel_(std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      : registrar_(registrar),
+        channel_(std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
             registrar->messenger(), kChannel,
             &flutter::StandardMethodCodec::GetInstance())) {
     channel_->SetMethodCallHandler([this](const auto& call, auto result) {
@@ -167,15 +185,22 @@ class ShipglowsOverlayWindowPlugin : public flutter::Plugin {
                 {flutter::EncodableValue("arguments"), value}});
       };
       config.on_visibility = [this, id](bool visible) {
+        const auto overlay = overlays_.find(id);
+        const HWND previous = visible && overlay != overlays_.end()
+                                  ? Impl(overlay->second.get())->previous_foreground()
+                                  : nullptr;
         Report("onVisibility", id,
                {{flutter::EncodableValue("visible"),
-                 flutter::EncodableValue(visible)}});
+                 flutter::EncodableValue(visible)},
+                {flutter::EncodableValue("previousForeground"),
+                 HandleValue(previous)}});
       };
       auto overlay = ShipglowsOverlayWindowCreate(config);
       if (!overlay) {
         result->Error("duplicate_overlay", "Another overlay already uses this id.");
         return;
       }
+      Impl(overlay.get())->set_app_window(AppWindow());
       overlays_[id] = std::move(overlay);
       result->Success(flutter::EncodableValue(true));
       return;
@@ -194,12 +219,14 @@ class ShipglowsOverlayWindowPlugin : public flutter::Plugin {
       const auto* data = Field(arguments, "data");
       bool activate = true;
       ReadBool(arguments, "activate", &activate);
-      result->Success(flutter::EncodableValue(
-          overlay->Show(data ? *data : flutter::EncodableValue(), activate)));
+      result->Success(flutter::EncodableValue(Impl(overlay)->ShowFrom(
+          data ? *data : flutter::EncodableValue(), activate,
+          HandleFrom(arguments, "previousForeground"))));
       return;
     }
     if (method == "hide") {
-      overlay->Hide();
+      Impl(overlay)->HideWithFocus(
+          FocusReturnFrom(StringField(arguments, "focus")));
       result->Success();
       return;
     }
@@ -222,6 +249,13 @@ class ShipglowsOverlayWindowPlugin : public flutter::Plugin {
     result->NotImplemented();
   }
 
+  // Top-level window of the engine that registered the plugin.
+  HWND AppWindow() const {
+    flutter::FlutterView* view = registrar_->GetView();
+    const HWND child = view ? view->GetNativeWindow() : nullptr;
+    return child ? GetAncestor(child, GA_ROOT) : nullptr;
+  }
+
   void Report(const char* method, const std::string& id,
               flutter::EncodableMap fields) {
     fields[flutter::EncodableValue("id")] = flutter::EncodableValue(id);
@@ -229,6 +263,7 @@ class ShipglowsOverlayWindowPlugin : public flutter::Plugin {
                            std::make_unique<flutter::EncodableValue>(std::move(fields)));
   }
 
+  flutter::PluginRegistrarWindows* registrar_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
   // Declared after the channel: overlays close before it goes away.
   std::map<std::string, std::unique_ptr<OverlayWindow>> overlays_;

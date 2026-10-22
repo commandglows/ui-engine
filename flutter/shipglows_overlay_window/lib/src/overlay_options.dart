@@ -41,6 +41,20 @@ enum OverlayOutsideClick {
   none,
 }
 
+/// What gets the keyboard when an overlay hides.
+enum OverlayHideFocus {
+  /// The window that was in front before the overlay opened, if the overlay
+  /// still had focus.
+  previous,
+
+  /// Nothing is activated: the app activates a window itself.
+  none,
+
+  /// The main window of the app that created the overlay, shown if hidden
+  /// (a command that opens a screen of the app).
+  app,
+}
+
 /// Window behaviour of a [ShipglowsOverlayWindow], fixed at creation.
 @immutable
 class ShipglowsOverlayOptions {

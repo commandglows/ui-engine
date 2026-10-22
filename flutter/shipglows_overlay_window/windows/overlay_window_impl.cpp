@@ -66,11 +66,27 @@ std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
 
 int Scale(int logical, UINT dpi) { return MulDiv(logical, dpi, 96); }
 
+COLORREF ColorFromArgb(int64_t argb) {
+  const auto value = static_cast<uint32_t>(argb);
+  return RGB((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF);
+}
+
+flutter::EncodableValue HandleValue(HWND window) {
+  return flutter::EncodableValue(
+      static_cast<int64_t>(reinterpret_cast<intptr_t>(window)));
+}
+
 }  // namespace
 
 bool ReserveOverlayId(const std::string& id) {
   if (id.empty()) return false;
   return ReservedIds().insert(id).second;
+}
+
+FocusReturn FocusReturnFrom(const std::string& name) {
+  if (name == "none") return FocusReturn::kNone;
+  if (name == "app") return FocusReturn::kApp;
+  return FocusReturn::kPrevious;
 }
 
 OverlayWindowImpl::OverlayWindowImpl(OverlayConfig config)
@@ -145,14 +161,7 @@ bool OverlayWindowImpl::CreateOverlay() {
   const DWM_WINDOW_CORNER_PREFERENCE corners = DWMWCP_ROUND;
   native_corners_ = SUCCEEDED(DwmSetWindowAttribute(
       window_, DWMWA_WINDOW_CORNER_PREFERENCE, &corners, sizeof(corners)));
-  const BOOL dark = config_.dark_frame ? TRUE : FALSE;
-  DwmSetWindowAttribute(window_, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark,
-                        sizeof(dark));
-  if (config_.border_color) {
-    const COLORREF border = *config_.border_color;
-    DwmSetWindowAttribute(window_, DWMWA_BORDER_COLOR, &border,
-                          sizeof(border));
-  }
+  ApplyFrameStyle();
   const MARGINS frame{1, 1, 1, 1};  // DWM needs a one-pixel frame.
   DwmExtendFrameIntoClientArea(window_, &frame);
   SetWindowPos(window_, nullptr, 0, 0, 0, 0,
@@ -194,6 +203,35 @@ bool OverlayWindowImpl::CreateOverlay() {
   if (config_.on_created) config_.on_created(window_);
   controller_->ForceRedraw();
   return true;
+}
+
+void OverlayWindowImpl::ApplyFrameStyle() {
+  if (!window_) return;
+  const BOOL dark = config_.dark_frame ? TRUE : FALSE;
+  DwmSetWindowAttribute(window_, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark,
+                        sizeof(dark));
+  // DWMWA_COLOR_DEFAULT gives the border back to the system.
+  const COLORREF border = config_.border_color.value_or(0xFFFFFFFF);
+  DwmSetWindowAttribute(window_, DWMWA_BORDER_COLOR, &border, sizeof(border));
+}
+
+void OverlayWindowImpl::SetFrameStyle(const flutter::EncodableValue* arguments) {
+  const auto* dark = Field(arguments, "darkFrame");
+  if (const auto* flag = dark ? std::get_if<bool>(dark) : nullptr) {
+    config_.dark_frame = *flag;
+  }
+  // A key sent without a color goes back to the default.
+  if (const auto* border = Field(arguments, "borderColor")) {
+    const auto argb = IntOf(border);
+    config_.border_color =
+        argb ? std::optional<COLORREF>(ColorFromArgb(*argb)) : std::nullopt;
+  }
+  if (const auto* background = Field(arguments, "backgroundColor")) {
+    const auto argb = IntOf(background);
+    config_.background_color =
+        argb ? std::optional<COLORREF>(ColorFromArgb(*argb)) : std::nullopt;
+  }
+  ApplyFrameStyle();
 }
 
 void OverlayWindowImpl::DestroyOverlay() {
@@ -243,8 +281,16 @@ void OverlayWindowImpl::HandleHostCall(
     return;
   }
   if (method == "hide") {
+    const auto* focus = call.arguments()
+                            ? std::get_if<std::string>(call.arguments())
+                            : nullptr;
     result->Success();
-    Hide();
+    HideWindow(focus ? FocusReturnFrom(*focus) : FocusReturn::kPrevious);
+    return;
+  }
+  if (method == "setFrame") {
+    result->Success();
+    SetFrameStyle(call.arguments());
     return;
   }
   if (method == "startDrag") {
@@ -291,8 +337,14 @@ void OverlayWindowImpl::HandleHostCall(
 
 bool OverlayWindowImpl::Show(const flutter::EncodableValue& data,
                              bool activate) {
+  return ShowFrom(data, activate, nullptr);
+}
+
+bool OverlayWindowImpl::ShowFrom(const flutter::EncodableValue& data,
+                                 bool activate, HWND previous_foreground) {
   if (!Prepare()) return false;
   if (visible_ && view_visible_) {
+    if (previous_foreground) previous_foreground_ = previous_foreground;
     // Already on screen: hand over the new data, no new reveal.
     ++generation_;
     InvokeHost("show", std::make_unique<flutter::EncodableValue>(
@@ -300,13 +352,19 @@ bool OverlayWindowImpl::Show(const flutter::EncodableValue& data,
                                {flutter::EncodableValue("generation"),
                                 flutter::EncodableValue(generation_)},
                                {flutter::EncodableValue("data"), data},
+                               {flutter::EncodableValue("previousForeground"),
+                                HandleValue(previous_foreground_)},
                            }));
     return !activate || Activate();
   }
   pending_data_ = data;
   activate_on_reveal_ = activate_on_reveal_ || activate;
-  if (!reveal_pending_) {
+  if (previous_foreground) {
+    previous_foreground_ = previous_foreground;
+  } else if (!reveal_pending_) {
     previous_foreground_ = GetForegroundWindow();
+  }
+  if (!reveal_pending_) {
     if (!visible_) Place(config_.width, config_.height);
     FitViewToClient();
     reveal_pending_ = true;
@@ -323,6 +381,8 @@ void OverlayWindowImpl::StartPresentation() {
                              {flutter::EncodableValue("generation"),
                               flutter::EncodableValue(generation_)},
                              {flutter::EncodableValue("data"), pending_data_},
+                             {flutter::EncodableValue("previousForeground"),
+                              HandleValue(previous_foreground_)},
                          }));
 }
 
@@ -347,7 +407,9 @@ void OverlayWindowImpl::Reveal(int64_t generation) {
   NotifyVisibility(true);
 }
 
-void OverlayWindowImpl::Hide() { HideWindow(true); }
+void OverlayWindowImpl::Hide() { HideWindow(FocusReturn::kPrevious); }
+
+void OverlayWindowImpl::HideWithFocus(FocusReturn focus) { HideWindow(focus); }
 
 void OverlayWindowImpl::RequestClose() {
   if (ready_) {
@@ -369,7 +431,7 @@ void OverlayWindowImpl::OnActivate(WPARAM wparam) {
   if (!visible_ || activating_) return;
   switch (config_.outside_click) {
     case OutsideClick::kClose:
-      HideWindow(false);
+      HideWindow(FocusReturn::kNone);
       break;
     case OutsideClick::kBackground:
       PostMessageW(window_, kSendBackMessage, 0, 0);
@@ -400,7 +462,7 @@ void OverlayWindowImpl::SendBehindForeground() {
   }
 }
 
-void OverlayWindowImpl::HideWindow(bool restore_focus) {
+void OverlayWindowImpl::HideWindow(FocusReturn focus) {
   if (!window_) return;
   if (!visible_ && !reveal_pending_ && !IsWindowVisible(window_)) return;
   const bool was_visible = visible_;
@@ -414,9 +476,15 @@ void OverlayWindowImpl::HideWindow(bool restore_focus) {
   previous_foreground_ = nullptr;
   // Give focus back only while the overlay still held it: a user who has
   // moved to another window keeps it.
-  if (restore_focus && GetForegroundWindow() == window_ && previous &&
-      previous != window_ && IsWindow(previous) && IsWindowVisible(previous)) {
+  if (focus == FocusReturn::kPrevious && GetForegroundWindow() == window_ &&
+      previous && previous != window_ && IsWindow(previous) &&
+      IsWindowVisible(previous)) {
     SetForegroundWindow(previous);
+  }
+  // Activated while the overlay is still in front, which lets this process
+  // take the foreground.
+  if (focus == FocusReturn::kApp && app_window_ && app_window_ != window_) {
+    ActivateWindowForUser(app_window_, app_window_);
   }
   // Hide the window before its view: a window without its view shows, for a
   // frame, the caption buttons DWM draws under it.

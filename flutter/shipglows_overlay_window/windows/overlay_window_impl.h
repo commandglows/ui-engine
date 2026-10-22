@@ -16,6 +16,20 @@ namespace shipglows_overlay {
 // Reports whether |id| is free and reserves it; released by the overlay.
 bool ReserveOverlayId(const std::string& id);
 
+// What gets the keyboard when the overlay hides.
+enum class FocusReturn {
+  // The window that was in front before the overlay, if the overlay still
+  // had focus.
+  kPrevious,
+  // Nothing is activated; the app activates a window itself.
+  kNone,
+  // The app's main window (|set_app_window|), shown if hidden.
+  kApp,
+};
+
+// "previous", "none" or "app"; anything else is kPrevious.
+FocusReturn FocusReturnFrom(const std::string& name);
+
 class OverlayWindowImpl : public OverlayWindow {
  public:
   explicit OverlayWindowImpl(OverlayConfig config);
@@ -42,6 +56,16 @@ class OverlayWindowImpl : public OverlayWindow {
   flutter::BinaryMessenger* messenger() const override;
   void SetNextFrameCallback(std::function<void()> callback) override;
   void ForceRedraw() override;
+
+  // Show with the window focus returns to on hide. Null: the window in
+  // front now.
+  bool ShowFrom(const flutter::EncodableValue& data, bool activate,
+                HWND previous_foreground);
+  void HideWithFocus(FocusReturn focus);
+  // Window in front before the overlay opened; null once it hid.
+  HWND previous_foreground() const { return previous_foreground_; }
+  // Main window of the app that created the overlay, for FocusReturn::kApp.
+  void set_app_window(HWND window) { app_window_ = window; }
 
  private:
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wparam,
@@ -73,7 +97,11 @@ class OverlayWindowImpl : public OverlayWindow {
   void UpdateRegion();
   void StartPresentation();
   void Reveal(int64_t generation);
-  void HideWindow(bool restore_focus);
+  void HideWindow(FocusReturn focus);
+  // Dark frame and border color (DWM) from |config_|.
+  void ApplyFrameStyle();
+  // Host "setFrame": darkFrame, borderColor, backgroundColor (ARGB).
+  void SetFrameStyle(const flutter::EncodableValue* arguments);
   // Applies |OverlayConfig::outside_click| when another window becomes
   // active, and puts a backgrounded overlay back on top when it is active
   // again. Runs before the runner's message hook, which cannot skip it.
@@ -96,6 +124,7 @@ class OverlayWindowImpl : public OverlayWindow {
   std::unique_ptr<flutter::FlutterViewController> controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
   HWND previous_foreground_ = nullptr;
+  HWND app_window_ = nullptr;
   bool prepare_failed_ = false;
   bool native_corners_ = false;
   // True once the DWM frame attributes are set; before that, no region.

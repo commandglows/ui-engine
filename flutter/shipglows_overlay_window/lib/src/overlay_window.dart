@@ -51,6 +51,7 @@ class ShipglowsOverlayWindow {
   final ValueNotifier<bool> visible = ValueNotifier(false);
 
   Future<bool>? _created;
+  int? _previousForeground;
 
   /// Whether overlays exist on this platform.
   static bool get isSupported =>
@@ -58,6 +59,11 @@ class ShipglowsOverlayWindow {
 
   /// Messages the overlay sent with [ShipglowsOverlayHost.send].
   Stream<ShipglowsOverlayMessage> get messages => _messages.stream;
+
+  /// Handle (HWND) of the window that was in front when the overlay last
+  /// appeared, for example to paste into it once the overlay is gone. Kept
+  /// after it hides; null before the first opening or when there was none.
+  int? get previousForeground => _previousForeground;
 
   /// Starts the overlay's engine, hidden and without taking focus, so the
   /// first [show] is instant. Optional.
@@ -69,18 +75,28 @@ class ShipglowsOverlayWindow {
   /// Hands [data] to [ShipglowsOverlayHost.onShow] and shows the overlay
   /// once it has drawn it. With [activate] it takes the keyboard; focus goes
   /// back to the previous window when it hides.
-  Future<bool> show({Object? data, bool activate = true}) async {
+  ///
+  /// [previousForeground] (an HWND) replaces the window in front now as the
+  /// one focus returns to, for an app that activated its own window first
+  /// (a tray menu).
+  Future<bool> show({
+    Object? data,
+    bool activate = true,
+    int? previousForeground,
+  }) async {
     if (!await _create()) return false;
     return await _invoke<bool>('show', {
           'data': data,
           'activate': activate,
+          'previousForeground': ?previousForeground,
         }) ??
         false;
   }
 
-  Future<void> hide() async {
+  /// Hides the overlay; [focus] says which window gets the keyboard.
+  Future<void> hide({OverlayHideFocus focus = OverlayHideFocus.previous}) async {
     if (_created == null) return;
-    await _invoke<void>('hide');
+    await _invoke<void>('hide', {'focus': focus.name});
   }
 
   /// Sends a message to [ShipglowsOverlayHost.messages].
@@ -136,7 +152,14 @@ class ShipglowsOverlayWindow {
             );
           }
         case 'onVisibility':
-          overlay.visible.value = arguments['visible'] == true;
+          final visible = arguments['visible'] == true;
+          if (visible) {
+            final previous = arguments['previousForeground'];
+            overlay._previousForeground = previous is int && previous != 0
+                ? previous
+                : null;
+          }
+          overlay.visible.value = visible;
       }
     });
   }
