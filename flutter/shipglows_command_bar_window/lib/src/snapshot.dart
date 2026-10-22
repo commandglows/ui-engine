@@ -16,6 +16,7 @@ class ShipglowsCommandBarSnapshot {
     this.brightness,
     this.locale,
     this.appWindowIds = const <String>{},
+    this.data = const <String, Object?>{},
   });
 
   /// Restores a snapshot from [json], as produced by [toJson]. Invalid
@@ -41,6 +42,10 @@ class ShipglowsCommandBarSnapshot {
       },
       locale: _localeFrom(json['locale']),
       appWindowIds: _strings(json['appWindowIds']).toSet(),
+      data: switch (json['data']) {
+        final Map data => data.cast<String, Object?>(),
+        _ => const <String, Object?>{},
+      },
     );
   }
 
@@ -61,6 +66,10 @@ class ShipglowsCommandBarSnapshot {
   /// window in front before the bar.
   final Set<String> appWindowIds;
 
+  /// The app's own JSON-safe values for its bar, such as the color theme it
+  /// draws with (`ShipglowsCommandBarOverlayController.snapshot`).
+  final Map<String, Object?> data;
+
   /// JSON-safe map with the keys [fromJson] reads.
   Map<String, Object?> toJson() => <String, Object?>{
     'entries': [for (final entry in entries) entry.toJson()],
@@ -68,6 +77,7 @@ class ShipglowsCommandBarSnapshot {
     'brightness': brightness?.name,
     'locale': locale?.toLanguageTag(),
     'appWindowIds': appWindowIds.toList(),
+    'data': data,
   };
 }
 

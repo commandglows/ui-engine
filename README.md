@@ -225,6 +225,9 @@ on close. Escape and a click outside close it.
   place while open. `selections` reports each choice (`id`, `secondary`,
   `previousForeground` HWND); the bar is already hidden and the app runs the
   effect itself.
+- `data`: the app's own JSON-safe values for its bar (a color theme the
+  bar's engine cannot read from storage), read back from
+  `ShipglowsCommandBarOverlayController.snapshot`.
 - `appWindowIds`: entries that open a screen of the app; choosing one brings
   the main window forward instead of the previous window.
 - Bar engine: `runShipglowsCommandBarOverlay` from the app's
