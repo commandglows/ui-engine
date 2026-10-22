@@ -46,6 +46,7 @@ class CommandBarView extends StatefulWidget {
     this.refresh,
     this.behavior = const CommandBarBehavior(),
     this.onSearchDoubleTap,
+    this.onSearchDragStart,
     this.footerBuilder,
   });
 
@@ -77,9 +78,16 @@ class CommandBarView extends StatefulWidget {
   /// Whether the search field takes the focus when the bar opens.
   final bool autofocus;
 
-  /// Called when the user double-clicks the search field. The field still
-  /// selects the word under the pointer.
+  /// Called when the user double-clicks the search field (expand the bar,
+  /// maximize its window). The field then keeps its caret instead of
+  /// selecting the word under the pointer.
   final VoidCallback? onSearchDoubleTap;
+
+  /// Called when the user drags in the search field with the primary button,
+  /// instead of selecting text with the mouse: a floating window moves from
+  /// there. Keyboard selection (Shift+arrows, Ctrl+A) and a click to place
+  /// the caret keep working.
+  final VoidCallback? onSearchDragStart;
 
   /// Wraps the footer strip of key hints, which holds nothing to click: a
   /// frameless window can make it its drag area.
@@ -146,6 +154,18 @@ class _CommandBarViewState extends State<CommandBarView> {
 
   /// Last primary press on the search field, to spot a double-click.
   PointerDownEvent? _lastSearchDown;
+
+  /// Primary press in progress on the search field, until it moves the
+  /// window or is released.
+  PointerDownEvent? _searchPress;
+
+  /// Selection to put back once the press ends, when the field must not keep
+  /// what the mouse did (a word selected by a double-click, a drag
+  /// selection while the window moved).
+  TextSelection? _restoreSelection;
+
+  /// Selection after the last click released on the search field.
+  TextSelection? _selectionAfterClick;
 
   @override
   void initState() {
@@ -267,18 +287,63 @@ class _CommandBarViewState extends State<CommandBarView> {
   /// Spots a double-click from raw presses, so the text field keeps its own
   /// tap and selection gestures.
   void _onSearchPointerDown(PointerDownEvent event) {
+    if (event.buttons != kPrimaryButton) return;
+    _searchPress = event;
     final onDoubleTap = widget.onSearchDoubleTap;
-    if (onDoubleTap == null || event.buttons != kPrimaryButton) return;
+    if (onDoubleTap == null) return;
     final previous = _lastSearchDown;
     if (previous != null &&
         previous.kind == event.kind &&
         event.timeStamp - previous.timeStamp <= kDoubleTapTimeout &&
         (event.position - previous.position).distance <= kDoubleTapSlop) {
       _lastSearchDown = null;
+      _searchPress = null;
+      // The field selects the word on this press: the caret goes back.
+      _restoreSelection =
+          _selectionAfterClick ??
+          TextSelection.collapsed(offset: _controller.text.length);
       onDoubleTap();
       return;
     }
     _lastSearchDown = event;
+  }
+
+  void _onSearchPointerMove(PointerMoveEvent event) {
+    final press = _searchPress;
+    final onDragStart = widget.onSearchDragStart;
+    if (press == null || onDragStart == null) return;
+    final slop = press.kind == PointerDeviceKind.touch
+        ? kTouchSlop
+        : kPrecisePointerPanSlop;
+    if ((event.position - press.position).distance <= slop) return;
+    _searchPress = null;
+    _lastSearchDown = null;
+    // The field placed the caret on the press and may have started a drag
+    // selection from it: the caret stays where the press was.
+    _restoreSelection = TextSelection.collapsed(
+      offset: _controller.selection.baseOffset,
+    );
+    onDragStart();
+  }
+
+  void _onSearchPointerEnd(PointerEvent event) {
+    _searchPress = null;
+    final restore = _restoreSelection;
+    _restoreSelection = null;
+    if (restore != null) {
+      _controller.selection = restore;
+      _selectionAfterClick = restore;
+      // The field may still apply its own gesture end after this event.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _controller.selection = restore;
+      });
+      return;
+    }
+    // The field places the caret once the click is resolved, after this
+    // event.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _selectionAfterClick = _controller.selection;
+    });
   }
 
   void _chooseItem(int itemIndex, {required bool secondary}) {
@@ -490,6 +555,9 @@ class _CommandBarViewState extends State<CommandBarView> {
               Expanded(
                 child: Listener(
                   onPointerDown: _onSearchPointerDown,
+                  onPointerMove: _onSearchPointerMove,
+                  onPointerUp: _onSearchPointerEnd,
+                  onPointerCancel: _onSearchPointerEnd,
                   child: TextField(
                     controller: _controller,
                     autofocus: widget.autofocus,

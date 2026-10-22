@@ -58,6 +58,11 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 - Other engines (floating window, native relay): `CommandBarEntry.toJson` /
   `fromJson` (icons by code point through an app table), `CommandBarView` and
   `showCommandBar` with your own `CommandBarSource`.
+- Search field gestures on `CommandBarView`: `onSearchDoubleTap` (expand the
+  bar, maximize its window) keeps the caret instead of selecting a word;
+  `onSearchDragStart` turns a mouse drag in the field into a window move
+  instead of a text selection. Click to place the caret and keyboard
+  selection (Shift+arrows, Ctrl/⌘+A) keep working.
 
 ## `flutter/shipglows_window`
 
@@ -215,6 +220,9 @@ on close. Escape and a click outside close it.
   icon fonts stay tree-shaken). `initialEntries` fills the bar before the
   first snapshot. `ShipglowsCommandBarOverlayController` and
   `ShipglowsCommandBarOverlayApp` for an app that calls `runApp` itself.
+- Drag anywhere to move the window, the search field included; double-click
+  on the search field or an empty area maximizes or restores it (`defaultOptions(doubleClickMaximizes:)`,
+  on by default).
 - The frame (dark mode, border, background) follows the bar's theme
   (`CommandBarThemeData`).
 - App surface: `surfaceBuilder` (on `runShipglowsCommandBarOverlay` and

@@ -396,6 +396,12 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
           strings: widget.strings,
           behavior: widget.behavior,
           autofocus: controller.visible,
+          // The search field moves and maximizes the window like the rest
+          // of the bar, rather than selecting text with the mouse.
+          onSearchDragStart: () => unawaited(controller.host.startDrag()),
+          onSearchDoubleTap: controller.host.doubleClickMaximizes
+              ? () => unawaited(controller.host.toggleMaximize())
+              : null,
           onChoose: (choice) => unawaited(controller.choose(choice)),
           onClose: () => unawaited(controller.close()),
         ),
