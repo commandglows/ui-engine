@@ -8,34 +8,17 @@ import 'command_bar_window.dart';
 extension ShipglowsCommandBarHotkey on ShipglowsCommandBarWindow {
   /// Lets the hotkey [id] of [hotkeys] toggle the bar: a press closes it when
   /// open, otherwise opens it over the window in front, which gets the
-  /// keyboard back when the bar closes (and receives a paste).
-  ///
-  /// With the app's own window in front, [openInApp] runs instead when given
-  /// (the in-app palette, for example); without it the floating bar opens
-  /// there too and gives the keyboard back to the app.
+  /// keyboard back when the bar closes (and receives a paste). The app's own
+  /// window in front is no exception: the floating bar opens there too.
   ///
   /// Cancel the returned subscription to unbind.
   StreamSubscription<ShipglowsHotkeyEvent> bindHotkey(
     ShipglowsHotkeys hotkeys,
-    String id, {
-    FutureOr<void> Function()? openInApp,
-  }) => hotkeys.events
+    String id,
+  ) => hotkeys.events
       .where((event) => event.id == id)
-      .listen((event) => unawaited(_onHotkey(event, openInApp)));
-
-  Future<void> _onHotkey(
-    ShipglowsHotkeyEvent event,
-    FutureOr<void> Function()? openInApp,
-  ) async {
-    if (visible.value) {
-      await close();
-      return;
-    }
-    if (event.foreground == ShipglowsHotkeyForeground.app &&
-        openInApp != null) {
-      await openInApp();
-      return;
-    }
-    await open(previousForeground: event.previousForeground);
-  }
+      .listen(
+        (event) =>
+            unawaited(toggle(previousForeground: event.previousForeground)),
+      );
 }

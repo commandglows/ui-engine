@@ -249,8 +249,8 @@ on close. Escape and a click outside close it.
   Ctrl/⌘+K and the app's `open()` calls show only the floating bar.
 - Global hotkey: `bar.bindHotkey(hotkeys, 'commandBar')` with
   `shipglows_hotkeys`. A press closes the open bar, otherwise opens it over
-  the window in front; with the app in front, `openInApp:` shows the in-app
-  palette instead, else the floating bar opens there too.
+  the window in front, the app's own window included: the in-app bar is
+  only the fallback off Windows or before the floating bar is ready.
 
 ```yaml
 dependencies:
