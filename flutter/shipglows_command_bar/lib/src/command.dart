@@ -81,6 +81,8 @@ class CommandBarEntryAction {
     this.icon,
     this.shortcut,
     this.group,
+    this.destructive = false,
+    this.confirm = false,
   });
 
   /// Restores an action from [json], as produced by [toJson]; null when `id`
@@ -101,6 +103,8 @@ class CommandBarEntryAction {
       icon: codePoint is int ? iconFor?.call(codePoint) : null,
       shortcut: _optionalString(json['shortcut']),
       group: _optionalString(json['group']),
+      destructive: json['destructive'] == true,
+      confirm: json['confirm'] == true,
     );
   }
 
@@ -123,6 +127,15 @@ class CommandBarEntryAction {
   /// Enter and Shift+Enter.
   final String? group;
 
+  /// Whether the action destroys something, such as « Delete »: listed last
+  /// in the panel, after a separator, in the error color.
+  final bool destructive;
+
+  /// Whether choosing the action in the panel asks for a second press first
+  /// ([CommandBarStrings.confirmAction]), for an app that confirms that
+  /// action elsewhere. Its shortcut from the list never asks.
+  final bool confirm;
+
   /// JSON-safe map with the keys [fromJson] reads.
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -130,6 +143,8 @@ class CommandBarEntryAction {
     'iconCodePoint': icon?.codePoint,
     'shortcut': shortcut,
     'group': group,
+    'destructive': destructive,
+    'confirm': confirm,
   };
 
   @override
@@ -139,10 +154,13 @@ class CommandBarEntryAction {
       other.label == label &&
       other.icon == icon &&
       other.shortcut == shortcut &&
-      other.group == group;
+      other.group == group &&
+      other.destructive == destructive &&
+      other.confirm == confirm;
 
   @override
-  int get hashCode => Object.hash(id, label, icon, shortcut, group);
+  int get hashCode =>
+      Object.hash(id, label, icon, shortcut, group, destructive, confirm);
 }
 
 /// Display data of one command, without any callback.

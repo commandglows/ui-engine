@@ -231,6 +231,19 @@ class _CommandBarViewState extends State<CommandBarView> {
   /// Highlighted line of the actions panel.
   int _actionHighlight = 0;
 
+  /// Action of the panel line waiting for its second press.
+  String? _actionConfirming;
+
+  /// The row the actions panel belongs to, in the coordinates of [_listKey];
+  /// null when it could not be measured.
+  Rect? _panelAnchor;
+
+  /// The list area the actions panel is laid out over.
+  final GlobalKey _listKey = GlobalKey();
+
+  /// Entry under the mouse, which shows its « … » button.
+  final ValueNotifier<int?> _hoveredItem = ValueNotifier<int?>(null);
+
   @override
   void initState() {
     super.initState();
@@ -304,6 +317,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     _reportQuery();
     _controller.dispose();
     _scroll.dispose();
+    _hoveredItem.dispose();
     super.dispose();
   }
 
@@ -527,19 +541,19 @@ class _CommandBarViewState extends State<CommandBarView> {
     final actions = [
       for (final group in groups)
         for (final action in entry.actions)
-          if (action.group == group) action,
+          if (action.group == group && !action.destructive) action,
+      for (final action in entry.actions)
+        if (action.destructive) action,
     ];
     return [
       if (entry.enabled)
         CommandBarPanelLine(
           label: entry.primaryLabel ?? strings.open,
           icon: entry.icon,
-          keys: const ['Enter'],
         ),
       if (entry.hasSecondary)
         CommandBarPanelLine(
           label: entry.secondaryLabel ?? strings.secondary,
-          keys: const ['Shift', 'Enter'],
           secondary: true,
         ),
       for (final action in actions)
@@ -547,11 +561,9 @@ class _CommandBarViewState extends State<CommandBarView> {
           label: action.label,
           icon: action.icon,
           group: action.group,
-          keys: [
-            if (action.shortcut case final shortcut?)
-              ...commandShortcutKeys(shortcut),
-          ],
           action: action.id,
+          destructive: action.destructive,
+          confirm: action.confirm,
         ),
     ];
   }
@@ -567,12 +579,38 @@ class _CommandBarViewState extends State<CommandBarView> {
       _highlight = itemIndex;
       _actionsOpen = true;
       _actionHighlight = 0;
+      _actionConfirming = null;
+      _panelAnchor = _anchorOf(itemIndex);
     });
+  }
+
+  /// Opens the actions panel of row [itemIndex], or closes it when it is
+  /// already that row's: the « … » button and a right-click toggle it.
+  void _toggleActions(int itemIndex) {
+    if (_actionsOpen && _effectiveHighlight == itemIndex) {
+      _closeActions();
+    } else {
+      _openActions(itemIndex);
+    }
+  }
+
+  /// Where row [itemIndex] is over the list, to anchor the panel to it.
+  Rect? _anchorOf(int itemIndex) {
+    final row = _layout.rowOfItem[itemIndex];
+    final rowBox = _rowKeys[row]?.currentContext?.findRenderObject();
+    final listBox = _listKey.currentContext?.findRenderObject();
+    if (rowBox is! RenderBox || listBox is! RenderBox) return null;
+    if (!rowBox.hasSize || !listBox.hasSize) return null;
+    return rowBox.localToGlobal(Offset.zero, ancestor: listBox) & rowBox.size;
   }
 
   void _closeActions() => setState(() => _actionsOpen = false);
 
   void _choosePanelAction(CommandBarPanelLine line) {
+    if (line.confirm && _actionConfirming != line.action) {
+      setState(() => _actionConfirming = line.action);
+      return;
+    }
     setState(() => _actionsOpen = false);
     _chooseItem(
       _effectiveHighlight,
@@ -613,6 +651,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     }
     if (lines.isEmpty ||
         key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.arrowLeft ||
         (enter && HardwareKeyboard.instance.isAltPressed)) {
       if (event is! KeyRepeatEvent) _closeActions();
       return KeyEventResult.handled;
@@ -621,10 +660,21 @@ class _CommandBarViewState extends State<CommandBarView> {
     if (key == LogicalKeyboardKey.arrowDown ||
         key == LogicalKeyboardKey.arrowUp) {
       final delta = key == LogicalKeyboardKey.arrowDown ? 1 : -1;
-      setState(
-        () => _actionHighlight =
-            ((highlight + delta) % lines.length + lines.length) % lines.length,
-      );
+      setState(() {
+        _actionHighlight =
+            ((highlight + delta) % lines.length + lines.length) % lines.length;
+        _actionConfirming = null;
+      });
+      return KeyEventResult.handled;
+    }
+    // A digit chooses its line, as Enter would on it.
+    final digit = commandBarDigit(key);
+    if (digit != null && digit <= lines.length) {
+      if (event is! KeyRepeatEvent) {
+        if (_actionHighlight != digit - 1) _actionConfirming = null;
+        setState(() => _actionHighlight = digit - 1);
+        _choosePanelAction(lines[digit - 1]);
+      }
       return KeyEventResult.handled;
     }
     if (enter) {
@@ -849,7 +899,7 @@ class _CommandBarViewState extends State<CommandBarView> {
   Widget _list(_BarLayout layout, int highlight, bool showNumbers) {
     final strings = widget.strings;
     final behavior = widget.behavior;
-    return ListView.builder(
+    final list = ListView.builder(
       controller: _scroll,
       shrinkWrap: true,
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -873,11 +923,66 @@ class _CommandBarViewState extends State<CommandBarView> {
                 : null,
             onTap: () => _chooseItem(itemIndex, secondary: false),
             onSecondaryTap: entry.hasActions
-                ? () => _openActions(itemIndex)
+                ? () => _toggleActions(itemIndex)
+                : null,
+            onHover: (hovering) {
+              if (hovering) {
+                _hoveredItem.value = itemIndex;
+              } else if (_hoveredItem.value == itemIndex) {
+                _hoveredItem.value = null;
+              }
+            },
+            actionsButton: entry.hasActions
+                ? ValueListenableBuilder<int?>(
+                    valueListenable: _hoveredItem,
+                    builder: (context, hovered, _) => _ActionsButton(
+                      visible: itemIndex == highlight || hovered == itemIndex,
+                      tooltip: strings.actionsPanel.replaceAll(
+                        '{label}',
+                        entry.label,
+                      ),
+                      onPressed: () => _toggleActions(itemIndex),
+                    ),
+                  )
                 : null,
           ),
         },
       ),
+    );
+    // The panel is anchored to its row: it closes once the list moves.
+    return NotificationListener<ScrollUpdateNotification>(
+      onNotification: (_) {
+        if (_actionsOpen) _closeActions();
+        return false;
+      },
+      child: list,
+    );
+  }
+
+  /// What the panel says under the entry's label: its section, then its
+  /// state and subtitle.
+  String? _panelSubtitle(CommandBarEntry entry) {
+    String? section;
+    for (final candidate in widget.sections) {
+      if (candidate.id == entry.section) section = candidate.title;
+    }
+    final parts = [?section, ?entry.badge, ?entry.subtitle];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// Lays [panel] out next to its row, or at the end of the list when the
+  /// row could not be measured.
+  Widget _placePanel(BuildContext context, Widget panel) {
+    final anchor = _panelAnchor;
+    if (anchor == null) {
+      return Align(alignment: AlignmentDirectional.bottomEnd, child: panel);
+    }
+    return CustomSingleChildLayout(
+      delegate: CommandBarActionsPanelLayout(
+        anchor: anchor,
+        textDirection: Directionality.of(context),
+      ),
+      child: panel,
     );
   }
 
@@ -897,6 +1002,12 @@ class _CommandBarViewState extends State<CommandBarView> {
     final panelActions = _actionsOpen && highlighted != null
         ? _panelActions(highlighted)
         : const <CommandBarPanelLine>[];
+    final panelSubtitle = highlighted == null
+        ? null
+        : _panelSubtitle(highlighted);
+    final confirming = _actionConfirming == null
+        ? -1
+        : panelActions.indexWhere((line) => line.action == _actionConfirming);
 
     return Focus(
       onKeyEvent: (node, event) => _onKeyEvent(event, style.rowMinHeight),
@@ -979,6 +1090,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                     ),
                   )
                 : Stack(
+                    key: _listKey,
                     fit: StackFit.passthrough,
                     children: [
                       ConstrainedBox(
@@ -986,23 +1098,30 @@ class _CommandBarViewState extends State<CommandBarView> {
                         constraints: BoxConstraints(
                           minHeight: panelActions.isEmpty
                               ? 0
-                              : CommandBarActionsPanel.heightFor(panelActions),
+                              : CommandBarActionsPanel.heightFor(
+                                  panelActions,
+                                  subtitle: panelSubtitle != null,
+                                ),
                         ),
                         child: _list(layout, highlight, showNumbers),
                       ),
                       if (panelActions.isNotEmpty)
                         Positioned.fill(
-                          child: Align(
-                            alignment: AlignmentDirectional.bottomEnd,
-                            child: CommandBarActionsPanel(
-                              title: strings.actionsPanel.replaceAll(
+                          child: _placePanel(
+                            context,
+                            CommandBarActionsPanel(
+                              title: highlighted!.label,
+                              subtitle: panelSubtitle,
+                              semanticLabel: strings.actionsPanel.replaceAll(
                                 '{label}',
-                                highlighted!.label,
+                                highlighted.label,
                               ),
                               lines: panelActions,
                               highlight: _actionHighlight
                                   .clamp(0, panelActions.length - 1)
                                   .toInt(),
+                              confirming: confirming < 0 ? null : confirming,
+                              confirmLabel: strings.confirmAction,
                               onChoose: _choosePanelAction,
                             ),
                           ),
@@ -1096,6 +1215,8 @@ class CommandBarTile extends StatelessWidget {
     this.kindText,
     this.compact = false,
     this.onSecondaryTap,
+    this.onHover,
+    this.actionsButton,
   });
 
   /// The entry shown.
@@ -1137,6 +1258,13 @@ class CommandBarTile extends StatelessWidget {
   /// Called on a right-click, even on a disabled entry: the bar opens the
   /// row's actions panel. Null when the row has none.
   final VoidCallback? onSecondaryTap;
+
+  /// Called when the mouse enters or leaves the row.
+  final ValueChanged<bool>? onHover;
+
+  /// Shown at the end of the row, such as the bar's « … » button that opens
+  /// the row's actions panel.
+  final Widget? actionsButton;
 
   @override
   Widget build(BuildContext context) {
@@ -1187,6 +1315,7 @@ class CommandBarTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(style.rowRadius),
           onTap: disabled ? null : onTap,
           onSecondaryTap: onSecondaryTap,
+          onHover: onHover,
           child: Semantics(
             button: true,
             enabled: entry.enabled,
@@ -1287,6 +1416,10 @@ class CommandBarTile extends StatelessWidget {
                         keys: [commandBarPrimaryModifierLabel(), '$number'],
                       ),
                     ),
+                  ],
+                  if (actionsButton case final button?) ...[
+                    const SizedBox(width: 4),
+                    button,
                   ],
                 ],
               ),
@@ -1432,6 +1565,46 @@ class _Badge extends StatelessWidget {
         maxLines: 1,
         style: Theme.of(context).textTheme.labelSmall
             ?.copyWith(color: style.mutedColor),
+      ),
+    );
+  }
+}
+
+/// The « … » button at the end of a row, which opens its actions panel.
+/// It keeps its room when hidden, so the row never shifts.
+class _ActionsButton extends StatelessWidget {
+  const _ActionsButton({
+    required this.visible,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final bool visible;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CommandBarThemeData.of(context);
+    return Visibility(
+      visible: visible,
+      maintainSize: true,
+      maintainAnimation: true,
+      maintainState: true,
+      child: SizedBox.square(
+        dimension: 28,
+        child: IconButton(
+          tooltip: tooltip,
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          iconSize: 18,
+          style: IconButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(style.rowRadius),
+            ),
+          ),
+          icon: Icon(Icons.more_horiz_rounded, color: style.iconColor),
+        ),
       ),
     );
   }
