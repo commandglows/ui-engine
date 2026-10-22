@@ -661,11 +661,18 @@ class _CommandBarScopeState extends State<CommandBarScope>
       }
       return;
     }
-    final run = choice.secondary
-        ? command.runSecondary
-        : command.enabled
-        ? command.run
-        : null;
+    final action = choice.action;
+    final runAction = command.runAction;
+    final CommandBarRun? run;
+    if (action != null) {
+      run = runAction == null ? null : (context) => runAction(context, action);
+    } else {
+      run = choice.secondary
+          ? command.runSecondary
+          : command.enabled
+          ? command.run
+          : null;
+    }
     if (run == null) return;
     try {
       await _recents.write(nextCommandBarRecents(recentIds, command.id));

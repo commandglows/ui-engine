@@ -1,5 +1,19 @@
 import 'package:flutter/foundation.dart';
 
+/// How a row shows its [CommandBarEntry.kind] when
+/// [CommandBarBehavior.showEntryKinds] is on.
+enum CommandBarKindDisplay {
+  /// A small muted icon, its text in a tooltip.
+  icon,
+
+  /// The short text of [CommandBarStrings.entryKindLabels], muted, at the end
+  /// of the row (« Action », « App »).
+  label,
+
+  /// The icon, then the text.
+  iconAndLabel,
+}
+
 /// Optional ways the bar searches and lists, chosen per app (by its
 /// developer, or from the app's settings when the bar opens). All are off by
 /// default.
@@ -13,6 +27,8 @@ class CommandBarBehavior {
     this.showQueryHistory = false,
     this.showEntryKinds = false,
     this.hiddenKinds = const <String>{},
+    this.kindDisplay = CommandBarKindDisplay.icon,
+    this.compactRows = false,
   });
 
   /// Every option on.
@@ -23,6 +39,7 @@ class CommandBarBehavior {
     restoreLastQuery: true,
     showQueryHistory: true,
     showEntryKinds: true,
+    compactRows: true,
   );
 
   /// Whether a word that is not part of the label or keywords still matches
@@ -57,6 +74,13 @@ class CommandBarBehavior {
   /// a user who only wants actions. Entries without a kind always show.
   final Set<String> hiddenKinds;
 
+  /// How each row shows its kind, when [showEntryKinds] is on.
+  final CommandBarKindDisplay kindDisplay;
+
+  /// Whether the subtitle follows the label on the same line, muted, so
+  /// more rows fit. A disabled row keeps its reason on a line of its own.
+  final bool compactRows;
+
   /// Copy with the given options replaced, for an app that lets the user
   /// turn some on or off.
   CommandBarBehavior copyWith({
@@ -67,6 +91,8 @@ class CommandBarBehavior {
     bool? showQueryHistory,
     bool? showEntryKinds,
     Set<String>? hiddenKinds,
+    CommandBarKindDisplay? kindDisplay,
+    bool? compactRows,
   }) => CommandBarBehavior(
     fuzzyMatch: fuzzyMatch ?? this.fuzzyMatch,
     sortSectionsByMatch: sortSectionsByMatch ?? this.sortSectionsByMatch,
@@ -75,6 +101,8 @@ class CommandBarBehavior {
     showQueryHistory: showQueryHistory ?? this.showQueryHistory,
     showEntryKinds: showEntryKinds ?? this.showEntryKinds,
     hiddenKinds: hiddenKinds ?? this.hiddenKinds,
+    kindDisplay: kindDisplay ?? this.kindDisplay,
+    compactRows: compactRows ?? this.compactRows,
   );
 
   /// JSON-safe map with the keys [fromJson] reads, for a bar in another
@@ -87,10 +115,13 @@ class CommandBarBehavior {
     'showQueryHistory': showQueryHistory,
     'showEntryKinds': showEntryKinds,
     'hiddenKinds': hiddenKinds.toList(),
+    'kindDisplay': kindDisplay.name,
+    'compactRows': compactRows,
   };
 
   /// Restores options from [json], as produced by [toJson]; null when [json]
-  /// is not a map. A missing option is off.
+  /// is not a map. A missing option is off; a missing [kindDisplay] is
+  /// [CommandBarKindDisplay.icon].
   static CommandBarBehavior? fromJson(Object? json) {
     if (json is! Map) return null;
     return CommandBarBehavior(
@@ -105,6 +136,11 @@ class CommandBarBehavior {
           for (final id in ids)
             if (id is String) id,
       },
+      kindDisplay: CommandBarKindDisplay.values.firstWhere(
+        (display) => display.name == json['kindDisplay'],
+        orElse: () => CommandBarKindDisplay.icon,
+      ),
+      compactRows: json['compactRows'] == true,
     );
   }
 
@@ -117,7 +153,9 @@ class CommandBarBehavior {
       other.restoreLastQuery == restoreLastQuery &&
       other.showQueryHistory == showQueryHistory &&
       other.showEntryKinds == showEntryKinds &&
-      setEquals(other.hiddenKinds, hiddenKinds);
+      setEquals(other.hiddenKinds, hiddenKinds) &&
+      other.kindDisplay == kindDisplay &&
+      other.compactRows == compactRows;
 
   @override
   int get hashCode => Object.hash(
@@ -128,5 +166,7 @@ class CommandBarBehavior {
     showQueryHistory,
     showEntryKinds,
     Object.hashAllUnordered(hiddenKinds),
+    kindDisplay,
+    compactRows,
   );
 }

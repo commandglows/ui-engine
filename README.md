@@ -58,16 +58,33 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 - Opt-in behaviours (`CommandBarBehavior`, all off by default; the scope
   takes a builder read at each opening, so app settings can drive it):
   `fuzzyMatch` (letters in order, ranked last), `sortSectionsByMatch`,
-  `tappablePrefixHints`, `showEntryKinds`, `hiddenKinds`.
+  `tappablePrefixHints`, `showEntryKinds`, `hiddenKinds`, `kindDisplay`,
+  `compactRows` (the subtitle follows the label on its line, muted, so more
+  rows fit; a disabled row keeps its reason on a line of its own).
   `CommandBarFilter.requiresSpace: false` applies a symbol prefix without a
   space (`>foo`).
 - Entry kinds (`CommandBarEntry.kind`, `CommandBarEntryKind`): what choosing
   a row does, so an action run right in the bar never looks like a way to a
   screen. Built-in `open` (a screen of the app), `action` (works from the
   bar: save, copy, toggle) and `app` (another application, the browser); an
-  app adds its own with another id. `showEntryKinds` shows each kind's icon
-  on its row, with `CommandBarStrings.entryKinds[id]` as tooltip and spoken
-  text; `hiddenKinds` leaves whole kinds out (`{'open'}` for actions only).
+  app adds its own with another id. `showEntryKinds` shows each kind at the
+  end of its row, as `kindDisplay` says (`CommandBarKindDisplay.icon`,
+  `label` or `iconAndLabel`): the icon, and/or the short muted text of
+  `CommandBarStrings.entryKindLabels[id]` (« Action », « App »), with
+  `entryKinds[id]` as tooltip and spoken text; `hiddenKinds` leaves whole
+  kinds out (`{'open'}` for actions only).
+- Actions panel (like Raycast's): `CommandBarEntry.actions`
+  (`CommandBarEntryAction`: `id`, `label`, `icon`, one-chord `shortcut`,
+  all JSON-safe) lists more things to do with a row. Alt+Enter (Ctrl+K stays
+  the hotkey) or a right-click opens it on the highlighted row; it lists
+  Enter (`primaryLabel`), Shift+Enter (`secondaryLabel`) then the actions,
+  ↑/↓ and Enter choose, Escape or Alt+Enter close it, the footer shows
+  « Alt Enter actions » when the row has any. An action's `shortcut` also
+  runs it straight from the list. The choice carries
+  `CommandBarChoice.action` (null for Enter and Shift+Enter, which keep
+  working as before); actions run on a disabled row like the secondary
+  action. In a `CommandBarScope`, `CommandBarCommand(actions: …, runAction:
+  (context, actionId) …)`.
 - Actions on the typed text: `CommandBarCommand.query(runQuery: (context,
   text) …)` (`CommandBarEntry.usesQuery` in JSON). Never searched nor kept in
   the recents: once words are typed they are listed last under « With this
@@ -335,13 +352,15 @@ on close. Escape and a click outside close it.
   `ShipglowsCommandBarSnapshot` (entries as `CommandBarEntry`, recent ids,
   brightness, locale), opens, closes or toggles the bar and updates it in
   place while open. `selections` reports each choice (`id`, `secondary`,
-  `previousForeground` HWND, `query` for an entry that `usesQuery`); the bar
-  is already hidden and the app runs the effect itself.
+  `previousForeground` HWND, `query` for an entry that `usesQuery`, `action`
+  for an action of its panel); the bar is already hidden and the app runs
+  the effect itself.
 - `data`: the app's own JSON-safe values for its bar (a color theme the
   bar's engine cannot read from storage), read back from
   `ShipglowsCommandBarOverlayController.snapshot`.
 - `appWindowIds`: entries that open a screen of the app; choosing one brings
   the main window forward instead of the previous window.
+  `appWindowActions` does the same for panel action ids (`open-in-app`).
 - Bar engine: `runShipglowsCommandBarOverlay` from the app's
   `@pragma('vm:entry-point')` function, with its sections, filters, texts
   (per locale), themes and icon table (code point → constant `IconData`, so
@@ -703,3 +722,120 @@ void trash(Item item) {
   showUndoSnackBar(context, message: 'Moved to trash', pending: pending);
 }
 ```
+
+## `flutter/shipglows_guide`
+
+In-app guidance: guided tours across screens, coach marks on a precise
+widget (spotlight, « this control is for… », « try it »), one-step tips,
+shown on a screen's first visit and replayable. Extracted from the
+ContentGlows guided tour. No dependency besides Flutter: routing, storage and
+translations are the app's, passed as callbacks. Not the first-launch
+onboarding (`shipglows-onboarding-engine`).
+
+### Tours and steps
+
+```dart
+const videosTour = GuideTour(
+  id: 'videos.intro',
+  steps: [
+    GuideStep(
+      id: 'filter',
+      targetId: 'videos.filter',          // a GuideTarget on screen
+      route: '/videos',                   // opened when the step starts
+      title: 'guide.videos.filterTitle',  // text or translation key
+      body: 'guide.videos.filterBody',
+      hint: 'guide.videos.filterHint',    // optional call to action
+    ),
+    GuideStep(
+      id: 'play',
+      targetId: 'videos.play',
+      advanceOnTargetTap: true,           // « try it »: tapping moves on
+      title: '…',
+      body: '…',
+    ),
+  ],
+);
+```
+
+- `GuideStep.targetId`: the step points at that `GuideTarget`; the card sits
+  next to it (below, else above), the target is scrolled into view and kept
+  tracked while it moves. A target not on screen (narrow layout, offstage
+  tab) leaves the card floating at the bottom center.
+- `spotlight` (default on): dims the rest of the screen and absorbs taps
+  there; the target stays usable. Off: a ring around the target only, the
+  screen keeps working.
+- `advanceOnTargetTap`: the card says « Try it » and the target's own tap
+  (its action runs first) moves to the next step.
+- `route` / `routeLabel`: the controller opens the route when the step
+  starts; if the user leaves it, the card offers « Open {routeLabel} ».
+- A tour of one step is a tip: « Tip » header, no progress, « Got it » and
+  the close button end it for good.
+- The card can be dragged anywhere (kept on screen), reset at each step.
+
+### Controller
+
+```dart
+final guide = GuideController(
+  tours: [videosTour],
+  store: CallbackGuideStore(
+    onRead: (id) async => GuideProgress.decode(
+      (await SharedPreferences.getInstance()).getString('guide:$id')),
+    onWrite: (id, p) async =>
+      (await SharedPreferences.getInstance()).setString('guide:$id', p.encode()),
+  ),
+  navigate: (route) => router.go(route),
+  location: () => router.routerDelegate.currentConfiguration.uri.path,
+);
+```
+
+One per app (a Riverpod `Provider` with `ref.onDispose(guide.dispose)`).
+It is a `ChangeNotifier`: a settings row rebuilds with `ListenableBuilder`.
+
+- `start(id, {step})`, `resume(id)` (where the user left it, from the start
+  once completed), `pause()` (resumable), `skip()` (completed), `next()`,
+  `previous()`, `openStepRoute()`.
+- `startIfFirstVisit(id)`: starts a tour never shown, unless another runs.
+- `reset(id)` / `resetAll()`: « Show tips again ».
+- `progressOf(id)` (after `load(id)`): `stepIndex`, `started`, `completed`.
+- A tour is never resumed on its own at startup.
+- `store`: `MemoryGuideStore` by default; `CallbackGuideStore` for the
+  app's storage (`GuideProgress.encode` / `decode` for one string per tour).
+
+### Widgets
+
+```dart
+GuideScope(                       // around the shell, under the navigator
+  controller: guide,
+  strings: GuideStrings.forLocale(Localizations.localeOf(context)),
+  resolveText: (context, key) => t(key, locale: appLocale(context)),
+  child: shell,
+)
+
+GuideTrigger(tourId: 'videos.intro', child: VideosScreen())  // first visit
+GuideTarget(id: 'videos.filter', child: IconButton(...))      // pointable
+```
+
+- `GuideScope.navigate` / `location`: context-based routing
+  (`(context, route) => context.go(route)`) for an app whose controller has
+  no `navigate` of its own; used while the scope is mounted. A tour started
+  outside the shell (onboarding) opens its first route itself:
+  `context.go(guide.activeStep?.route ?? '/home')`.
+- `GuideScope.of(context)` / `maybeOf`: the controller, for a « Replay the
+  tour » button inside the shell.
+- `GuideTrigger.enabled: false` while the screen is not ready (loading); it
+  fires when it turns on, after `delay` (600 ms), and only while its screen
+  is shown (an offstage tab waits).
+- `GuideTarget` ids are unique among mounted screens.
+
+### Texts, look, accessibility
+
+- Card texts: `GuideStrings.en`, `.fr`, `forLocale(locale)` or the app's
+  own (`{current}`, `{total}`, `{screen}` are filled in). Step texts go
+  through `resolveText`.
+- Look: `GuideThemeData` theme extension (accent, surface, scrim, max width,
+  radii, spotlight padding, bottom offset of a floating card), every value
+  falls back on the `ColorScheme`.
+- Accessibility: the card is a live region (read when a step changes), the
+  primary button takes focus, Esc pauses (closes a tip), every button is
+  44 px at least, icons are excluded from semantics, reduce-motion turns the
+  card's entrance and the scroll to the target off.

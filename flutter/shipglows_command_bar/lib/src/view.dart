@@ -8,20 +8,22 @@ import 'package:flutter/services.dart';
 import 'behavior.dart';
 import 'command.dart';
 import 'hotkey.dart';
+import 'practice.dart';
 import 'query.dart';
 import 'query_history.dart';
 import 'strings.dart';
 import 'theme.dart';
 
 /// What the user chose in the bar: an entry, whether its secondary action
-/// (Shift+Enter) was asked for, and the typed text it works on. The owner of
-/// the bar runs it.
+/// (Shift+Enter) or one of its [CommandBarEntry.actions] was asked for, and
+/// the typed text it works on. The owner of the bar runs it.
 @immutable
 class CommandBarChoice {
   const CommandBarChoice({
     required this.id,
     this.secondary = false,
     this.query,
+    this.action,
   });
 
   /// Id of the chosen entry, as in [CommandBarEntry.id].
@@ -33,6 +35,10 @@ class CommandBarChoice {
   /// The typed words, filter prefix left out, for an entry that
   /// [CommandBarEntry.usesQuery]; null for any other.
   final String? query;
+
+  /// Id of the [CommandBarEntryAction] chosen in the actions panel, or with
+  /// its shortcut; null for Enter and Shift+Enter.
+  final String? action;
 }
 
 /// The command bar: a search field, a filter chip, a grouped list and a
@@ -41,9 +47,11 @@ class CommandBarChoice {
 /// floating bar.
 ///
 /// Keys: ↑/↓ move, Enter chooses, Shift+Enter or Ctrl/⌘+Enter chooses the
-/// secondary action,
-/// Ctrl/⌘+1…9 chooses row n, Backspace on an empty field removes the filter,
-/// Escape removes the filter first, then closes, and [hotkey] closes.
+/// secondary action, Alt+Enter (or a right-click on a row) opens the actions
+/// panel of the row, the shortcut of one of its [CommandBarEntry.actions]
+/// chooses it, Ctrl/⌘+1…9 chooses row n, Backspace on an empty field removes
+/// the filter, Escape closes the panel, then removes the filter, then closes,
+/// and [hotkey] closes.
 ///
 /// With [CommandBarBehavior.restoreLastQuery] the field opens with the first
 /// of [queryHistory], selected; with [CommandBarBehavior.showQueryHistory]
@@ -153,6 +161,26 @@ final class _HeaderRow extends _BarRow {
   final String title;
 }
 
+/// One line of the actions panel: Enter, Shift+Enter or an entry action.
+@immutable
+class _PanelAction {
+  const _PanelAction({
+    required this.label,
+    required this.keys,
+    this.icon,
+    this.secondary = false,
+    this.action,
+  });
+
+  final String label;
+  final IconData? icon;
+  final List<String> keys;
+  final bool secondary;
+
+  /// Id of the [CommandBarEntryAction]; null for Enter and Shift+Enter.
+  final String? action;
+}
+
 /// Id prefix of the rows listing past searches; never a real entry id.
 const String _queryRowPrefix = '\u0000query:';
 
@@ -215,6 +243,12 @@ class _CommandBarViewState extends State<CommandBarView> {
 
   /// Whether this opening already gave its search to [onQueryUsed].
   bool _queryReported = false;
+
+  /// Whether the actions panel of the highlighted entry is open.
+  bool _actionsOpen = false;
+
+  /// Highlighted line of the actions panel.
+  int _actionHighlight = 0;
 
   @override
   void initState() {
@@ -294,6 +328,7 @@ class _CommandBarViewState extends State<CommandBarView> {
 
   void _onChanged(String raw) {
     _restoredUntouched = false;
+    _actionsOpen = false;
     final parsed = parseCommandBarQuery(raw, widget.filters);
     if (_filter == null && parsed.filter != null) {
       // The prefix moves into the chip; only the words stay in the field.
@@ -335,7 +370,10 @@ class _CommandBarViewState extends State<CommandBarView> {
     if (count == 0) return;
     final previous = _effectiveHighlight;
     final next = ((previous + delta) % count + count) % count;
-    setState(() => _highlight = next);
+    setState(() {
+      _highlight = next;
+      _actionsOpen = false;
+    });
     _revealRow(
       _layout.rowOfItem[next],
       towardsEnd: next > previous,
@@ -435,11 +473,11 @@ class _CommandBarViewState extends State<CommandBarView> {
     });
   }
 
-  void _chooseItem(int itemIndex, {required bool secondary}) {
+  void _chooseItem(int itemIndex, {required bool secondary, String? action}) {
     if (itemIndex < 0 || itemIndex >= _layout.items.length) return;
     final entry = _layout.items[itemIndex];
     if (entry.id.startsWith(_queryRowPrefix)) {
-      if (secondary) return;
+      if (secondary || action != null) return;
       setState(() {
         _restoredUntouched = false;
         _fillQuery(
@@ -449,7 +487,10 @@ class _CommandBarViewState extends State<CommandBarView> {
       });
       return;
     }
-    if (secondary) {
+    if (action != null) {
+      // Like the secondary action, an entry action runs on a disabled row.
+      if (!entry.actions.any((candidate) => candidate.id == action)) return;
+    } else if (secondary) {
       if (!entry.hasSecondary) return;
     } else if (!entry.enabled) {
       // A disabled entry stays visible but never runs.
@@ -459,10 +500,118 @@ class _CommandBarViewState extends State<CommandBarView> {
     widget.onChoose(
       CommandBarChoice(
         id: entry.id,
-        secondary: secondary,
+        secondary: action == null && secondary,
         query: entry.usesQuery ? _controller.text.trim() : null,
+        action: action,
       ),
     );
+  }
+
+  /// What the actions panel of [entry] lists: Enter when it runs, Shift+Enter
+  /// when there is one, then the entry's own actions.
+  List<_PanelAction> _panelActions(CommandBarEntry entry) {
+    final strings = widget.strings;
+    return [
+      if (entry.enabled)
+        _PanelAction(
+          label: entry.primaryLabel ?? strings.open,
+          icon: entry.icon,
+          keys: const ['Enter'],
+        ),
+      if (entry.hasSecondary)
+        _PanelAction(
+          label: entry.secondaryLabel ?? strings.secondary,
+          keys: const ['Shift', 'Enter'],
+          secondary: true,
+        ),
+      for (final action in entry.actions)
+        _PanelAction(
+          label: action.label,
+          icon: action.icon,
+          keys: [
+            if (action.shortcut case final shortcut?)
+              ...commandShortcutKeys(shortcut),
+          ],
+          action: action.id,
+        ),
+    ];
+  }
+
+  CommandBarEntry? get _highlightedEntry =>
+      _layout.items.isEmpty ? null : _layout.items[_effectiveHighlight];
+
+  /// Opens the actions panel of row [itemIndex], when it has more than Enter.
+  void _openActions(int itemIndex) {
+    if (itemIndex < 0 || itemIndex >= _layout.items.length) return;
+    if (!_layout.items[itemIndex].hasActions) return;
+    setState(() {
+      _highlight = itemIndex;
+      _actionsOpen = true;
+      _actionHighlight = 0;
+    });
+  }
+
+  void _closeActions() => setState(() => _actionsOpen = false);
+
+  void _choosePanelAction(_PanelAction line) {
+    setState(() => _actionsOpen = false);
+    _chooseItem(
+      _effectiveHighlight,
+      secondary: line.secondary,
+      action: line.action,
+    );
+  }
+
+  /// Chooses the action of [entry] whose shortcut [event] presses; false
+  /// when none does.
+  bool _runActionShortcut(CommandBarEntry? entry, KeyEvent event) {
+    if (entry == null || event is KeyRepeatEvent) return false;
+    for (final action in entry.actions) {
+      final shortcut = action.shortcut;
+      if (shortcut != null && commandBarShortcutMatches(shortcut, event)) {
+        setState(() => _actionsOpen = false);
+        _chooseItem(_effectiveHighlight, secondary: false, action: action.id);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Keys while the actions panel is open: it keeps them all, so typing
+  /// never changes the search behind it.
+  KeyEventResult _onPanelKeyEvent(KeyEvent event) {
+    final entry = _highlightedEntry;
+    final lines = entry == null ? const <_PanelAction>[] : _panelActions(entry);
+    final key = event.logicalKey;
+    final enter =
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter;
+    if (widget.hotkey?.matches(event) ?? false) {
+      widget.onClose();
+      return KeyEventResult.handled;
+    }
+    if (lines.isEmpty ||
+        key == LogicalKeyboardKey.escape ||
+        (enter && HardwareKeyboard.instance.isAltPressed)) {
+      if (event is! KeyRepeatEvent) _closeActions();
+      return KeyEventResult.handled;
+    }
+    final highlight = _actionHighlight.clamp(0, lines.length - 1).toInt();
+    if (key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowUp) {
+      final delta = key == LogicalKeyboardKey.arrowDown ? 1 : -1;
+      setState(
+        () => _actionHighlight =
+            ((highlight + delta) % lines.length + lines.length) % lines.length,
+      );
+      return KeyEventResult.handled;
+    }
+    if (enter) {
+      if (event is! KeyRepeatEvent) _choosePanelAction(lines[highlight]);
+      return KeyEventResult.handled;
+    }
+    _runActionShortcut(entry, event);
+    return KeyEventResult.handled;
   }
 
   KeyEventResult _onKeyEvent(KeyEvent event, double rowHeight) {
@@ -471,6 +620,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     final keyboard = HardwareKeyboard.instance;
     final hasCommandModifier =
         keyboard.isControlPressed || keyboard.isMetaPressed;
+    if (_actionsOpen) return _onPanelKeyEvent(event);
 
     if (key == LogicalKeyboardKey.escape) {
       if (_controller.text.isEmpty && _filter != null) {
@@ -492,6 +642,10 @@ class _CommandBarViewState extends State<CommandBarView> {
         key == LogicalKeyboardKey.numpadEnter) {
       // Holding Enter must not run a command again and again.
       if (event is KeyRepeatEvent) return KeyEventResult.handled;
+      if (keyboard.isAltPressed) {
+        _openActions(_effectiveHighlight);
+        return KeyEventResult.handled;
+      }
       _chooseItem(
         _effectiveHighlight,
         secondary: keyboard.isShiftPressed || hasCommandModifier,
@@ -511,6 +665,9 @@ class _CommandBarViewState extends State<CommandBarView> {
     }
     if (widget.hotkey?.matches(event) ?? false) {
       widget.onClose();
+      return KeyEventResult.handled;
+    }
+    if (_runActionShortcut(_highlightedEntry, event)) {
       return KeyEventResult.handled;
     }
     // Plain digits are not shortcuts: they type into the field.
@@ -666,6 +823,41 @@ class _CommandBarViewState extends State<CommandBarView> {
   Widget _wrapFooter(BuildContext context, Widget footer) =>
       widget.footerBuilder?.call(context, footer) ?? footer;
 
+  Widget _list(_BarLayout layout, int highlight, bool showNumbers) {
+    final strings = widget.strings;
+    final behavior = widget.behavior;
+    return ListView.builder(
+      controller: _scroll,
+      shrinkWrap: true,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: layout.rows.length,
+      itemBuilder: (context, row) => KeyedSubtree(
+        key: _keyOfRow(row),
+        child: switch (layout.rows[row]) {
+          _HeaderRow(:final title) => _SectionHeader(title),
+          _EntryRow(:final entry, :final itemIndex) => CommandBarTile(
+            entry: entry,
+            showKind: behavior.showEntryKinds,
+            kindDisplay: behavior.kindDisplay,
+            kindLabel: strings.entryKinds[entry.kind?.id],
+            kindText:
+                strings.entryKindLabels[entry.kind?.id] ??
+                strings.entryKinds[entry.kind?.id],
+            compact: behavior.compactRows,
+            highlighted: itemIndex == highlight,
+            number: showNumbers && itemIndex < _numberedRows
+                ? itemIndex + 1
+                : null,
+            onTap: () => _chooseItem(itemIndex, secondary: false),
+            onSecondaryTap: entry.hasActions
+                ? () => _openActions(itemIndex)
+                : null,
+          ),
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final style = CommandBarThemeData.of(context);
@@ -684,6 +876,9 @@ class _CommandBarViewState extends State<CommandBarView> {
     final showNumbers =
         MediaQuery.sizeOf(context).width >= _numberedRowsMinWidth;
     final highlighted = layout.items.isEmpty ? null : layout.items[highlight];
+    final panelActions = _actionsOpen && highlighted != null
+        ? _panelActions(highlighted)
+        : const <_PanelAction>[];
 
     return Focus(
       onKeyEvent: (node, event) => _onKeyEvent(event, style.rowMinHeight),
@@ -766,29 +961,36 @@ class _CommandBarViewState extends State<CommandBarView> {
                       ),
                     ),
                   )
-                : ListView.builder(
-                    controller: _scroll,
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: layout.rows.length,
-                    itemBuilder: (context, row) => KeyedSubtree(
-                      key: _keyOfRow(row),
-                      child: switch (layout.rows[row]) {
-                        _HeaderRow(:final title) => _SectionHeader(title),
-                        _EntryRow(:final entry, :final itemIndex) =>
-                          CommandBarTile(
-                            entry: entry,
-                            showKind: widget.behavior.showEntryKinds,
-                            kindLabel: strings.entryKinds[entry.kind?.id],
-                            highlighted: itemIndex == highlight,
-                            number: showNumbers && itemIndex < _numberedRows
-                                ? itemIndex + 1
-                                : null,
-                            onTap: () =>
-                                _chooseItem(itemIndex, secondary: false),
+                : Stack(
+                    fit: StackFit.passthrough,
+                    children: [
+                      ConstrainedBox(
+                        // The panel needs room even over a short list.
+                        constraints: BoxConstraints(
+                          minHeight: panelActions.isEmpty
+                              ? 0
+                              : _ActionsPanel.heightFor(panelActions.length),
+                        ),
+                        child: _list(layout, highlight, showNumbers),
+                      ),
+                      if (panelActions.isNotEmpty)
+                        Positioned.fill(
+                          child: Align(
+                            alignment: AlignmentDirectional.bottomEnd,
+                            child: _ActionsPanel(
+                              title: strings.actionsPanel.replaceAll(
+                                '{label}',
+                                highlighted!.label,
+                              ),
+                              actions: panelActions,
+                              highlight: _actionHighlight
+                                  .clamp(0, panelActions.length - 1)
+                                  .toInt(),
+                              onChoose: _choosePanelAction,
+                            ),
                           ),
-                      },
-                    ),
+                        ),
+                    ],
                   ),
           ),
           Divider(height: 1, color: style.borderColor),
@@ -814,6 +1016,11 @@ class _CommandBarViewState extends State<CommandBarView> {
                       _FooterHint(
                         keys: const ['Shift', 'Enter'],
                         label: highlighted.secondaryLabel ?? strings.secondary,
+                      ),
+                    if (highlighted != null && highlighted.hasActions)
+                      _FooterHint(
+                        keys: const ['Alt', 'Enter'],
+                        label: strings.actions,
                       ),
                     _FooterHint(keys: const ['Esc'], label: strings.close),
                   ],
@@ -863,6 +1070,10 @@ class CommandBarTile extends StatelessWidget {
     this.trailingLabel,
     this.showKind = false,
     this.kindLabel,
+    this.kindDisplay = CommandBarKindDisplay.icon,
+    this.kindText,
+    this.compact = false,
+    this.onSecondaryTap,
   });
 
   /// The entry shown.
@@ -885,20 +1096,49 @@ class CommandBarTile extends StatelessWidget {
   /// tooltip, read aloud with the row.
   final String? kindLabel;
 
+  /// Whether the kind shows as its icon, its [kindText] or both.
+  final CommandBarKindDisplay kindDisplay;
+
+  /// Short name of the kind ([CommandBarStrings.entryKindLabels]), written
+  /// at the end of the row unless [kindDisplay] is
+  /// [CommandBarKindDisplay.icon].
+  final String? kindText;
+
+  /// Whether the subtitle follows the label on the same line
+  /// ([CommandBarBehavior.compactRows]). A disabled row keeps its reason on
+  /// a second line.
+  final bool compact;
+
   /// Called on tap, unless the entry is disabled.
   final VoidCallback onTap;
+
+  /// Called on a right-click, even on a disabled entry: the bar opens the
+  /// row's actions panel. Null when the row has none.
+  final VoidCallback? onSecondaryTap;
 
   @override
   Widget build(BuildContext context) {
     final style = CommandBarThemeData.of(context);
     final textTheme = Theme.of(context).textTheme;
     final disabled = !entry.enabled;
-    // A disabled row explains why in its second line; otherwise the subtitle.
+    // A disabled row explains why in its second line; otherwise the subtitle,
+    // on the label's line when compact.
     final secondLine = disabled ? entry.disabledReason : entry.subtitle;
+    final inlineSubtitle = compact && !disabled ? entry.subtitle : null;
+    final belowLine = inlineSubtitle == null ? secondLine : null;
     final trailingLabel = this.trailingLabel;
     final badge = entry.badge;
     final kind = showKind ? entry.kind : null;
     final kindLabel = kind == null ? null : this.kindLabel;
+    final kindText = kind == null || kindDisplay == CommandBarKindDisplay.icon
+        ? null
+        : this.kindText ?? kindLabel;
+    final kindIcon = kind != null && kindDisplay != CommandBarKindDisplay.label;
+    final mutedSmall = textTheme.labelSmall?.copyWith(color: style.mutedColor);
+    final labelStyle = textTheme.bodyMedium?.copyWith(
+      color: disabled ? style.mutedColor : style.textColor,
+      fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
+    );
     final spoken = [
       entry.label,
       ?badge,
@@ -924,6 +1164,7 @@ class CommandBarTile extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(style.rowRadius),
           onTap: disabled ? null : onTap,
+          onSecondaryTap: onSecondaryTap,
           child: Semantics(
             button: true,
             enabled: entry.enabled,
@@ -956,18 +1197,24 @@ class CommandBarTile extends StatelessWidget {
                         Row(
                           children: [
                             Flexible(
-                              child: Text(
-                                entry.label,
+                              // One text: the label keeps its room, the
+                              // subtitle after it is cut first.
+                              child: Text.rich(
+                                TextSpan(
+                                  text: entry.label,
+                                  style: labelStyle,
+                                  children: [
+                                    if (inlineSubtitle != null)
+                                      TextSpan(
+                                        text: '   $inlineSubtitle',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: style.mutedColor,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: disabled
-                                      ? style.mutedColor
-                                      : style.textColor,
-                                  fontWeight: highlighted
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                ),
                               ),
                             ),
                             if (badge != null) ...[
@@ -976,14 +1223,13 @@ class CommandBarTile extends StatelessWidget {
                             ],
                           ],
                         ),
-                        if (secondLine != null)
+                        if (belowLine != null)
                           Text(
-                            secondLine,
-                            maxLines: 1,
+                            belowLine,
+                            // The reason a row is disabled is never cut short.
+                            maxLines: disabled ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
-                            style: textTheme.labelSmall?.copyWith(
-                              color: style.mutedColor,
-                            ),
+                            style: mutedSmall,
                           ),
                       ],
                     ),
@@ -999,17 +1245,13 @@ class CommandBarTile extends StatelessWidget {
                   ],
                   if (kind != null) ...[
                     const SizedBox(width: 8),
-                    if (kindLabel == null)
-                      Icon(kind.icon, size: 16, color: style.mutedColor)
-                    else
-                      Tooltip(
-                        message: kindLabel,
-                        child: Icon(
-                          kind.icon,
-                          size: 16,
-                          color: style.mutedColor,
-                        ),
-                      ),
+                    _KindMarker(
+                      icon: kindIcon ? kind.icon : null,
+                      text: kindText,
+                      tooltip: kindLabel,
+                      style: mutedSmall,
+                      color: style.mutedColor,
+                    ),
                   ],
                   for (final shortcut in entry.shortcuts) ...[
                     const SizedBox(width: 8),
@@ -1130,6 +1372,209 @@ class _FooterHint extends StatelessWidget {
               ?.copyWith(color: style.mutedColor),
         ),
       ],
+    );
+  }
+}
+
+/// The kind of a row at its end: icon, short text, or both, with the long
+/// description as tooltip.
+class _KindMarker extends StatelessWidget {
+  const _KindMarker({
+    required this.icon,
+    required this.text,
+    required this.tooltip,
+    required this.style,
+    required this.color,
+  });
+
+  final IconData? icon;
+  final String? text;
+  final String? tooltip;
+  final TextStyle? style;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = this.icon;
+    final text = this.text;
+    final marker = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) Icon(icon, size: 16, color: color),
+        if (icon != null && text != null) const SizedBox(width: 4),
+        if (text != null) Text(text, maxLines: 1, style: style),
+      ],
+    );
+    final tooltip = this.tooltip;
+    // The text already says it: the tooltip only explains a lone icon.
+    if (tooltip == null || (text != null && text == tooltip)) return marker;
+    return Tooltip(message: tooltip, child: marker);
+  }
+}
+
+/// The actions of the highlighted row, over the end of the list: Enter,
+/// Shift+Enter, then the entry's own actions with their shortcuts.
+class _ActionsPanel extends StatelessWidget {
+  const _ActionsPanel({
+    required this.title,
+    required this.actions,
+    required this.highlight,
+    required this.onChoose,
+  });
+
+  static const double _rowHeight = 36;
+  static const double _titleHeight = 32;
+  static const int _rowsShown = 8;
+  static const double _margin = 8;
+
+  /// Room the panel takes with [count] lines, margin included.
+  static double heightFor(int count) =>
+      _titleHeight +
+      (count > _rowsShown ? _rowsShown : count) * _rowHeight +
+      8 +
+      2 * _margin;
+
+  final String title;
+  final List<_PanelAction> actions;
+  final int highlight;
+  final ValueChanged<_PanelAction> onChoose;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CommandBarThemeData.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.all(_margin),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Material(
+          color: style.backgroundColor,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(style.rowRadius + 4),
+            side: BorderSide(color: style.borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Semantics(
+            label: title,
+            explicitChildNodes: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: _titleHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ExcludeSemantics(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: style.mutedColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(bottom: 4),
+                    itemCount: actions.length,
+                    itemBuilder: (context, index) => _ActionLine(
+                      line: actions[index],
+                      highlighted: index == highlight,
+                      onTap: () => onChoose(actions[index]),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionLine extends StatelessWidget {
+  const _ActionLine({
+    required this.line,
+    required this.highlighted,
+    required this.onTap,
+  });
+
+  final _PanelAction line;
+  final bool highlighted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CommandBarThemeData.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final icon = line.icon;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Material(
+        color: highlighted ? style.highlightColor : Colors.transparent,
+        borderRadius: BorderRadius.circular(style.rowRadius),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(style.rowRadius),
+          onTap: onTap,
+          child: Semantics(
+            button: true,
+            selected: highlighted,
+            label: line.label,
+            excludeSemantics: true,
+            child: SizedBox(
+              height: _ActionsPanel._rowHeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      child: icon == null
+                          ? null
+                          : Icon(
+                              icon,
+                              size: 16,
+                              color: highlighted
+                                  ? style.highlightedIconColor
+                                  : style.iconColor,
+                            ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        line.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: style.textColor,
+                          fontWeight: highlighted
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (line.keys.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      CommandBarKeys(keys: line.keys),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

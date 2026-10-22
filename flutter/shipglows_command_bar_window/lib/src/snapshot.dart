@@ -19,6 +19,7 @@ class ShipglowsCommandBarSnapshot {
     this.brightness,
     this.locale,
     this.appWindowIds = const <String>{},
+    this.appWindowActions = const <String>{},
     this.data = const <String, Object?>{},
   });
 
@@ -47,6 +48,7 @@ class ShipglowsCommandBarSnapshot {
       },
       locale: _localeFrom(json['locale']),
       appWindowIds: _strings(json['appWindowIds']).toSet(),
+      appWindowActions: _strings(json['appWindowActions']).toSet(),
       data: switch (json['data']) {
         final Map data => data.cast<String, Object?>(),
         _ => const <String, Object?>{},
@@ -80,6 +82,11 @@ class ShipglowsCommandBarSnapshot {
   /// window in front before the bar.
   final Set<String> appWindowIds;
 
+  /// Ids of the entry actions (`CommandBarEntryAction.id`) that open a
+  /// screen of the app, whatever the entry: choosing one from the actions
+  /// panel brings the app's main window forward, like [appWindowIds].
+  final Set<String> appWindowActions;
+
   /// The app's own JSON-safe values for its bar, such as the color theme it
   /// draws with (`ShipglowsCommandBarOverlayController.snapshot`).
   final Map<String, Object?> data;
@@ -93,6 +100,7 @@ class ShipglowsCommandBarSnapshot {
     'brightness': brightness?.name,
     'locale': locale?.toLanguageTag(),
     'appWindowIds': appWindowIds.toList(),
+    'appWindowActions': appWindowActions.toList(),
     'data': data,
   };
 }

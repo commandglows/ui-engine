@@ -63,6 +63,13 @@ class CommandBarStrings {
       'action': 'Runs right here',
       'app': 'Opens another app',
     },
+    this.entryKindLabels = const <String, String>{
+      'open': 'Screen',
+      'action': 'Action',
+      'app': 'App',
+    },
+    this.actions = 'actions',
+    this.actionsPanel = 'Actions of « {label} »',
   });
 
   /// English texts.
@@ -141,6 +148,13 @@ class CommandBarStrings {
       'action': 'S’exécute ici',
       'app': 'Ouvre une autre app',
     },
+    entryKindLabels: <String, String>{
+      'open': 'Ouvre un écran',
+      'action': 'Action',
+      'app': 'App',
+    },
+    actions: 'actions',
+    actionsPanel: 'Actions de « {label} »',
   );
 
   /// Accessible name of the dialog.
@@ -289,6 +303,18 @@ class CommandBarStrings {
   /// marker, and read aloud with the row. An app adds its own kinds here.
   final Map<String, String> entryKinds;
 
+  /// Short name of each [CommandBarEntryKind], by its id, written at the end
+  /// of the row when [CommandBarBehavior.kindDisplay] asks for text. Falls
+  /// back to [entryKinds].
+  final Map<String, String> entryKindLabels;
+
+  /// Footer: Alt+Enter, which opens the actions panel of the row.
+  final String actions;
+
+  /// Title and accessible name of the actions panel; `{label}` is the
+  /// entry's label.
+  final String actionsPanel;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -339,6 +365,9 @@ class CommandBarStrings {
     String? hotkeyReset,
     String? queryActionsSection,
     Map<String, String>? entryKinds,
+    Map<String, String>? entryKindLabels,
+    String? actions,
+    String? actionsPanel,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -388,5 +417,8 @@ class CommandBarStrings {
     hotkeyReset: hotkeyReset ?? this.hotkeyReset,
     queryActionsSection: queryActionsSection ?? this.queryActionsSection,
     entryKinds: entryKinds ?? this.entryKinds,
+    entryKindLabels: entryKindLabels ?? this.entryKindLabels,
+    actions: actions ?? this.actions,
+    actionsPanel: actionsPanel ?? this.actionsPanel,
   );
 }

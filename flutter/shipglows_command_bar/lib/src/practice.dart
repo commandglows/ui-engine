@@ -635,3 +635,12 @@ String _typedLabel(
     key.length == 1 ? key.toUpperCase() : key,
   ].join('+');
 }
+
+/// Whether [event] presses the one key combination [label] names
+/// (`Ctrl+Shift+C`, `Alt+P`), as the practice reads labels. A sequence or a
+/// label the bar cannot read never matches.
+bool commandBarShortcutMatches(String label, KeyEvent event) {
+  if (event is KeyUpEvent || _isModifier(event.logicalKey)) return false;
+  final chord = _parseChord(label);
+  return chord != null && chord.accepts(event, HardwareKeyboard.instance);
+}

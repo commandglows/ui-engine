@@ -193,7 +193,8 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
   }
 
   /// Hides the bar, reports [choice] to the app and lets it run the entry.
-  /// A disabled entry never runs; its secondary action runs if it has one.
+  /// A disabled entry never runs; its secondary action and its actions run
+  /// if it has them.
   Future<void> choose(CommandBarChoice choice) async {
     CommandBarEntry? entry;
     for (final candidate in entries) {
@@ -203,10 +204,18 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
       }
     }
     if (entry == null) return;
-    final allowed = choice.secondary ? entry.hasSecondary : entry.enabled;
+    final action = choice.action;
+    final allowed = action != null
+        ? entry.actions.any((candidate) => candidate.id == action)
+        : choice.secondary
+        ? entry.hasSecondary
+        : entry.enabled;
     if (!allowed) return;
     final previous = host.previousForeground;
-    final opensApp = _snapshot?.appWindowIds.contains(entry.id) ?? false;
+    final snapshot = _snapshot;
+    final opensApp = action != null
+        ? snapshot?.appWindowActions.contains(action) ?? false
+        : snapshot?.appWindowIds.contains(entry.id) ?? false;
     await host.hide(
       focus: opensApp ? OverlayHideFocus.app : OverlayHideFocus.previous,
     );
@@ -215,6 +224,7 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
       'secondary': choice.secondary,
       'previousForeground': previous,
       'query': choice.query,
+      'action': action,
     });
   }
 

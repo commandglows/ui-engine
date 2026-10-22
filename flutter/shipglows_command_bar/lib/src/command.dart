@@ -10,8 +10,10 @@ typedef CommandBarRun = FutureOr<void> Function(BuildContext context);
 
 /// Runs a command on the text typed in the bar ([query], filter prefix
 /// left out), as [CommandBarCommand.query] builds.
-typedef CommandBarQueryRun =
-    FutureOr<void> Function(BuildContext context, String query);
+typedef CommandBarQueryRun = FutureOr<void> Function(
+  BuildContext context,
+  String query,
+);
 
 /// Stands for the typed text in the label and subtitle of an entry that
 /// [CommandBarEntry.usesQuery]: `Search « {query} » on the web`.
@@ -57,6 +59,83 @@ class CommandBarEntryKind {
   int get hashCode => Object.hash(id, icon);
 }
 
+/// Runs one of the [CommandBarCommand.actions] of a command, by its
+/// [CommandBarEntryAction.id].
+typedef CommandBarActionRun = FutureOr<void> Function(
+  BuildContext context,
+  String actionId,
+);
+
+/// One more thing to do with an entry, listed in its actions panel
+/// (Alt+Enter on the highlighted row, or a right-click): copy, paste, pin,
+/// open in the app.
+///
+/// Display data only, so it travels as JSON to a floating bar: choosing it
+/// reports its [id] in [CommandBarChoice.action], and the owner of the bar
+/// runs it.
+@immutable
+class CommandBarEntryAction {
+  const CommandBarEntryAction({
+    required this.id,
+    required this.label,
+    this.icon,
+    this.shortcut,
+  });
+
+  /// Restores an action from [json], as produced by [toJson]; null when `id`
+  /// or `label` is missing. [iconFor] maps the icon code point back, as in
+  /// [CommandBarEntry.fromJson].
+  static CommandBarEntryAction? fromJson(
+    Object? json, {
+    IconData? Function(int codePoint)? iconFor,
+  }) {
+    if (json is! Map) return null;
+    final id = json['id'];
+    final label = json['label'];
+    if (id is! String || label is! String) return null;
+    final codePoint = json['iconCodePoint'];
+    return CommandBarEntryAction(
+      id: id,
+      label: label,
+      icon: codePoint is int ? iconFor?.call(codePoint) : null,
+      shortcut: _optionalString(json['shortcut']),
+    );
+  }
+
+  /// Stable identifier within the entry, such as `copy` or `pin`.
+  final String id;
+
+  /// Localized name shown in the panel, also read aloud.
+  final String label;
+
+  /// Icon shown before the label.
+  final IconData? icon;
+
+  /// One key combination (`Ctrl+Shift+C`) that runs the action from the
+  /// list as well as from the panel, shown as keycaps. Keep it clear of the
+  /// keys the search field edits with (Ctrl+C, Ctrl+Delete).
+  final String? shortcut;
+
+  /// JSON-safe map with the keys [fromJson] reads.
+  Map<String, Object?> toJson() => <String, Object?>{
+    'id': id,
+    'label': label,
+    'iconCodePoint': icon?.codePoint,
+    'shortcut': shortcut,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is CommandBarEntryAction &&
+      other.id == id &&
+      other.label == label &&
+      other.icon == icon &&
+      other.shortcut == shortcut;
+
+  @override
+  int get hashCode => Object.hash(id, label, icon, shortcut);
+}
+
 /// Display data of one command, without any callback.
 ///
 /// The bar renders entries only; running one goes through its
@@ -82,6 +161,7 @@ class CommandBarEntry {
     this.badge,
     this.kind,
     this.usesQuery = false,
+    this.actions = const <CommandBarEntryAction>[],
   });
 
   /// Restores an entry from [json], as produced by [toJson].
@@ -104,6 +184,11 @@ class CommandBarEntry {
     return CommandBarEntry(
       kind: _kindFrom(json['kind'], json['kindIconCodePoint'], iconFor),
       usesQuery: json['usesQuery'] == true,
+      actions: [
+        if (json['actions'] case final List items)
+          for (final item in items)
+            ?CommandBarEntryAction.fromJson(item, iconFor: iconFor),
+      ],
       id: id,
       label: label,
       section: section,
@@ -184,6 +269,14 @@ class CommandBarEntry {
   /// [commandBarQueryPlaceholder] in [label] and [subtitle] shows the text.
   final bool usesQuery;
 
+  /// More things to do with the entry, listed in its actions panel after
+  /// Enter and Shift+Enter. They run even when the entry is disabled, like
+  /// the secondary action.
+  final List<CommandBarEntryAction> actions;
+
+  /// Whether the actions panel has more than Enter to offer.
+  bool get hasActions => actions.isNotEmpty || hasSecondary;
+
   /// Copy of this entry with [commandBarQueryPlaceholder] replaced by
   /// [query] in its label and subtitle.
   CommandBarEntry withQuery(String query) => CommandBarEntry(
@@ -204,6 +297,7 @@ class CommandBarEntry {
     badge: badge,
     kind: kind,
     usesQuery: usesQuery,
+    actions: actions,
   );
 
   /// JSON-safe map with the same keys [CommandBarEntry.fromJson] reads.
@@ -226,6 +320,7 @@ class CommandBarEntry {
     'kind': kind?.id,
     'kindIconCodePoint': kind?.icon.codePoint,
     'usesQuery': usesQuery,
+    'actions': [for (final action in actions) action.toJson()],
   };
 
   @override
@@ -247,7 +342,8 @@ class CommandBarEntry {
       other.primaryLabel == primaryLabel &&
       other.badge == badge &&
       other.kind == kind &&
-      other.usesQuery == usesQuery;
+      other.usesQuery == usesQuery &&
+      listEquals(other.actions, actions);
 
   @override
   int get hashCode => Object.hash(
@@ -268,6 +364,7 @@ class CommandBarEntry {
     badge,
     kind,
     usesQuery,
+    Object.hashAll(actions),
   );
 }
 
@@ -292,6 +389,8 @@ class CommandBarCommand {
     this.primaryLabel,
     this.badge,
     this.kind,
+    this.actions = const <CommandBarEntryAction>[],
+    this.runAction,
   }) : runQuery = null;
 
   /// A command on the typed text, listed once words are typed (see
@@ -316,7 +415,9 @@ class CommandBarCommand {
        shortcuts = const <String>[],
        secondaryLabel = null,
        runSecondary = null,
-       searchOnly = false;
+       searchOnly = false,
+       actions = const <CommandBarEntryAction>[],
+       runAction = null;
 
   /// See [CommandBarEntry.id].
   final String id;
@@ -375,6 +476,12 @@ class CommandBarCommand {
   /// See [CommandBarEntry.badge].
   final String? badge;
 
+  /// See [CommandBarEntry.actions]. Listed only with [runAction].
+  final List<CommandBarEntryAction> actions;
+
+  /// Runs the action of [actions] chosen in the panel, by its id.
+  final CommandBarActionRun? runAction;
+
   /// Display data of this command, without its callbacks.
   CommandBarEntry get entry => CommandBarEntry(
     id: id,
@@ -394,6 +501,7 @@ class CommandBarCommand {
     badge: badge,
     kind: kind,
     usesQuery: runQuery != null,
+    actions: runAction == null ? const <CommandBarEntryAction>[] : actions,
   );
 }
 
