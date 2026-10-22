@@ -7,6 +7,7 @@
 /// back. The app runs the effect itself.
 library;
 
+export 'src/command_bar_hotkey.dart';
 export 'src/command_bar_overlay.dart';
 export 'src/command_bar_window.dart';
 export 'src/snapshot.dart';

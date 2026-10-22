@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   shipglows_command_bar:
     path: ../shipglows_command_bar
+  shipglows_hotkeys:
+    path: ../shipglows_hotkeys
   shipglows_overlay_window:
     path: ../shipglows_overlay_window
 

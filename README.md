@@ -247,6 +247,10 @@ on close. Escape and a click outside close it.
 - Window options: `ShipglowsCommandBarWindow.defaultOptions(appFolder: …)`.
 - In-app bar replaced: `CommandBarScope(opener: bar.scopeOpener, …)`, so
   Ctrl/⌘+K and the app's `open()` calls show only the floating bar.
+- Global hotkey: `bar.bindHotkey(hotkeys, 'commandBar')` with
+  `shipglows_hotkeys`. A press closes the open bar, otherwise opens it over
+  the window in front; with the app in front, `openInApp:` shows the in-app
+  palette instead, else the floating bar opens there too.
 
 ```yaml
 dependencies:
@@ -271,7 +275,7 @@ await bar.publish(ShipglowsCommandBarSnapshot(
   appWindowIds: {'screen:/settings'},
 ));
 unawaited(bar.prepare()); // optional, first opening instant
-await bar.toggle(); // from the global hotkey
+bar.bindHotkey(hotkeys, 'commandBar'); // see shipglows_hotkeys
 
 // Bar engine (same Dart program, own entry point)
 @pragma('vm:entry-point')
@@ -397,3 +401,73 @@ if (ShipglowsTrayForwardToPrimary(L"contentglows")) return EXIT_SUCCESS;
 A runner that handles `WM_CLOSE` or its own tray icon must drop that code:
 the plugin intercepts `WM_CLOSE` through Flutter's top-level window
 delegate, which runs after the runner's own handling.
+
+## `flutter/shipglows_hotkeys`
+
+System-wide hotkeys for desktop apps (Windows; no-op elsewhere): they fire
+while the app is in front, in the background or hidden in the tray. Native
+Win32 (`RegisterHotKey` on a hidden message-only window), no third-party
+plugin, nothing to route in the runner.
+
+- Declared once at startup with `apply`: each hotkey has an id and
+  `candidates` by preference; the first one free is registered (Alt+Space
+  is often a launcher's), or the user's saved choice.
+- `events`: id, `foreground` (`otherApp`, `app`, `ownWindow`, `none`) and
+  `previousForeground`, the HWND in front read natively at the press, before
+  any Dart code runs: the window to give the keyboard back to or paste into.
+- Conflicts by id in `state` (`alreadyRegistered`, `duplicate`, `invalid`,
+  `failed`); another app's hotkey is reported, never stolen.
+- Settings: `set(id, hotkey)` (null leaves it unassigned), `setAll` for
+  several at once, all or none (two hotkeys can swap), `reset(id)` back to
+  the candidates. Choices are saved in `%APPDATA%\<appFolder>\hotkeys.json`
+  (or a custom `ShipglowsHotkeyStore`); a failed save undoes the change.
+- `hookFallback: true`: a hotkey Windows refuses for another reason than an
+  owner is caught with a low-level keyboard hook instead.
+- `ShipglowsHotkey.label(ShipglowsHotkeyLabels.fr)` → « Ctrl+Alt+Espace ».
+- After an Alt+key hotkey pressed in the app, releasing Alt no longer opens
+  the main window's menu mode (which swallowed the next key).
+
+Default combinations, so the ShipGlows apps do not take each other's:
+
+| App | Hotkey | Default |
+|---|---|---|
+| ContentGlows | command bar | Ctrl+Alt+Space |
+| CommandGlows | command bar | Alt+Space, Alt+Shift+Space, Ctrl+Shift+Space |
+| CommandGlows | inline overlay | Ctrl+Alt+Space today: to change |
+| CommandGlows | shortcut sheet | Ctrl+Alt+K |
+| ShipGlows app | command bar | Ctrl+Shift+Space |
+| DreamGlows | quick capture | Shift+Alt+S |
+
+```yaml
+dependencies:
+  shipglows_hotkeys:
+    path: ../../shipglows-ui-engine/flutter/shipglows_hotkeys
+```
+
+```dart
+final hotkeys = ShipglowsHotkeys(appFolder: 'MyApp');
+await hotkeys.apply([
+  ShipglowsHotkeyBinding(id: 'commandBar', candidates: [
+    ShipglowsHotkey(ShipglowsKey.space, control: true, alt: true),
+    ShipglowsHotkey(ShipglowsKey.space, alt: true, shift: true),
+  ]),
+  ShipglowsHotkeyBinding(id: 'capture', candidates: [
+    ShipglowsHotkey(ShipglowsKey.f(2), control: true, shift: true),
+  ]),
+]);
+
+bar.bindHotkey(hotkeys, 'commandBar'); // shipglows_command_bar_window
+hotkeys.events
+    .where((event) => event.id == 'capture')
+    .listen((event) => startCapture());
+
+// Settings screen
+final result = await hotkeys.set(
+  'commandBar',
+  ShipglowsHotkey(ShipglowsKey.character('K'), control: true, alt: true),
+);
+if (!result.applied) showConflict(result.conflicts['commandBar']);
+```
+
+One `ShipglowsHotkeys` per app, in the main engine. Adding the package adds a
+native plugin: the app needs a full restart, not a hot reload.
