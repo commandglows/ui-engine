@@ -204,7 +204,7 @@ builder: (context, child) => ShipglowsWindowFrame(
 ),
 ```
 
-Zoom (`shipglows_flutter_zoom`) and last page:
+Zoom ([`shipglows_flutter_zoom`](#fluttershipglows_flutter_zoom)) and last page:
 
 ```dart
 final session = ShipglowsWindowSession.instance;
@@ -221,6 +221,19 @@ FlutterZoomViewport(
 ```
 
 Each app passes its own brand tokens through `ShipglowsTitleBarStyle`.
+
+## `flutter/shipglows_flutter_zoom`
+
+Zooms the whole app UI while the window stays filled: Ctrl/Command+wheel,
+trackpad pinch, Ctrl/Command+= / Ctrl/Command+- (5 % per press by default) and
+Ctrl/Command+0. Bounds 75–150 % by default. See the
+[package README](flutter/shipglows_flutter_zoom/README.md).
+
+```yaml
+dependencies:
+  shipglows_flutter_zoom:
+    path: ../../shipglows-ui-engine/flutter/shipglows_flutter_zoom
+```
 
 ## `flutter/shipglows_overlay_window`
 

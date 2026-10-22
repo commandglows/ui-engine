@@ -36,6 +36,7 @@ do nothing or fall back to plain Flutter.
 | Package | Role | Native | Consumers (2026-10-22) |
 | --- | --- | --- | --- |
 | `shipglows_command_bar` | Command palette widget (`CommandBarView`, sections, filters, recents) | no | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ReplayGlows |
+| `shipglows_flutter_zoom` | App-wide zoom (`FlutterZoomViewport`): Ctrl+wheel, pinch, Ctrl+= / Ctrl+- / Ctrl+0; moved from `shipglows-email-engine` | no | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ShipGlows app, email-engine `source_sidebar_flutter` |
 | `shipglows_window` | Custom title bar and window chrome (`window_manager`) | via plugin dep | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ShipGlows app |
 | `shipglows_overlay_window` | Independent always-on-top windows with their own engine | Win32 | ContentGlows (direct), the command bar window |
 | `shipglows_command_bar_window` | The command bar in a floating overlay window | through overlay | BeatGlows, CommandGlows, ContentGlows, DreamGlows |
@@ -50,6 +51,9 @@ do nothing or fall back to plain Flutter.
   back to that window when the bar closes.
 - `WM_CLOSE`: `shipglows_tray` decides through Flutter's top-level window
   delegate; a runner's own shutdown handling must run after it.
+- Zoom: `ShipglowsWindowSession` owns the bounds (`minimumZoom`,
+  `maximumZoom`) and the saved zoom; apps pass them to `FlutterZoomViewport`
+  with `onZoomChanged: session.saveZoom`.
 
 ## Decisions
 
