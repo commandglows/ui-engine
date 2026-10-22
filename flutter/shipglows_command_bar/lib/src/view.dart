@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import 'actions_panel.dart';
 import 'behavior.dart';
 import 'command.dart';
 import 'hotkey.dart';
@@ -159,26 +160,6 @@ final class _HeaderRow extends _BarRow {
   const _HeaderRow(this.title);
 
   final String title;
-}
-
-/// One line of the actions panel: Enter, Shift+Enter or an entry action.
-@immutable
-class _PanelAction {
-  const _PanelAction({
-    required this.label,
-    required this.keys,
-    this.icon,
-    this.secondary = false,
-    this.action,
-  });
-
-  final String label;
-  final IconData? icon;
-  final List<String> keys;
-  final bool secondary;
-
-  /// Id of the [CommandBarEntryAction]; null for Enter and Shift+Enter.
-  final String? action;
 }
 
 /// Id prefix of the rows listing past searches; never a real entry id.
@@ -508,26 +489,37 @@ class _CommandBarViewState extends State<CommandBarView> {
   }
 
   /// What the actions panel of [entry] lists: Enter when it runs, Shift+Enter
-  /// when there is one, then the entry's own actions.
-  List<_PanelAction> _panelActions(CommandBarEntry entry) {
+  /// when there is one, then the entry's own actions, those without a group
+  /// first, then each group in the order it first appears.
+  List<CommandBarPanelLine> _panelActions(CommandBarEntry entry) {
     final strings = widget.strings;
+    final groups = <String?>[
+      null,
+      for (final action in entry.actions) action.group,
+    ].toSet().toList();
+    final actions = [
+      for (final group in groups)
+        for (final action in entry.actions)
+          if (action.group == group) action,
+    ];
     return [
       if (entry.enabled)
-        _PanelAction(
+        CommandBarPanelLine(
           label: entry.primaryLabel ?? strings.open,
           icon: entry.icon,
           keys: const ['Enter'],
         ),
       if (entry.hasSecondary)
-        _PanelAction(
+        CommandBarPanelLine(
           label: entry.secondaryLabel ?? strings.secondary,
           keys: const ['Shift', 'Enter'],
           secondary: true,
         ),
-      for (final action in entry.actions)
-        _PanelAction(
+      for (final action in actions)
+        CommandBarPanelLine(
           label: action.label,
           icon: action.icon,
+          group: action.group,
           keys: [
             if (action.shortcut case final shortcut?)
               ...commandShortcutKeys(shortcut),
@@ -553,7 +545,7 @@ class _CommandBarViewState extends State<CommandBarView> {
 
   void _closeActions() => setState(() => _actionsOpen = false);
 
-  void _choosePanelAction(_PanelAction line) {
+  void _choosePanelAction(CommandBarPanelLine line) {
     setState(() => _actionsOpen = false);
     _chooseItem(
       _effectiveHighlight,
@@ -581,7 +573,9 @@ class _CommandBarViewState extends State<CommandBarView> {
   /// never changes the search behind it.
   KeyEventResult _onPanelKeyEvent(KeyEvent event) {
     final entry = _highlightedEntry;
-    final lines = entry == null ? const <_PanelAction>[] : _panelActions(entry);
+    final lines = entry == null
+        ? const <CommandBarPanelLine>[]
+        : _panelActions(entry);
     final key = event.logicalKey;
     final enter =
         key == LogicalKeyboardKey.enter ||
@@ -878,7 +872,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     final highlighted = layout.items.isEmpty ? null : layout.items[highlight];
     final panelActions = _actionsOpen && highlighted != null
         ? _panelActions(highlighted)
-        : const <_PanelAction>[];
+        : const <CommandBarPanelLine>[];
 
     return Focus(
       onKeyEvent: (node, event) => _onKeyEvent(event, style.rowMinHeight),
@@ -969,7 +963,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                         constraints: BoxConstraints(
                           minHeight: panelActions.isEmpty
                               ? 0
-                              : _ActionsPanel.heightFor(panelActions.length),
+                              : CommandBarActionsPanel.heightFor(panelActions),
                         ),
                         child: _list(layout, highlight, showNumbers),
                       ),
@@ -977,12 +971,12 @@ class _CommandBarViewState extends State<CommandBarView> {
                         Positioned.fill(
                           child: Align(
                             alignment: AlignmentDirectional.bottomEnd,
-                            child: _ActionsPanel(
+                            child: CommandBarActionsPanel(
                               title: strings.actionsPanel.replaceAll(
                                 '{label}',
                                 highlighted!.label,
                               ),
-                              actions: panelActions,
+                              lines: panelActions,
                               highlight: _actionHighlight
                                   .clamp(0, panelActions.length - 1)
                                   .toInt(),
@@ -1409,172 +1403,5 @@ class _KindMarker extends StatelessWidget {
     // The text already says it: the tooltip only explains a lone icon.
     if (tooltip == null || (text != null && text == tooltip)) return marker;
     return Tooltip(message: tooltip, child: marker);
-  }
-}
-
-/// The actions of the highlighted row, over the end of the list: Enter,
-/// Shift+Enter, then the entry's own actions with their shortcuts.
-class _ActionsPanel extends StatelessWidget {
-  const _ActionsPanel({
-    required this.title,
-    required this.actions,
-    required this.highlight,
-    required this.onChoose,
-  });
-
-  static const double _rowHeight = 36;
-  static const double _titleHeight = 32;
-  static const int _rowsShown = 8;
-  static const double _margin = 8;
-
-  /// Room the panel takes with [count] lines, margin included.
-  static double heightFor(int count) =>
-      _titleHeight +
-      (count > _rowsShown ? _rowsShown : count) * _rowHeight +
-      8 +
-      2 * _margin;
-
-  final String title;
-  final List<_PanelAction> actions;
-  final int highlight;
-  final ValueChanged<_PanelAction> onChoose;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = CommandBarThemeData.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.all(_margin),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 320),
-        child: Material(
-          color: style.backgroundColor,
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(style.rowRadius + 4),
-            side: BorderSide(color: style.borderColor),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Semantics(
-            label: title,
-            explicitChildNodes: true,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: _titleHeight,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: ExcludeSemantics(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.labelSmall?.copyWith(
-                            color: style.mutedColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.only(bottom: 4),
-                    itemCount: actions.length,
-                    itemBuilder: (context, index) => _ActionLine(
-                      line: actions[index],
-                      highlighted: index == highlight,
-                      onTap: () => onChoose(actions[index]),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionLine extends StatelessWidget {
-  const _ActionLine({
-    required this.line,
-    required this.highlighted,
-    required this.onTap,
-  });
-
-  final _PanelAction line;
-  final bool highlighted;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = CommandBarThemeData.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    final icon = line.icon;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Material(
-        color: highlighted ? style.highlightColor : Colors.transparent,
-        borderRadius: BorderRadius.circular(style.rowRadius),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(style.rowRadius),
-          onTap: onTap,
-          child: Semantics(
-            button: true,
-            selected: highlighted,
-            label: line.label,
-            excludeSemantics: true,
-            child: SizedBox(
-              height: _ActionsPanel._rowHeight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 18,
-                      child: icon == null
-                          ? null
-                          : Icon(
-                              icon,
-                              size: 16,
-                              color: highlighted
-                                  ? style.highlightedIconColor
-                                  : style.iconColor,
-                            ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        line.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: style.textColor,
-                          fontWeight: highlighted
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    if (line.keys.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      CommandBarKeys(keys: line.keys),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

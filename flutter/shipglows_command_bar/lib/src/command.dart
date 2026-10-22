@@ -80,6 +80,7 @@ class CommandBarEntryAction {
     required this.label,
     this.icon,
     this.shortcut,
+    this.group,
   });
 
   /// Restores an action from [json], as produced by [toJson]; null when `id`
@@ -99,6 +100,7 @@ class CommandBarEntryAction {
       label: label,
       icon: codePoint is int ? iconFor?.call(codePoint) : null,
       shortcut: _optionalString(json['shortcut']),
+      group: _optionalString(json['group']),
     );
   }
 
@@ -116,12 +118,18 @@ class CommandBarEntryAction {
   /// keys the search field edits with (Ctrl+C, Ctrl+Delete).
   final String? shortcut;
 
+  /// Localized title of the group the action is listed under in the panel
+  /// (« Open », « Share »). Actions without a group come first, right after
+  /// Enter and Shift+Enter.
+  final String? group;
+
   /// JSON-safe map with the keys [fromJson] reads.
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
     'label': label,
     'iconCodePoint': icon?.codePoint,
     'shortcut': shortcut,
+    'group': group,
   };
 
   @override
@@ -130,10 +138,11 @@ class CommandBarEntryAction {
       other.id == id &&
       other.label == label &&
       other.icon == icon &&
-      other.shortcut == shortcut;
+      other.shortcut == shortcut &&
+      other.group == group;
 
   @override
-  int get hashCode => Object.hash(id, label, icon, shortcut);
+  int get hashCode => Object.hash(id, label, icon, shortcut, group);
 }
 
 /// Display data of one command, without any callback.

@@ -75,7 +75,10 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   kinds out (`{'open'}` for actions only).
 - Actions panel (like Raycast's): `CommandBarEntry.actions`
   (`CommandBarEntryAction`: `id`, `label`, `icon`, one-chord `shortcut`,
-  all JSON-safe) lists more things to do with a row. Alt+Enter (Ctrl+K stays
+  `group`, all JSON-safe) lists more things to do with a row, ungrouped
+  ones first, then one titled block per `group`. The panel view lives on
+  its own in `src/actions_panel.dart` (`CommandBarActionsPanel`, not
+  exported), so a shared floating menu can replace it later. Alt+Enter (Ctrl+K stays
   the hotkey) or a right-click opens it on the highlighted row; it lists
   Enter (`primaryLabel`), Shift+Enter (`secondaryLabel`) then the actions,
   ↑/↓ and Enter choose, Escape or Alt+Enter close it, the footer shows
