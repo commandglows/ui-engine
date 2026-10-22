@@ -58,8 +58,24 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 - Opt-in behaviours (`CommandBarBehavior`, all off by default; the scope
   takes a builder read at each opening, so app settings can drive it):
   `fuzzyMatch` (letters in order, ranked last), `sortSectionsByMatch`,
-  `tappablePrefixHints`. `CommandBarFilter.requiresSpace: false` applies a
-  symbol prefix without a space (`>foo`).
+  `tappablePrefixHints`, `showEntryKinds`, `hiddenKinds`.
+  `CommandBarFilter.requiresSpace: false` applies a symbol prefix without a
+  space (`>foo`).
+- Entry kinds (`CommandBarEntry.kind`, `CommandBarEntryKind`): what choosing
+  a row does, so an action run right in the bar never looks like a way to a
+  screen. Built-in `open` (a screen of the app), `action` (works from the
+  bar: save, copy, toggle) and `app` (another application, the browser); an
+  app adds its own with another id. `showEntryKinds` shows each kind's icon
+  on its row, with `CommandBarStrings.entryKinds[id]` as tooltip and spoken
+  text; `hiddenKinds` leaves whole kinds out (`{'open'}` for actions only).
+- Actions on the typed text: `CommandBarCommand.query(runQuery: (context,
+  text) …)` (`CommandBarEntry.usesQuery` in JSON). Never searched nor kept in
+  the recents: once words are typed they are listed last under « With this
+  text » (`queryActionsSection`), alone when nothing matches, so a phrase
+  that finds nothing still offers something to do with it. A filter keeps
+  those it matches. `{query}` (`commandBarQueryPlaceholder`) in the label or
+  subtitle shows the text; `CommandBarChoice.query` carries it (filter
+  prefix left out) to the owner of a `CommandBarView`.
 - Other engines (floating window, native relay): `CommandBarEntry.toJson` /
   `fromJson` (icons by code point through an app table), `CommandBarView` and
   `showCommandBar` with your own `CommandBarSource`.
@@ -319,8 +335,8 @@ on close. Escape and a click outside close it.
   `ShipglowsCommandBarSnapshot` (entries as `CommandBarEntry`, recent ids,
   brightness, locale), opens, closes or toggles the bar and updates it in
   place while open. `selections` reports each choice (`id`, `secondary`,
-  `previousForeground` HWND); the bar is already hidden and the app runs the
-  effect itself.
+  `previousForeground` HWND, `query` for an entry that `usesQuery`); the bar
+  is already hidden and the app runs the effect itself.
 - `data`: the app's own JSON-safe values for its bar (a color theme the
   bar's engine cannot read from storage), read back from
   `ShipglowsCommandBarOverlayController.snapshot`.
