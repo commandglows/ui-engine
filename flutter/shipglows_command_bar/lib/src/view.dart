@@ -1504,39 +1504,41 @@ class _FilterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = CommandBarThemeData.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final color = selected ? style.highlightedIconColor : style.mutedColor;
     final prefix = this.prefix;
+    // Drawn with the footer's keycaps; the active one stands out like the
+    // highlighted row's number.
     final button = Semantics(
+      button: true,
       selected: selected,
-      child: TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          backgroundColor: selected ? style.highlightColor : null,
-          foregroundColor: color,
-          minimumSize: const Size(0, 30),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-        child: Text.rich(
-          TextSpan(
-            text: label,
-            style: textTheme.labelMedium?.copyWith(
-              color: color,
-              fontWeight: selected ? FontWeight.w600 : null,
+      label: label,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            decoration: BoxDecoration(
+              color: selected ? style.highlightColor : null,
+              borderRadius: BorderRadius.circular(8),
             ),
-            children: [
-              if (prefix != null)
-                TextSpan(
-                  text: '  $prefix',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: style.mutedColor.withValues(alpha: 0.7),
-                  ),
-                ),
-            ],
+            child: Opacity(
+              opacity: selected ? 1 : 0.6,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  style.keycapBuilder(context, label),
+                  if (prefix != null) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      prefix,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: style.mutedColor,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
