@@ -639,3 +639,51 @@ ContentGlows (offline queue, per-account cache, partial writes), BeatGlows
 echoes, Timestamps read as ISO text, `permission-denied` mapped to
 `SettingsRemoteAuthException`. `decorate` adds derived fields for security
 rules.
+
+## `flutter/shipglows_undo_trash`
+
+Undo, redo and trash, extracted from ContentGlows. No dependency beyond
+Flutter.
+
+- `UndoHistory<T>`: undo/redo stacks of snapshots for an editor. `record(before)`
+  before each change (clears redo), `undo(current)` / `redo(current)` return
+  the step to restore, `pop()` for an undo-only history. `group(before,
+  change, changed:)` folds a batch (an AI pass) into one step, and records
+  nothing when `changed` says it was a no-op. Capped at `limit` (oldest
+  dropped); optional labels for « Undo: … » tooltips; a `ChangeNotifier`.
+- `UndoShortcuts`: Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z (and Ctrl+Y off Apple)
+  redoes for the subtree; keys typed in a text field stay its own
+  (`isTextInputFocused()`), disabled actions let the key through. A command
+  bar calls the same handlers directly.
+- `PendingUndo`: an action shown at once whose lasting part (`onCommit`: a
+  server call) waits for the « Undo » window. Settles exactly once, undo or
+  commit; commit errors go to `onError`.
+- `UndoWindow<K>`: a screen's open windows by item. `start(key, commit:)`
+  hides the item (`isHidden`), `undoLast()` for Ctrl/⌘+Z,
+  `flush()` commits everything (app backgrounded). `keepHiddenAfterCommit`
+  avoids a flicker while the list reloads; a failed commit shows it again.
+  Commits still run once the screen is gone.
+- `showUndoSnackBar(context, message:, pending:)`: floating snack bar with
+  « Undo » (persists for assistive-technology users); `attachUndoSnackBar`
+  ties a `PendingUndo` to the app's own toast instead. Closing commits;
+  undoing elsewhere hides it.
+- `TrashView<T>`: trash screen body inside the app's scaffold. `entryOf` maps
+  an item to a `TrashEntry` (title, deletion and purge dates, `purging`);
+  search with accents folded, `TrashFilter`s, restore, delete permanently and
+  empty the trash (confirmed through `confirm`, an `AlertDialog` by default),
+  a spinner per row, errors to `onError`. Most recent first; the subtitle
+  turns red `warnDays` before the purge. Texts: `TrashStrings.en`, `.fr`, or
+  the app's own (`copyWith`).
+
+```dart
+final window = UndoWindow<String>();
+
+void trash(Item item) {
+  final pending = window.start(
+    item.id,
+    commit: () => api.trash(item.id),
+    keepHiddenAfterCommit: true,
+  );
+  showUndoSnackBar(context, message: 'Moved to trash', pending: pending);
+}
+```
