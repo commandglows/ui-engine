@@ -41,7 +41,7 @@ do nothing or fall back to plain Flutter.
 | `shipglows_overlay_window` | Independent always-on-top windows with their own engine | Win32 | ContentGlows (direct), the command bar window |
 | `shipglows_command_bar_window` | The command bar in a floating overlay window | through overlay | BeatGlows, CommandGlows, ContentGlows, DreamGlows |
 | `shipglows_hotkeys` | System-wide hotkeys, saved choices, conflicts reported | Win32 | none yet |
-| `shipglows_tray` | Notification area icon, standard menu, close-to-tray, single instance | Win32 | none yet |
+| `shipglows_tray` | Notification area icon, standard menu, close-or-hide dialog, single instance | Win32 | DreamGlows |
 | `shipglows_diagnostics` | Crash net: `FlutterError.onError` + `PlatformDispatcher.onError` chained, masked event buffer, « Copier le diagnostic » report, optional `crash.log` (256 KB, `.1` rotation, engine label); Sentry stays in the app via `onReport` | no | BeatGlows |
 
 ## Cross-Package Contracts
