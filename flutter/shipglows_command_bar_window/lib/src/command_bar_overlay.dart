@@ -13,6 +13,11 @@ import 'snapshot.dart';
 /// texts).
 typedef ShipglowsCommandBarLocalized<T> = T Function(Locale locale);
 
+/// Wraps the bar inside the window, for an app's own surface (a card
+/// outline, a margin, a shadow). [bar] is the bar itself.
+typedef ShipglowsCommandBarSurfaceBuilder =
+    Widget Function(BuildContext context, Widget bar);
+
 /// Runs the floating command bar in this engine. Call it from the overlay's
 /// entry point, the `entrypoint` given to [ShipglowsCommandBarWindow]:
 ///
@@ -40,6 +45,7 @@ void runShipglowsCommandBarOverlay({
   List<LocalizationsDelegate<Object?>> localizationsDelegates =
       const <LocalizationsDelegate<Object?>>[],
   CommandBarBehavior behavior = const CommandBarBehavior(),
+  ShipglowsCommandBarSurfaceBuilder? surfaceBuilder,
 }) {
   WidgetsFlutterBinding.ensureInitialized();
   // Attached before ready(): the first opening may arrive right after it.
@@ -58,6 +64,7 @@ void runShipglowsCommandBarOverlay({
       darkTheme: darkTheme,
       localizationsDelegates: localizationsDelegates,
       behavior: behavior,
+      surfaceBuilder: surfaceBuilder,
     ),
   );
   unawaited(controller.host.ready());
@@ -244,6 +251,7 @@ class ShipglowsCommandBarOverlayApp extends StatelessWidget {
     this.darkTheme,
     this.localizationsDelegates = const <LocalizationsDelegate<Object?>>[],
     this.behavior = const CommandBarBehavior(),
+    this.surfaceBuilder,
   });
 
   final ShipglowsCommandBarOverlayController controller;
@@ -269,6 +277,9 @@ class ShipglowsCommandBarOverlayApp extends StatelessWidget {
 
   /// Optional search and listing behaviours.
   final CommandBarBehavior behavior;
+
+  /// The app's own surface around the bar. Null: the bar fills the window.
+  final ShipglowsCommandBarSurfaceBuilder? surfaceBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -296,6 +307,7 @@ class ShipglowsCommandBarOverlayApp extends StatelessWidget {
                     ? CommandBarStrings.fr
                     : CommandBarStrings.en),
             behavior: behavior,
+            surfaceBuilder: surfaceBuilder,
           ),
         );
       },
@@ -310,6 +322,7 @@ class _CommandBarSurface extends StatefulWidget {
     required this.filters,
     required this.strings,
     required this.behavior,
+    this.surfaceBuilder,
   });
 
   final ShipglowsCommandBarOverlayController controller;
@@ -317,6 +330,7 @@ class _CommandBarSurface extends StatefulWidget {
   final List<CommandBarFilter> filters;
   final CommandBarStrings strings;
   final CommandBarBehavior behavior;
+  final ShipglowsCommandBarSurfaceBuilder? surfaceBuilder;
 
   @override
   State<_CommandBarSurface> createState() => _CommandBarSurfaceState();
@@ -368,30 +382,31 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
       border: style.borderColor,
       background: style.backgroundColor,
     );
+    final bar = Semantics(
+      container: true,
+      label: widget.strings.dialogLabel,
+      child: Focus(
+        focusNode: _barFocus,
+        child: CommandBarView(
+          key: ValueKey<int>(controller.session),
+          source: controller,
+          refresh: controller,
+          sections: widget.sections,
+          filters: widget.filters,
+          strings: widget.strings,
+          behavior: widget.behavior,
+          autofocus: controller.visible,
+          onChoose: (choice) => unawaited(controller.choose(choice)),
+          onClose: () => unawaited(controller.close()),
+        ),
+      ),
+    );
     return Material(
       color: style.backgroundColor,
       child: ShipglowsOverlayFrame(
         host: controller.host,
         gripColor: style.mutedColor,
-        child: Semantics(
-          container: true,
-          label: widget.strings.dialogLabel,
-          child: Focus(
-            focusNode: _barFocus,
-            child: CommandBarView(
-              key: ValueKey<int>(controller.session),
-              source: controller,
-              refresh: controller,
-              sections: widget.sections,
-              filters: widget.filters,
-              strings: widget.strings,
-              behavior: widget.behavior,
-              autofocus: controller.visible,
-              onChoose: (choice) => unawaited(controller.choose(choice)),
-              onClose: () => unawaited(controller.close()),
-            ),
-          ),
-        ),
+        child: widget.surfaceBuilder?.call(context, bar) ?? bar,
       ),
     );
   }

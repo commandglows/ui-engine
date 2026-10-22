@@ -212,6 +212,8 @@ on close. Escape and a click outside close it.
   `ShipglowsCommandBarOverlayApp` for an app that calls `runApp` itself.
 - The frame (dark mode, border, background) follows the bar's theme
   (`CommandBarThemeData`).
+  `surfaceBuilder` wraps the bar in the app's own surface (card outline,
+  margin, hard shadow) inside the window.
 - Window options: `ShipglowsCommandBarWindow.defaultOptions(appFolder: …)`.
 
 ```yaml
