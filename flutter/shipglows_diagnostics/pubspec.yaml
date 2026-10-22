@@ -1,0 +1,18 @@
+name: shipglows_diagnostics
+description: Global error handlers, in-memory event buffer with secret masking, copyable diagnostic report and optional rotating crash log for ShipGlows Flutter apps.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
