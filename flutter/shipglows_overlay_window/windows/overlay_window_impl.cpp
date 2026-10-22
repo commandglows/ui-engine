@@ -619,6 +619,7 @@ void OverlayWindowImpl::DragRestored() {
     // Dragging a maximized overlay restores its size first, under the
     // pointer at the same relative place, as a maximized window does.
     restore_bounds_.reset();
+    NotifyMaximized();
     RECT current{};
     GetWindowRect(window_, &current);
     const LONG width = saved->right - saved->left;
@@ -662,6 +663,7 @@ void OverlayWindowImpl::ResetSize() {
   size_.reset();
   SessionSizes().erase(config_.id);
   restore_bounds_.reset();
+  NotifyMaximized();
   if (IsZoomed(window_)) ShowWindow(window_, SW_RESTORE);
   MoveTo(BoundsAround(default_width_, default_height_));
 }
@@ -724,6 +726,7 @@ void OverlayWindowImpl::ToggleMaximize() {
   }
   if (const auto saved = restore_bounds_) {
     restore_bounds_.reset();
+    NotifyMaximized();
     MoveTo(*saved);
     return;
   }
@@ -736,11 +739,20 @@ void OverlayWindowImpl::ToggleMaximize() {
   }
   // The whole work area of the overlay's monitor, taskbar left visible.
   restore_bounds_ = current;
+  NotifyMaximized();
   MoveTo(info.rcWork);
 }
 
 bool OverlayWindowImpl::Maximized() const {
   return restore_bounds_.has_value() || (window_ && IsZoomed(window_));
+}
+
+void OverlayWindowImpl::NotifyMaximized() {
+  const bool maximized = restore_bounds_.has_value();
+  if (maximized == notified_maximized_) return;
+  notified_maximized_ = maximized;
+  // Before the eased resize: the overlay can drop its margins at once.
+  InvokeHost("maximized", std::make_unique<flutter::EncodableValue>(maximized));
 }
 
 SIZE OverlayWindowImpl::OpeningSize(int width, int height) const {

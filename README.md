@@ -160,7 +160,8 @@ own Flutter engine in its own window.
   the default size (eased, unless Windows animations are off); double-click
   on the drag area maximizes (`doubleClickMaximizes`): the overlay fills the
   work area of its monitor (taskbar left visible) and a second double-click
-  gives back its exact bounds. Dragging it while maximized restores its size
+  gives back its exact bounds. `ShipglowsOverlayHost.maximized` tells the
+  overlay (listeners notified before the eased resize). Dragging it while maximized restores its size
   under the pointer. Win+Up/Down use the same maximize. The system maximize
   is not used: it misplaced borderless and transparent overlays.
 - Live resize without flicker: the view draws its frame at the new size
@@ -244,6 +245,8 @@ on close. Escape and a click outside close it.
   `defaultOptions(transparent: true)` the window has no background, corners
   or shadow of its own, so only that surface shows over the desktop; keep a
   margin in the surface for the shadow and as a drag handle.
+  `ShipglowsCommandBarWindowState.maximizedOf(context)` lets the surface drop
+  that margin while the window is maximized.
 - Window options: `ShipglowsCommandBarWindow.defaultOptions(appFolder: …)`.
 - In-app bar replaced: `CommandBarScope(opener: bar.scopeOpener, …)`, so
   Ctrl/⌘+K and the app's `open()` calls show only the floating bar.

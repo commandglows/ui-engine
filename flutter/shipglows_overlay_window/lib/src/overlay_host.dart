@@ -64,6 +64,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   bool _resizable = false;
   bool _doubleClickMaximizes = false;
   bool _transparent = false;
+  bool _maximized = false;
   bool _visible = false;
   bool _listeningKeys = false;
   int? _previousForeground;
@@ -80,6 +81,11 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   /// Whether the window is see-through ([ShipglowsOverlayOptions.transparent]):
   /// the overlay then paints no background of its own.
   bool get transparent => _transparent;
+
+  /// Whether the overlay fills its monitor's work area (double-click on the
+  /// drag area, [toggleMaximize]). Listeners are told when it changes, before
+  /// the window's eased resize: drop margins meant for a floating window.
+  bool get maximized => _maximized;
 
   /// Whether the overlay is on screen.
   bool get visible => _visible;
@@ -204,6 +210,11 @@ class ShipglowsOverlayHost extends ChangeNotifier {
         final method = arguments['method'];
         if (method is String && !_messages.isClosed) {
           _messages.add(ShipglowsOverlayMessage(method, arguments['arguments']));
+        }
+      case 'maximized':
+        if (arguments is bool && arguments != _maximized) {
+          _maximized = arguments;
+          notifyListeners();
         }
       case 'requestClose':
         await requestClose();

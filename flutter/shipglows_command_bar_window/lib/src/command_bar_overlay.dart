@@ -14,9 +14,34 @@ import 'snapshot.dart';
 typedef ShipglowsCommandBarLocalized<T> = T Function(Locale locale);
 
 /// Wraps the bar inside the window, for an app's own surface (a card
-/// outline, a margin, a shadow). [bar] is the bar itself.
+/// outline, a margin, a shadow). [bar] is the bar itself; the window's state
+/// is read with [ShipglowsCommandBarWindowState.maximizedOf].
 typedef ShipglowsCommandBarSurfaceBuilder =
     Widget Function(BuildContext context, Widget bar);
+
+/// State of the bar's window, above a [ShipglowsCommandBarSurfaceBuilder].
+class ShipglowsCommandBarWindowState extends InheritedWidget {
+  const ShipglowsCommandBarWindowState({
+    super.key,
+    required this.maximized,
+    required super.child,
+  });
+
+  /// Whether the window fills its monitor's work area: a surface drops the
+  /// margins meant for a floating card. Set before the eased resize starts.
+  final bool maximized;
+
+  /// [maximized] of the nearest window state; false outside one.
+  static bool maximizedOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<ShipglowsCommandBarWindowState>()
+          ?.maximized ??
+      false;
+
+  @override
+  bool updateShouldNotify(ShipglowsCommandBarWindowState oldWidget) =>
+      oldWidget.maximized != maximized;
+}
 
 /// Runs the floating command bar in this engine. Call it from the overlay's
 /// entry point, the `entrypoint` given to [ShipglowsCommandBarWindow]:
@@ -418,7 +443,16 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
       child: ShipglowsOverlayFrame(
         host: controller.host,
         gripColor: style.mutedColor,
-        child: widget.surfaceBuilder?.call(context, bar) ?? bar,
+        child: ListenableBuilder(
+          listenable: controller.host,
+          builder: (context, _) => ShipglowsCommandBarWindowState(
+            maximized: controller.host.maximized,
+            child: Builder(
+              builder: (context) =>
+                  widget.surfaceBuilder?.call(context, bar) ?? bar,
+            ),
+          ),
+        ),
       ),
     );
   }

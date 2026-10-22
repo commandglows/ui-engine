@@ -122,6 +122,8 @@ class OverlayWindowImpl : public OverlayWindow {
   // Whether the overlay fills its monitor's work area (|restore_bounds_|,
   // or a system maximize).
   bool Maximized() const;
+  // Tells the overlay's Dart side when |restore_bounds_| is set or cleared.
+  void NotifyMaximized();
   void NotifyVisibility(bool shown);
   void InvokeHost(const std::string& method,
                   std::unique_ptr<flutter::EncodableValue> arguments);
@@ -135,6 +137,7 @@ class OverlayWindowImpl : public OverlayWindow {
   // The system maximize is not used: on a borderless, possibly transparent
   // window it misplaces the frame (outside the monitor, off the work area).
   std::optional<RECT> restore_bounds_;
+  bool notified_maximized_ = false;
   HWND app_window_ = nullptr;
   bool prepare_failed_ = false;
   bool native_corners_ = false;
