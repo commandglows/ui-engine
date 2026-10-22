@@ -1495,8 +1495,8 @@ class _FilterButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onPressed;
 
-  /// The prefix that applies the filter when typed, shown as a keycap
-  /// before the label.
+  /// The prefix that applies the filter when typed, written before the
+  /// label in the button's text (« c Presse-papiers »).
   final String? prefix;
   final String? tooltip;
 
@@ -1505,8 +1505,8 @@ class _FilterButton extends StatelessWidget {
     final style = CommandBarThemeData.of(context);
     final textTheme = Theme.of(context).textTheme;
     final prefix = this.prefix;
-    // Drawn like a footer hint: the prefix keycap, then the plain label; the
-    // active one stands out like the highlighted row's number.
+    // One plain text, the prefix then the label; the active one stands out
+    // like the highlighted row.
     final button = Semantics(
       button: true,
       selected: selected,
@@ -1516,28 +1516,20 @@ class _FilterButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: selected ? style.highlightColor : null,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Opacity(
               opacity: selected ? 1 : 0.6,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (prefix != null) ...[
-                    style.keycapBuilder(context, prefix),
-                    const SizedBox(width: 6),
-                  ],
-                  Text(
-                    label,
-                    style: textTheme.labelSmall?.copyWith(
-                      color: selected ? style.textColor : style.mutedColor,
-                      fontWeight: selected ? FontWeight.w600 : null,
-                    ),
-                  ),
-                ],
+              child: Text(
+                prefix == null ? label : '$prefix $label',
+                maxLines: 1,
+                style: textTheme.labelMedium?.copyWith(
+                  color: selected ? style.textColor : style.mutedColor,
+                  fontWeight: selected ? FontWeight.w600 : null,
+                ),
               ),
             ),
           ),
