@@ -4,6 +4,8 @@
 library;
 
 export 'src/tray.dart';
+export 'src/tray_close_dialog.dart';
 export 'src/tray_config.dart';
 export 'src/tray_events.dart';
 export 'src/tray_items.dart';
+export 'src/tray_store.dart';

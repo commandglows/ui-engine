@@ -24,10 +24,11 @@ constexpr char kChannel[] = "shipglows_tray";
 // IDI_APP_ICON of the Flutter Windows runner template.
 constexpr int kAppIconResource = 101;
 
-enum class CloseBehavior { kHideToTray, kMinimize, kQuit };
+enum class CloseBehavior { kAsk, kHideToTray, kMinimize, kQuit };
 enum class PrimaryClick { kOpenMainWindow, kMenu, kEvent, kItem };
 
 CloseBehavior CloseBehaviorFrom(const std::string& name) {
+  if (name == "ask") return CloseBehavior::kAsk;
   if (name == "minimize") return CloseBehavior::kMinimize;
   if (name == "quit") return CloseBehavior::kQuit;
   return CloseBehavior::kHideToTray;
@@ -171,6 +172,9 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     } else if (method == "showMainWindow") {
       ShowMainWindow();
       result->Success();
+    } else if (method == "hideMainWindow") {
+      HideMainWindow();
+      result->Success();
     } else if (method == "quit") {
       result->Success();
       Quit();
@@ -226,6 +230,14 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
 
   // Lets the next WM_CLOSE through. The icon stays until the engine goes
   // away, in case the runner's own shutdown keeps the app open.
+  // Hidden to the tray; minimized while there is no icon to come back
+  // through.
+  void HideMainWindow() {
+    const HWND window = MainWindow();
+    if (window == nullptr) return;
+    ShowWindow(window, host_ && host_->visible() ? SW_HIDE : SW_MINIMIZE);
+  }
+
   void Quit() {
     const HWND window = MainWindow();
     quitting_ = true;
@@ -241,13 +253,13 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
       return std::nullopt;
     }
     switch (close_behavior_) {
+      case CloseBehavior::kAsk:
+        // Dart shows the dialog, then hides or quits.
+        Emit({{flutter::EncodableValue("type"),
+               flutter::EncodableValue("closeRequested")}});
+        return 0;
       case CloseBehavior::kHideToTray:
-        if (host_ && host_->visible()) {
-          ShowWindow(window, SW_HIDE);
-          return 0;
-        }
-        // No icon to come back through: minimizing keeps the app reachable.
-        ShowWindow(window, SW_MINIMIZE);
+        HideMainWindow();
         return 0;
       case CloseBehavior::kMinimize:
         ShowWindow(window, SW_MINIMIZE);
@@ -344,7 +356,7 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   std::unique_ptr<TrayHost> host_;
   int window_proc_id_ = -1;
   std::vector<MenuItem> items_;
-  CloseBehavior close_behavior_ = CloseBehavior::kHideToTray;
+  CloseBehavior close_behavior_ = CloseBehavior::kAsk;
   PrimaryClick primary_click_ = PrimaryClick::kOpenMainWindow;
   std::string primary_item_;
   bool second_instance_shows_main_window_ = true;

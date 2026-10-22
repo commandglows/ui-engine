@@ -433,10 +433,16 @@ web, macOS and Linux). Native Win32, no third-party plugin.
 - Every event carries `previousForeground`, the HWND of the last window in
   front before the click (taskbar and menus ignored), for
   `ShipglowsCommandBarWindow.open(previousForeground:)`.
-- Closing the main window: hide to the tray (default; minimize while the
-  icon is missing), minimize, or quit (`ShipglowsTrayCloseBehavior`,
-  `setCloseBehavior` for a setting). Quitting goes through
-  `onQuitRequested` (false keeps the app running).
+- Closing the main window (`ShipglowsTrayCloseBehavior`): ask (default), hide
+  to the tray (minimize while the icon is missing), minimize, or quit.
+  « Ask » shows a dialog (Réduire dans la zone de notification / Quitter /
+  Annuler, « Ne plus me demander ») on `closeDialogContext`, a context below
+  the app's `MaterialApp`; without one the window hides to the tray. A
+  remembered choice is kept in `%APPDATA%\<appFolder>\tray.json` (or a
+  `ShipglowsTrayStore`) and wins over the configured default.
+  `ShipglowsTrayCloseSetting` is the settings row to change it back;
+  `closeBehavior` / `setCloseBehavior` for a custom one. Quitting goes
+  through `onQuitRequested` (false keeps the app running).
 - Icon back after an Explorer restart, retried for a minute when the
   taskbar is not ready at sign-in.
 - Single instance: a later launch hands its command line to the running app
@@ -462,6 +468,8 @@ await ShipglowsTray.instance.start(ShipglowsTrayConfig(
     onSettings: () => router.go('/settings'),
     onCheckForUpdates: () => autoUpdater.checkForUpdates(inBackground: false),
   ),
+  appFolder: 'ContentGlows',
+  closeDialogContext: () => homeKey.currentContext,
   onQuitRequested: () async => saveEverything(),
 ));
 

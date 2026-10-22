@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
+import 'tray_close_dialog.dart';
 import 'tray_config.dart';
 import 'tray_events.dart';
 import 'tray_items.dart';
+import 'tray_store.dart';
 
 /// The app's notification area icon and menu.
 ///
@@ -36,10 +39,14 @@ class ShipglowsTray {
 
   final _events = StreamController<ShipglowsTrayEvent>.broadcast();
   final _iconVisible = ValueNotifier(false);
+  final _closeBehavior = ValueNotifier(ShipglowsTrayCloseBehavior.ask);
+  final _sessionStore = ShipglowsTrayMemoryStore();
 
   ShipglowsTrayConfig? _config;
+  ShipglowsTrayStore? _store;
   String? _exeVersion;
   bool _quitting = false;
+  bool _askingToClose = false;
 
   /// Whether the tray exists on this platform.
   static bool get isSupported =>
@@ -53,17 +60,27 @@ class ShipglowsTray {
 
   ShipglowsTrayConfig? get config => _config;
 
+  /// What closing the main window does now: the user's saved choice, else
+  /// `ShipglowsTrayConfig.closeBehavior`.
+  ValueListenable<ShipglowsTrayCloseBehavior> get closeBehavior =>
+      _closeBehavior;
+
   /// Shows the icon with [config]; calling it again replaces the whole
   /// configuration. Returns whether the icon is visible.
   Future<bool> start(ShipglowsTrayConfig config) async {
     if (!isSupported) return false;
     _channel.setMethodCallHandler(_onCall);
     _config = config;
+    final folder = config.appFolder;
+    _store =
+        config.store ??
+        (folder == null ? _sessionStore : ShipglowsTrayFileStore(folder));
+    _closeBehavior.value = await _store!.load() ?? config.closeBehavior;
     _exeVersion ??= await _invoke<String>('version');
     final visible =
         await _invoke<bool>('start', {
           ..._payload(config),
-          'closeBehavior': config.closeBehavior.name,
+          'closeBehavior': _closeBehavior.value.name,
           'secondInstanceShowsMainWindow': config.secondInstanceShowsMainWindow,
           'hasQuitHandler': config.onQuitRequested != null,
           ...config.primaryClick.toMap(),
@@ -90,6 +107,9 @@ class ShipglowsTray {
       items: items ?? current.items,
       standard: standard ?? current.standard,
       closeBehavior: current.closeBehavior,
+      appFolder: current.appFolder,
+      store: current.store,
+      closeDialogContext: current.closeDialogContext,
       primaryClick: current.primaryClick,
       secondInstanceShowsMainWindow: current.secondInstanceShowsMainWindow,
       onQuitRequested: current.onQuitRequested,
@@ -98,22 +118,25 @@ class ShipglowsTray {
     await _invoke<void>('update', _payload(next));
   }
 
-  /// Changes what closing the main window does, for example from a setting.
-  Future<void> setCloseBehavior(ShipglowsTrayCloseBehavior behavior) async {
-    final current = _config;
-    if (!isSupported || current == null) return;
-    _config = ShipglowsTrayConfig(
-      appName: current.appName,
-      tooltip: current.tooltip,
-      icon: current.icon,
-      items: current.items,
-      standard: current.standard,
-      closeBehavior: behavior,
-      primaryClick: current.primaryClick,
-      secondInstanceShowsMainWindow: current.secondInstanceShowsMainWindow,
-      onQuitRequested: current.onQuitRequested,
-    );
+  /// Changes what closing the main window does, for example from a setting,
+  /// and keeps it in the store unless [save] is false. Returns false when
+  /// it could not be saved (it still applies until the app quits).
+  Future<bool> setCloseBehavior(
+    ShipglowsTrayCloseBehavior behavior, {
+    bool save = true,
+  }) async {
+    if (!isSupported || _config == null) return false;
+    _closeBehavior.value = behavior;
     await _invoke<void>('setCloseBehavior', {'closeBehavior': behavior.name});
+    if (!save) return true;
+    return await _store?.save(behavior) ?? false;
+  }
+
+  /// Hides the main window to the tray (minimizes it while the icon is
+  /// missing).
+  Future<void> hideMainWindow() async {
+    if (!isSupported) return;
+    await _invoke<void>('hideMainWindow');
   }
 
   /// Shows the main window (even hidden to the tray) and brings it to the
@@ -239,8 +262,38 @@ class ShipglowsTray {
         );
       case 'quitRequested':
         await quit();
+      case 'closeRequested':
+        await _askToClose();
       case 'iconVisible':
         _iconVisible.value = data['visible'] == true;
+    }
+  }
+
+  /// The window's X with [ShipglowsTrayCloseBehavior.ask].
+  Future<void> _askToClose() async {
+    final config = _config;
+    if (config == null || _askingToClose) return;
+    final context = config.closeDialogContext?.call();
+    if (context == null || !context.mounted) {
+      await hideMainWindow();
+      return;
+    }
+    _askingToClose = true;
+    try {
+      final decision = await showShipglowsTrayCloseDialog(
+        context,
+        appName: config.appName,
+        strings: config.standard.strings,
+      );
+      if (decision == null) return;
+      if (decision.remember) await setCloseBehavior(decision.behavior);
+      if (decision.behavior == ShipglowsTrayCloseBehavior.quit) {
+        await quit();
+      } else {
+        await hideMainWindow();
+      }
+    } finally {
+      _askingToClose = false;
     }
   }
 
