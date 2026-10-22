@@ -115,6 +115,8 @@ class OverlayWindowImpl : public OverlayWindow {
   void RequestClose();
   void SaveBounds(bool size_changed);
   void StartResize(const std::string& edge);
+  // Second half of a drag that starts on a maximized overlay.
+  void DragRestored();
   void ResetSize();
   void ToggleMaximize();
   // Whether the overlay fills its monitor's work area (|restore_bounds_|,

@@ -25,6 +25,8 @@ constexpr UINT kRevealMessage = WM_APP + 0x2F0;
 // Posted on deactivation: the window clicked is in front only once the
 // activation change completes.
 constexpr UINT kSendBackMessage = WM_APP + 0x2F1;
+// Restores a maximized overlay, then starts the drag (see StartDrag).
+constexpr UINT kDragRestoredMessage = WM_APP + 0x2F2;
 // Resource ID of the app icon in Flutter's Windows runner template.
 constexpr int kAppIconResource = 101;
 // Undocumented: the visual-styles engine sends these to repaint the caption
@@ -596,6 +598,21 @@ bool OverlayWindowImpl::Activate() {
 void OverlayWindowImpl::StartDrag() {
   if (!window_) return;
   ReleaseCapture();
+  if (restore_bounds_) {
+    // Resized from inside the engine's own channel call, the view cannot
+    // draw at its new size: it would keep the maximized frame. The restore
+    // runs from the message loop instead, the button still down.
+    PostMessageW(window_, kDragRestoredMessage, 0, 0);
+    return;
+  }
+  POINT cursor{};
+  GetCursorPos(&cursor);
+  SendMessageW(window_, WM_NCLBUTTONDOWN, HTCAPTION,
+               MAKELPARAM(cursor.x, cursor.y));
+}
+
+void OverlayWindowImpl::DragRestored() {
+  if (!window_) return;
   POINT cursor{};
   GetCursorPos(&cursor);
   if (const auto saved = restore_bounds_) {
@@ -616,6 +633,9 @@ void OverlayWindowImpl::StartDrag() {
     SetWindowPos(window_, nullptr, left, top, width, height,
                  SWP_NOZORDER | SWP_NOACTIVATE);
   }
+  // Released meanwhile: restored in place, no drag.
+  const int button = GetSystemMetrics(SM_SWAPBUTTON) ? VK_RBUTTON : VK_LBUTTON;
+  if ((GetAsyncKeyState(button) & 0x8000) == 0) return;
   SendMessageW(window_, WM_NCLBUTTONDOWN, HTCAPTION,
                MAKELPARAM(cursor.x, cursor.y));
 }
@@ -1064,6 +1084,10 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
     return *handled;
   }
   if (message == WM_ACTIVATE) OnActivate(wparam);
+  if (message == kDragRestoredMessage) {
+    DragRestored();
+    return 0;
+  }
   if (message == kSendBackMessage) {
     SendBehindForeground();
     return 0;
