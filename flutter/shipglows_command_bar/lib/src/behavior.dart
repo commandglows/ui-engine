@@ -9,6 +9,8 @@ class CommandBarBehavior {
     this.fuzzyMatch = false,
     this.sortSectionsByMatch = false,
     this.tappablePrefixHints = false,
+    this.restoreLastQuery = false,
+    this.showQueryHistory = false,
   });
 
   /// Every option on.
@@ -16,6 +18,8 @@ class CommandBarBehavior {
     fuzzyMatch: true,
     sortSectionsByMatch: true,
     tappablePrefixHints: true,
+    restoreLastQuery: true,
+    showQueryHistory: true,
   );
 
   /// Whether a word that is not part of the label or keywords still matches
@@ -32,14 +36,29 @@ class CommandBarBehavior {
   /// that applies its filter.
   final bool tappablePrefixHints;
 
+  /// Whether the bar opens with the last search that led to a command, fully
+  /// selected: typing replaces it, Enter runs it again.
+  final bool restoreLastQuery;
+
+  /// Whether the searches that led to a command are listed under an empty
+  /// field, after the recent commands; choosing one puts it back in the field.
+  final bool showQueryHistory;
+
   @override
   bool operator ==(Object other) =>
       other is CommandBarBehavior &&
       other.fuzzyMatch == fuzzyMatch &&
       other.sortSectionsByMatch == sortSectionsByMatch &&
-      other.tappablePrefixHints == tappablePrefixHints;
+      other.tappablePrefixHints == tappablePrefixHints &&
+      other.restoreLastQuery == restoreLastQuery &&
+      other.showQueryHistory == showQueryHistory;
 
   @override
-  int get hashCode =>
-      Object.hash(fuzzyMatch, sortSectionsByMatch, tappablePrefixHints);
+  int get hashCode => Object.hash(
+    fuzzyMatch,
+    sortSectionsByMatch,
+    tappablePrefixHints,
+    restoreLastQuery,
+    showQueryHistory,
+  );
 }

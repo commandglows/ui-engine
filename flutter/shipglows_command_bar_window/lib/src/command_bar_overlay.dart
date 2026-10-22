@@ -16,8 +16,10 @@ typedef ShipglowsCommandBarLocalized<T> = T Function(Locale locale);
 /// Wraps the bar inside the window, for an app's own surface (a card
 /// outline, a margin, a shadow). [bar] is the bar itself; the window's state
 /// is read with [ShipglowsCommandBarWindowState.maximizedOf].
-typedef ShipglowsCommandBarSurfaceBuilder =
-    Widget Function(BuildContext context, Widget bar);
+typedef ShipglowsCommandBarSurfaceBuilder = Widget Function(
+  BuildContext context,
+  Widget bar,
+);
 
 /// State of the bar's window, above a [ShipglowsCommandBarSurfaceBuilder].
 class ShipglowsCommandBarWindowState extends InheritedWidget {
@@ -133,6 +135,7 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
   bool _visible = false;
   int _session = 0;
   (bool, Color, Color)? _frame;
+  String? _usedQuery;
 
   /// Last snapshot received, null before the first one.
   ShipglowsCommandBarSnapshot? get snapshot => _snapshot;
@@ -155,12 +158,15 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
         if (supported.languageCode == candidate.languageCode) return supported;
       }
     }
-    return supportedLocales.isEmpty ? const Locale('en') : supportedLocales.first;
+    return supportedLocales.isEmpty
+        ? const Locale('en')
+        : supportedLocales.first;
   }
 
   /// Theme of the snapshot, else of the system.
   Brightness get brightness =>
-      _snapshot?.brightness ?? ui.PlatformDispatcher.instance.platformBrightness;
+      _snapshot?.brightness ??
+      ui.PlatformDispatcher.instance.platformBrightness;
 
   @override
   List<CommandBarEntry> get entries {
@@ -178,6 +184,13 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
   @override
   List<String> get recentIds => _snapshot?.recentIds ?? const <String>[];
 
+  /// Past searches the app published, most recent first.
+  List<String> get queryHistory => _snapshot?.queryHistory ?? const <String>[];
+
+  /// Keeps the search that leads to the next [choose], for the app's
+  /// history. The bar calls it just before the choice.
+  void useQuery(String query) => _usedQuery = query;
+
   /// Hides the bar, reports [choice] to the app and lets it run the entry.
   /// A disabled entry never runs; its secondary action runs if it has one.
   Future<void> choose(CommandBarChoice choice) async {
@@ -188,6 +201,8 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
         break;
       }
     }
+    final query = _usedQuery;
+    _usedQuery = null;
     if (entry == null) return;
     final allowed = choice.secondary ? entry.hasSecondary : entry.enabled;
     if (!allowed) return;
@@ -200,6 +215,7 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
       'id': entry.id,
       'secondary': choice.secondary,
       'previousForeground': previous,
+      'query': ?query,
     });
   }
 
@@ -244,6 +260,7 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
 
   void _onShow(Object? data) {
     _apply(data);
+    _usedQuery = null;
     _visible = true;
     _session++;
     notifyListeners();
@@ -420,6 +437,8 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
           filters: widget.filters,
           strings: widget.strings,
           behavior: widget.behavior,
+          queryHistory: controller.queryHistory,
+          onQueryUsed: controller.useQuery,
           autofocus: controller.visible,
           // The window sets the height: the list fills it, footer at the
           // bottom, maximized included.

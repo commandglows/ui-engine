@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'behavior.dart';
 import 'command.dart';
 import 'query.dart';
+import 'query_history.dart';
 import 'strings.dart';
 import 'theme.dart';
 
@@ -33,6 +34,11 @@ class CommandBarChoice {
 /// secondary action,
 /// Ctrl/⌘+1…9 chooses row n, Backspace on an empty field removes the filter,
 /// Escape removes the filter first, then closes, and Ctrl/⌘+K closes.
+///
+/// With [CommandBarBehavior.restoreLastQuery] the field opens with the first
+/// of [queryHistory], selected; with [CommandBarBehavior.showQueryHistory]
+/// the past searches are listed under an empty field. [onQueryUsed] receives
+/// the search that led to each choice, so the owner can keep the history.
 class CommandBarView extends StatefulWidget {
   const CommandBarView({
     super.key,
@@ -49,6 +55,8 @@ class CommandBarView extends StatefulWidget {
     this.onSearchDragStart,
     this.footerBuilder,
     this.fillHeight = false,
+    this.queryHistory = const <String>[],
+    this.onQueryUsed,
   });
 
   /// Where the entries come from.
@@ -99,6 +107,14 @@ class CommandBarView extends StatefulWidget {
   /// as its content (a dialog).
   final bool fillHeight;
 
+  /// Past searches that led to a choice, most recent first, filter prefix
+  /// included (as passed to [onQueryUsed]).
+  final List<String> queryHistory;
+
+  /// Called with the search, filter prefix included, when an entry is chosen
+  /// after typing words. Not called for a choice made from an empty field.
+  final ValueChanged<String>? onQueryUsed;
+
   @override
   State<CommandBarView> createState() => _CommandBarViewState();
 }
@@ -119,6 +135,9 @@ final class _HeaderRow extends _BarRow {
 
   final String title;
 }
+
+/// Id prefix of the rows listing past searches; never a real entry id.
+const String _queryRowPrefix = '\u0000query:';
 
 final class _EntryRow extends _BarRow {
   const _EntryRow({required this.entry, required this.itemIndex});
@@ -177,6 +196,35 @@ class _CommandBarViewState extends State<CommandBarView> {
   void initState() {
     super.initState();
     widget.refresh?.addListener(_onSourceChanged);
+    if (widget.behavior.restoreLastQuery && widget.queryHistory.isNotEmpty) {
+      _fillQuery(widget.queryHistory.first, selectAll: true);
+    }
+  }
+
+  /// Puts the past search [raw] back in the field, its prefix in the chip.
+  /// [selectAll] selects the words, so typing replaces them.
+  void _fillQuery(String raw, {required bool selectAll}) {
+    final parsed = parseCommandBarQuery(raw, widget.filters);
+    _filter = parsed.filter;
+    _highlight = 0;
+    _controller.value = TextEditingValue(
+      text: parsed.text,
+      selection: selectAll
+          ? TextSelection(baseOffset: 0, extentOffset: parsed.text.length)
+          : TextSelection.collapsed(offset: parsed.text.length),
+    );
+  }
+
+  /// The current search as typed, filter prefix included, so it parses back
+  /// to the same filter and words.
+  String _rawQuery() {
+    final text = _controller.text.trim();
+    final filter = _filter;
+    if (filter == null) return text;
+    if (filter.prefix == ' ') return ' $text';
+    return filter.requiresSpace
+        ? '${filter.prefix} $text'
+        : '${filter.prefix}$text';
   }
 
   @override
@@ -355,11 +403,24 @@ class _CommandBarViewState extends State<CommandBarView> {
   void _chooseItem(int itemIndex, {required bool secondary}) {
     if (itemIndex < 0 || itemIndex >= _layout.items.length) return;
     final entry = _layout.items[itemIndex];
+    if (entry.id.startsWith(_queryRowPrefix)) {
+      if (secondary) return;
+      setState(() {
+        _fillQuery(
+          entry.id.substring(_queryRowPrefix.length),
+          selectAll: false,
+        );
+      });
+      return;
+    }
     if (secondary) {
       if (!entry.hasSecondary) return;
     } else if (!entry.enabled) {
       // A disabled entry stays visible but never runs.
       return;
+    }
+    if (_controller.text.trim().isNotEmpty) {
+      widget.onQueryUsed?.call(_rawQuery());
     }
     widget.onChoose(CommandBarChoice(id: entry.id, secondary: secondary));
   }
@@ -447,6 +508,28 @@ class _CommandBarViewState extends State<CommandBarView> {
       if (recents.isNotEmpty) {
         rows.add(_HeaderRow(widget.strings.recentSection));
         recents.forEach(addItem);
+      }
+      if (widget.behavior.showQueryHistory && query.text.trim().isEmpty) {
+        final past = widget.queryHistory
+            .where((raw) => raw.trim().isNotEmpty)
+            .take(commandBarQueryHistoryShown)
+            .toList(growable: false);
+        if (past.isNotEmpty) {
+          rows.add(_HeaderRow(widget.strings.querySection));
+          for (final raw in past) {
+            final parsed = parseCommandBarQuery(raw, widget.filters);
+            addItem(
+              CommandBarEntry(
+                id: '$_queryRowPrefix$raw',
+                label: parsed.text,
+                section: _queryRowPrefix,
+                icon: Icons.history_rounded,
+                subtitle: parsed.filter?.label,
+                primaryLabel: widget.strings.fillQuery,
+              ),
+            );
+          }
+        }
       }
     }
 

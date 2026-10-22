@@ -3,7 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'package:shipglows_command_bar/shipglows_command_bar.dart';
 
 /// What the floating bar lists, as the app's engine sees it now: the
-/// entries, the recent ids, the theme brightness and the language.
+/// entries, the recent ids, the past searches, the theme brightness and the
+/// language.
 ///
 /// Engines share no memory, so the snapshot travels as JSON-safe values
 /// ([toJson]); icons go as code points, mapped back by the overlay's
@@ -13,6 +14,7 @@ class ShipglowsCommandBarSnapshot {
   const ShipglowsCommandBarSnapshot({
     required this.entries,
     this.recentIds = const <String>[],
+    this.queryHistory = const <String>[],
     this.brightness,
     this.locale,
     this.appWindowIds = const <String>{},
@@ -35,6 +37,7 @@ class ShipglowsCommandBarSnapshot {
             if (_entryFrom(item, iconFor) case final entry?) entry,
       ],
       recentIds: _strings(json['recentIds']),
+      queryHistory: _strings(json['queryHistory']),
       brightness: switch (json['brightness']) {
         'dark' => Brightness.dark,
         'light' => Brightness.light,
@@ -55,6 +58,10 @@ class ShipglowsCommandBarSnapshot {
   /// Ids of the most recently run entries, most recent first.
   final List<String> recentIds;
 
+  /// Past searches that led to a choice, most recent first, filter prefix
+  /// included: the bar's `CommandBarView.queryHistory`.
+  final List<String> queryHistory;
+
   /// Theme the bar follows. Null: the system brightness.
   final Brightness? brightness;
 
@@ -74,6 +81,7 @@ class ShipglowsCommandBarSnapshot {
   Map<String, Object?> toJson() => <String, Object?>{
     'entries': [for (final entry in entries) entry.toJson()],
     'recentIds': recentIds,
+    'queryHistory': queryHistory,
     'brightness': brightness?.name,
     'locale': locale?.toLanguageTag(),
     'appWindowIds': appWindowIds.toList(),

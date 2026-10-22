@@ -51,6 +51,8 @@ class CommandBarStrings {
     this.practiceRestart = 'Start over',
     this.practiceBack = 'Back to the list',
     this.shiftKey = 'Shift',
+    this.querySection = 'Recent searches',
+    this.fillQuery = 'search again',
   });
 
   /// English texts.
@@ -117,6 +119,8 @@ class CommandBarStrings {
     practiceRestart: 'Recommencer',
     practiceBack: 'Retour à la liste',
     shiftKey: 'Maj',
+    querySection: 'Recherches récentes',
+    fillQuery: 'relancer',
   );
 
   /// Accessible name of the dialog.
@@ -239,6 +243,12 @@ class CommandBarStrings {
   /// Name of the Shift key, in typed keys.
   final String shiftKey;
 
+  /// Title of the recently typed searches, listed under an empty field.
+  final String querySection;
+
+  /// Footer: Enter on a recent search, which puts it back in the field.
+  final String fillQuery;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -281,6 +291,8 @@ class CommandBarStrings {
     String? practiceRestart,
     String? practiceBack,
     String? shiftKey,
+    String? querySection,
+    String? fillQuery,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -322,5 +334,7 @@ class CommandBarStrings {
     practiceRestart: practiceRestart ?? this.practiceRestart,
     practiceBack: practiceBack ?? this.practiceBack,
     shiftKey: shiftKey ?? this.shiftKey,
+    querySection: querySection ?? this.querySection,
+    fillQuery: fillQuery ?? this.fillQuery,
   );
 }

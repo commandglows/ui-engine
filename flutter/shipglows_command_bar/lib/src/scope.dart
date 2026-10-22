@@ -10,6 +10,7 @@ import 'browser_guard.dart'
     if (dart.library.js_interop) 'browser_guard_web.dart';
 import 'command.dart';
 import 'practice.dart';
+import 'query_history.dart';
 import 'recents.dart';
 import 'shortcuts.dart';
 import 'size_store.dart';
@@ -30,7 +31,9 @@ List<String> commandBarHotkeyKeys() => [commandBarPrimaryModifierLabel(), 'K'];
 /// another size, kept in [sizeStore]; double-clicking an edge restores the
 /// theme's size. When [expandable], double-clicking the search field fills the
 /// screen with the bar, and again brings it back; the stored size is kept.
-/// [onRoute] receives the dialog route, so the caller can close it.
+/// [queryHistory] and [onQueryUsed] feed the search history (see
+/// [CommandBarView]). [onRoute] receives the dialog route, so the caller can
+/// close it.
 Future<CommandBarChoice?> showCommandBar(
   BuildContext context, {
   required CommandBarSource source,
@@ -42,6 +45,8 @@ Future<CommandBarChoice?> showCommandBar(
   bool expandable = false,
   CommandBarSizeStore? sizeStore,
   CommandBarBehavior behavior = const CommandBarBehavior(),
+  List<String> queryHistory = const <String>[],
+  ValueChanged<String>? onQueryUsed,
   ValueChanged<Route<CommandBarChoice>>? onRoute,
 }) {
   final style = CommandBarThemeData.of(context);
@@ -73,6 +78,8 @@ Future<CommandBarChoice?> showCommandBar(
       expandable: expandable,
       sizeStore: sizeStore,
       behavior: behavior,
+      queryHistory: queryHistory,
+      onQueryUsed: onQueryUsed,
       onChoose: finish,
       onClose: finish,
     ),
@@ -228,6 +235,7 @@ class CommandBarScope extends StatefulWidget {
     this.filters = const <CommandBarFilter>[],
     this.strings = CommandBarStrings.en,
     this.recents,
+    this.queryHistory,
     this.hotkey = true,
     this.onError,
     this.refresh,
@@ -259,6 +267,11 @@ class CommandBarScope extends StatefulWidget {
 
   /// Where recent command ids are kept; in memory when null.
   final CommandBarRecentsStore? recents;
+
+  /// Where the searches that led to a command are kept; in memory when null.
+  /// Used by [CommandBarBehavior.restoreLastQuery] and
+  /// [CommandBarBehavior.showQueryHistory].
+  final CommandBarQueryHistoryStore? queryHistory;
 
   /// Whether Ctrl/⌘+K opens and closes the bar.
   final bool hotkey;
@@ -296,8 +309,7 @@ class CommandBarScope extends StatefulWidget {
   /// last in the shortcuts sheet; their [CommandBarShortcutHint.bindings] run
   /// while nothing covers the scope. Screens add theirs with
   /// [CommandBarShortcuts].
-  final List<CommandBarShortcutGroup> Function(BuildContext context)?
-  shortcuts;
+  final List<CommandBarShortcutGroup> Function(BuildContext context)? shortcuts;
 
   /// Whether F1 opens and closes the shortcuts sheet.
   final bool shortcutsOnF1;
@@ -324,11 +336,35 @@ class _CommandBarScopeState extends State<CommandBarScope>
   final CommandBarRegistry registry = CommandBarRegistry();
   final MemoryCommandBarRecents _memoryRecents = MemoryCommandBarRecents();
   final MemoryCommandBarSize _memorySize = MemoryCommandBarSize();
+  final MemoryCommandBarQueryHistory _memoryQueryHistory =
+      MemoryCommandBarQueryHistory();
   final CommandBarBrowserGuard _browserGuard = CommandBarBrowserGuard();
   Route<CommandBarChoice>? _route;
   Route<void>? _shortcutsRoute;
 
   CommandBarRecentsStore get _recents => widget.recents ?? _memoryRecents;
+
+  CommandBarQueryHistoryStore get _queryHistory =>
+      widget.queryHistory ?? _memoryQueryHistory;
+
+  List<String> _readQueryHistory() {
+    try {
+      return _queryHistory.read();
+    } catch (error, stackTrace) {
+      _report(error, stackTrace);
+      return const <String>[];
+    }
+  }
+
+  Future<void> _rememberQuery(String query) async {
+    try {
+      await _queryHistory.write(
+        nextCommandBarQueryHistory(_readQueryHistory(), query),
+      );
+    } catch (error, stackTrace) {
+      _report(error, stackTrace);
+    }
+  }
 
   @override
   bool get isOpen => _route != null;
@@ -568,6 +604,8 @@ class _CommandBarScopeState extends State<CommandBarScope>
       expandable: widget.expandable,
       sizeStore: widget.sizeStore ?? _memorySize,
       behavior: widget.behavior?.call(context) ?? const CommandBarBehavior(),
+      queryHistory: _readQueryHistory(),
+      onQueryUsed: (query) => unawaited(_rememberQuery(query)),
       onRoute: (route) => _route = route,
     );
     _route = null;
@@ -764,6 +802,8 @@ class _CommandBarDialog extends StatefulWidget {
     required this.expandable,
     required this.sizeStore,
     required this.behavior,
+    required this.queryHistory,
+    required this.onQueryUsed,
     required this.onChoose,
     required this.onClose,
   });
@@ -777,6 +817,8 @@ class _CommandBarDialog extends StatefulWidget {
   final bool expandable;
   final CommandBarSizeStore? sizeStore;
   final CommandBarBehavior behavior;
+  final List<String> queryHistory;
+  final ValueChanged<String>? onQueryUsed;
   final ValueChanged<CommandBarChoice> onChoose;
   final VoidCallback onClose;
 
@@ -930,6 +972,8 @@ class _CommandBarDialogState extends State<_CommandBarDialog> {
           strings: widget.strings,
           refresh: widget.refresh,
           behavior: widget.behavior,
+          queryHistory: widget.queryHistory,
+          onQueryUsed: widget.onQueryUsed,
           onChoose: widget.onChoose,
           onClose: widget.onClose,
           onSearchDoubleTap: widget.expandable ? _toggleExpanded : null,

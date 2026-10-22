@@ -9,6 +9,7 @@ export 'src/behavior.dart';
 export 'src/command.dart';
 export 'src/practice.dart';
 export 'src/query.dart';
+export 'src/query_history.dart';
 export 'src/recents.dart';
 export 'src/scope.dart';
 export 'src/shortcuts.dart';
