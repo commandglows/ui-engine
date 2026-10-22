@@ -508,17 +508,20 @@ while the app is in front, in the background or hidden in the tray. Native
 Win32 (`RegisterHotKey` on a hidden message-only window), no third-party
 plugin, nothing to route in the runner.
 
-- Declared once at startup with `apply`: each hotkey has an id and
-  `candidates` by preference; the first one free is registered (Alt+Space
-  is often a launcher's), or the user's saved choice.
+- Declared once at startup with `apply`: one action, one combination (its
+  default `hotkey`, or the user's saved choice). No fallback list: when
+  another app owns it, the app says so and offers to change it
+  (`ShipglowsHotkeyConflictTexts.fr` : « Déjà utilisé par une autre
+  application. Choisis une autre combinaison. »).
 - `events`: id, `foreground` (`otherApp`, `app`, `ownWindow`, `none`) and
   `previousForeground`, the HWND in front read natively at the press, before
   any Dart code runs: the window to give the keyboard back to or paste into.
 - Conflicts by id in `state` (`alreadyRegistered`, `duplicate`, `invalid`,
-  `failed`); another app's hotkey is reported, never stolen.
+  `failed`); another app's hotkey is reported, never stolen nor replaced by
+  another combination.
 - Settings: `set(id, hotkey)` (null leaves it unassigned), `setAll` for
   several at once, all or none (two hotkeys can swap), `reset(id)` back to
-  the candidates. Choices are saved in `%APPDATA%\<appFolder>\hotkeys.json`
+  the default. Choices are saved in `%APPDATA%\<appFolder>\hotkeys.json`
   (or a custom `ShipglowsHotkeyStore`); a failed save undoes the change.
 - `hookFallback: true`: a hotkey Windows refuses for another reason than an
   owner is caught with a low-level keyboard hook instead.
@@ -531,7 +534,7 @@ Default combinations, so the ShipGlows apps do not take each other's:
 | App | Hotkey | Default |
 |---|---|---|
 | ContentGlows | command bar | Ctrl+Alt+Space |
-| CommandGlows | command bar | Alt+Space, Alt+Shift+Space, Ctrl+Shift+Space |
+| CommandGlows | command bar | Alt+Space |
 | CommandGlows | inline overlay | Ctrl+Alt+Space today: to change |
 | CommandGlows | shortcut sheet | Ctrl+Alt+K |
 | ShipGlows app | command bar | Ctrl+Shift+Space |
@@ -546,14 +549,20 @@ dependencies:
 ```dart
 final hotkeys = ShipglowsHotkeys(appFolder: 'MyApp');
 await hotkeys.apply([
-  ShipglowsHotkeyBinding(id: 'commandBar', candidates: [
-    ShipglowsHotkey(ShipglowsKey.space, control: true, alt: true),
-    ShipglowsHotkey(ShipglowsKey.space, alt: true, shift: true),
-  ]),
-  ShipglowsHotkeyBinding(id: 'capture', candidates: [
-    ShipglowsHotkey(ShipglowsKey.f(2), control: true, shift: true),
-  ]),
+  ShipglowsHotkeyBinding(
+    id: 'commandBar',
+    hotkey: ShipglowsHotkey(ShipglowsKey.space, control: true, alt: true),
+  ),
+  ShipglowsHotkeyBinding(
+    id: 'capture',
+    hotkey: ShipglowsHotkey(ShipglowsKey.f(2), control: true, shift: true),
+  ),
 ]);
+// Taken by another app: say it and offer to change it.
+for (final MapEntry(key: id, value: conflict)
+    in hotkeys.state.value.conflicts.entries) {
+  showHotkeyProblem(id, ShipglowsHotkeyConflictTexts.fr.of(conflict));
+}
 
 bar.bindHotkey(hotkeys, 'commandBar'); // shipglows_command_bar_window
 hotkeys.events
@@ -565,7 +574,12 @@ final result = await hotkeys.set(
   'commandBar',
   ShipglowsHotkey(ShipglowsKey.character('K'), control: true, alt: true),
 );
-if (!result.applied) showConflict(result.conflicts['commandBar']);
+if (!result.applied) {
+  showHotkeyProblem(
+    'commandBar',
+    ShipglowsHotkeyConflictTexts.fr.of(result.conflicts['commandBar']!),
+  );
+}
 ```
 
 One `ShipglowsHotkeys` per app, in the main engine. Adding the package adds a

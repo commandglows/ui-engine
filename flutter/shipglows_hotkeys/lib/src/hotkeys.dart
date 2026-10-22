@@ -41,24 +41,26 @@ class ShipglowsHotkeyEvent {
   final int? previousForeground;
 }
 
-/// A hotkey the app offers. The user's choice, once saved, replaces
-/// [candidates].
+/// A hotkey the app offers: one action, one combination. The user's choice,
+/// once saved, replaces [hotkey].
 @immutable
 class ShipglowsHotkeyBinding {
-  const ShipglowsHotkeyBinding({required this.id, this.candidates = const []});
+  const ShipglowsHotkeyBinding({required this.id, this.hotkey});
 
   /// Stable name, also the key of the saved choice.
   final String id;
 
-  /// Combinations by preference: the first one free is registered (the
-  /// usual one may belong to a launcher such as PowerToys). Empty: none
-  /// until the user picks one.
-  final List<ShipglowsHotkey> candidates;
+  /// Default combination. When another application owns it, the hotkey is
+  /// reported as [ShipglowsHotkeyConflict.alreadyRegistered] and no other
+  /// combination is tried: the app says so and offers to change it. Null:
+  /// none until the user picks one.
+  final ShipglowsHotkey? hotkey;
 }
 
 /// Why a hotkey is not active.
 enum ShipglowsHotkeyConflict {
-  /// Another application owns the combination.
+  /// Another application owns the combination. Show it to the user
+  /// ([ShipglowsHotkeyConflictTexts]) and offer to change it.
   alreadyRegistered,
 
   /// Another hotkey of the app already uses it.
@@ -73,6 +75,45 @@ enum ShipglowsHotkeyConflict {
 
   /// It worked but the choice could not be saved, so it was undone.
   persistFailed,
+}
+
+/// What to tell the user about a [ShipglowsHotkeyConflict].
+@immutable
+class ShipglowsHotkeyConflictTexts {
+  const ShipglowsHotkeyConflictTexts({
+    this.alreadyRegistered =
+        'Already used by another application. Choose another combination.',
+    this.duplicate = 'Already used by another shortcut of this app.',
+    this.invalid = 'This combination cannot be a global shortcut.',
+    this.failed = 'Windows refused this shortcut.',
+    this.persistFailed = 'The shortcut could not be saved.',
+  });
+
+  static const en = ShipglowsHotkeyConflictTexts();
+
+  static const fr = ShipglowsHotkeyConflictTexts(
+    alreadyRegistered:
+        'Déjà utilisé par une autre application. Choisis une autre '
+        'combinaison.',
+    duplicate: 'Déjà utilisé par un autre raccourci de l’app.',
+    invalid: 'Cette combinaison ne peut pas servir de raccourci global.',
+    failed: 'Windows a refusé ce raccourci.',
+    persistFailed: 'Le raccourci n’a pas pu être enregistré.',
+  );
+
+  final String alreadyRegistered;
+  final String duplicate;
+  final String invalid;
+  final String failed;
+  final String persistFailed;
+
+  String of(ShipglowsHotkeyConflict conflict) => switch (conflict) {
+    ShipglowsHotkeyConflict.alreadyRegistered => alreadyRegistered,
+    ShipglowsHotkeyConflict.duplicate => duplicate,
+    ShipglowsHotkeyConflict.invalid => invalid,
+    ShipglowsHotkeyConflict.failed => failed,
+    ShipglowsHotkeyConflict.persistFailed => persistFailed,
+  };
 }
 
 /// The app's hotkeys right now.
@@ -175,7 +216,9 @@ class ShipglowsHotkeys {
   List<ShipglowsHotkeyBinding> get bindings => List.unmodifiable(_bindings);
 
   /// Registers [bindings], replacing any declared before: each id gets the
-  /// user's saved choice, else its first free candidate.
+  /// user's saved choice, else its default. A combination another
+  /// application owns is reported in [ShipglowsHotkeyState.conflicts], never
+  /// replaced by another one.
   Future<ShipglowsHotkeyState> apply(List<ShipglowsHotkeyBinding> bindings) =>
       _serial(() => _apply(bindings));
 
@@ -188,7 +231,7 @@ class ShipglowsHotkeys {
   Future<ShipglowsHotkeyResult> setAll(Map<String, ShipglowsHotkey?> hotkeys) =>
       _serial(() => _setAll(hotkeys));
 
-  /// Forgets the user's choice for [id]: its candidates apply again.
+  /// Forgets the user's choice for [id]: its default applies again.
   Future<ShipglowsHotkeyState> reset(String id) => _serial(() async {
     if (!_choices.containsKey(id)) return _state.value;
     final choices = {..._choices}..remove(id);
@@ -221,31 +264,20 @@ class ShipglowsHotkeys {
     final active = <String, ShipglowsHotkey>{};
     final conflicts = <String, ShipglowsHotkeyConflict>{};
     for (final binding in bindings) {
-      final List<ShipglowsHotkey> wanted;
-      if (_choices.containsKey(binding.id)) {
-        final chosen = _choices[binding.id];
-        if (chosen == null) continue;
-        wanted = [chosen];
+      final hotkey = _choices.containsKey(binding.id)
+          ? _choices[binding.id]
+          : binding.hotkey;
+      if (hotkey == null) continue;
+      final conflict = !hotkey.isValid
+          ? ShipglowsHotkeyConflict.invalid
+          : active.containsValue(hotkey)
+          ? ShipglowsHotkeyConflict.duplicate
+          : await _register(binding.id, hotkey);
+      if (conflict == null) {
+        active[binding.id] = hotkey;
       } else {
-        wanted = binding.candidates;
+        conflicts[binding.id] = conflict;
       }
-      ShipglowsHotkeyConflict? conflict;
-      for (final hotkey in wanted) {
-        if (!hotkey.isValid) {
-          conflict ??= ShipglowsHotkeyConflict.invalid;
-          continue;
-        }
-        if (active.containsValue(hotkey)) {
-          conflict ??= ShipglowsHotkeyConflict.duplicate;
-          continue;
-        }
-        conflict = await _register(binding.id, hotkey);
-        if (conflict == null) {
-          active[binding.id] = hotkey;
-          break;
-        }
-      }
-      if (conflict != null) conflicts[binding.id] = conflict;
     }
     return _state.value = ShipglowsHotkeyState(
       active: active,

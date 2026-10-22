@@ -2,7 +2,7 @@ import 'hotkey.dart';
 import 'store_file_stub.dart' if (dart.library.io) 'store_file_io.dart';
 
 /// Where [ShipglowsHotkeys] keeps the hotkeys the user chose. Only choices
-/// are kept: an id absent from the map uses its candidates, an id mapped to
+/// are kept: an id absent from the map uses its default, an id mapped to
 /// null was left unassigned.
 abstract interface class ShipglowsHotkeyStore {
   /// The saved choices; empty when there are none or they cannot be read.
