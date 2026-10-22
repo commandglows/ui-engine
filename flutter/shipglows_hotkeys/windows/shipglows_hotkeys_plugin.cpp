@@ -135,7 +135,8 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
       SetWindowLongPtrW(window_, GWLP_USERDATA, 0);
       DestroyWindow(window_);
     }
-    channel_->SetMethodCallHandler(nullptr);
+    // No SetMethodCallHandler(nullptr): plugins go away with the engine,
+    // whose messenger is already released (access violation on quit).
   }
 
  private:
