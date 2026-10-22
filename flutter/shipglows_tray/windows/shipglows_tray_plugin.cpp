@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "encodable_utils.h"
+#include "single_instance_internal.h"
 #include "tray_host.h"
 #include "tray_menu.h"
 #include "window_activation.h"
@@ -108,23 +109,8 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
       : registrar_(registrar),
         channel_(std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
             registrar->messenger(), kChannel,
-            &flutter::StandardMethodCodec::GetInstance())),
-        host_(TrayHost::Callbacks{
-            [this](TrayHost::IconAction action, POINT anchor) {
-              OnIcon(action, anchor);
-            },
-            [this](const std::vector<std::wstring>& arguments) {
-              OnSecondInstance(arguments);
-            },
-            [this](bool visible) {
-              if (started_) {
-                Emit({{flutter::EncodableValue("type"),
-                       flutter::EncodableValue("iconVisible")},
-                      {flutter::EncodableValue("visible"),
-                       flutter::EncodableValue(visible)}});
-              }
-            },
-        }) {
+            &flutter::StandardMethodCodec::GetInstance())) {
+    EnsureInstanceReceiver();
     channel_->SetMethodCallHandler([this](const auto& call, auto result) {
       HandleCall(call, std::move(result));
     });
@@ -137,6 +123,7 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   ~ShipglowsTrayPlugin() override {
     // The engine is going away: removing the icon must not message Dart.
     started_ = false;
+    DetachSecondInstanceHandler(this);
     registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_id_);
     channel_->SetMethodCallHandler(nullptr);
   }
@@ -161,14 +148,20 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
                        : click == "item"  ? PrimaryClick::kItem
                                           : PrimaryClick::kOpenMainWindow;
       primary_item_ = StringField(arguments, "primaryItem");
+      // Only the engine that starts the tray owns an icon: overlays register
+      // the plugin too.
+      if (!host_) host_ = CreateHost();
       ApplyAppearance(arguments);
       quitting_ = false;
       started_ = true;
-      const bool visible = host_.Show();
+      const bool visible = host_->Show();
       result->Success(flutter::EncodableValue(visible));
-      FlushPendingSecondInstances();
+      AttachSecondInstanceHandler(
+          this, [this](const std::vector<std::wstring>& arguments) {
+            OnSecondInstance(arguments);
+          });
     } else if (method == "update") {
-      ApplyAppearance(arguments);
+      if (host_) ApplyAppearance(arguments);
       result->Success();
     } else if (method == "setCloseBehavior") {
       close_behavior_ =
@@ -182,7 +175,8 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
       Quit();
     } else if (method == "dispose") {
       started_ = false;
-      host_.Hide();
+      if (host_) host_->Hide();
+      DetachSecondInstanceHandler(this);
       items_.clear();
       result->Success();
     } else {
@@ -190,12 +184,27 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     }
   }
 
+  std::unique_ptr<TrayHost> CreateHost() {
+    return std::make_unique<TrayHost>(TrayHost::Callbacks{
+        [this](TrayHost::IconAction action, POINT anchor) {
+          OnIcon(action, anchor);
+        },
+        [this](bool visible) {
+          if (!started_) return;
+          Emit({{flutter::EncodableValue("type"),
+                 flutter::EncodableValue("iconVisible")},
+                {flutter::EncodableValue("visible"),
+                 flutter::EncodableValue(visible)}});
+        },
+    });
+  }
+
   void ApplyAppearance(const flutter::EncodableValue* arguments) {
     if (Field(arguments, "tooltip") != nullptr) {
-      host_.SetTooltip(Wide(StringField(arguments, "tooltip")));
+      host_->SetTooltip(Wide(StringField(arguments, "tooltip")));
     }
     if (const auto* icon = Field(arguments, "icon")) {
-      host_.SetIcon(LoadTrayIcon(icon));
+      host_->SetIcon(LoadTrayIcon(icon));
     }
     if (const auto* items = Field(arguments, "items")) {
       items_ = MenuFromValue(items);
@@ -232,7 +241,7 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     }
     switch (close_behavior_) {
       case CloseBehavior::kHideToTray:
-        if (host_.visible()) {
+        if (host_ && host_->visible()) {
           ShowWindow(window, SW_HIDE);
           return 0;
         }
@@ -254,9 +263,9 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   }
 
   void OnIcon(TrayHost::IconAction action, POINT anchor) {
-    if (!started_) return;
+    if (!started_ || !host_) return;
     // Read before the menu or the main window takes the foreground.
-    const HWND previous = host_.previous_foreground();
+    const HWND previous = host_->previous_foreground();
     if (action == TrayHost::IconAction::kMenu) {
       ShowMenu(anchor, previous);
       return;
@@ -284,7 +293,7 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     // A copy: Dart can replace the items while the menu is open.
     const std::vector<MenuItem> items = items_;
     if (const MenuItem* chosen =
-            ShowPopupMenu(host_.window(), items, anchor)) {
+            ShowPopupMenu(host_->window(), items, anchor)) {
       Select(*chosen, previous);
     }
   }
@@ -310,24 +319,10 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     for (const auto& argument : arguments) {
       list.emplace_back(Utf8(argument));
     }
-    if (!started_) {
-      pending_second_instances_.push_back(std::move(list));
-      return;
-    }
-    EmitSecondInstance(std::move(list));
-  }
-
-  void FlushPendingSecondInstances() {
-    auto pending = std::move(pending_second_instances_);
-    pending_second_instances_.clear();
-    for (auto& list : pending) EmitSecondInstance(std::move(list));
-  }
-
-  void EmitSecondInstance(flutter::EncodableList arguments) {
     Emit({{flutter::EncodableValue("type"),
            flutter::EncodableValue("secondInstance")},
           {flutter::EncodableValue("arguments"),
-           flutter::EncodableValue(std::move(arguments))}});
+           flutter::EncodableValue(std::move(list))}});
   }
 
   static flutter::EncodableValue WindowValue(HWND window) {
@@ -343,10 +338,11 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
 
   flutter::PluginRegistrarWindows* registrar_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
-  TrayHost host_;
+  // Created by the first "start"; declared after the channel, which it
+  // messages while going away.
+  std::unique_ptr<TrayHost> host_;
   int window_proc_id_ = -1;
   std::vector<MenuItem> items_;
-  std::vector<flutter::EncodableList> pending_second_instances_;
   CloseBehavior close_behavior_ = CloseBehavior::kHideToTray;
   PrimaryClick primary_click_ = PrimaryClick::kOpenMainWindow;
   std::string primary_item_;

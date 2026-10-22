@@ -5,12 +5,11 @@
 
 #include <functional>
 #include <string>
-#include <vector>
 
 namespace shipglows_tray {
 
-// The notification area icon and the hidden window receiving its messages,
-// the taskbar's restarts and the command lines of later instances.
+// The notification area icon and the hidden window receiving its messages
+// and the taskbar's restarts.
 //
 // The window is top level (not message-only), as only those receive the
 // "TaskbarCreated" broadcast.
@@ -25,8 +24,6 @@ class TrayHost {
 
   struct Callbacks {
     std::function<void(IconAction action, POINT anchor)> on_icon;
-    std::function<void(const std::vector<std::wstring>& arguments)>
-        on_second_instance;
     std::function<void(bool visible)> on_visibility;
   };
 
@@ -68,7 +65,6 @@ class TrayHost {
   NOTIFYICONDATAW IconData(UINT flags) const;
 
   Callbacks callbacks_;
-  std::wstring class_name_;
   HWND window_ = nullptr;
   UINT taskbar_created_message_ = 0;
   HICON icon_ = nullptr;
@@ -79,7 +75,6 @@ class TrayHost {
   int add_attempts_ = 0;
   HWINEVENTHOOK foreground_hook_ = nullptr;
   HWND last_foreground_ = nullptr;
-  std::vector<std::vector<std::wstring>> pending_command_lines_;
 };
 
 }  // namespace shipglows_tray

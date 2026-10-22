@@ -8,15 +8,13 @@
 #include <iterator>
 #include <utility>
 
-#include "single_instance_internal.h"
-
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
 namespace shipglows_tray {
 namespace {
 
 constexpr UINT kIconMessage = WM_APP + 0x5A1;
-constexpr UINT kSecondInstanceMessage = WM_APP + 0x5A2;
+constexpr wchar_t kWindowClass[] = L"ShipGlowsTrayIcon";
 constexpr UINT kIconId = 1;
 constexpr UINT_PTR kAddRetryTimer = 1;
 constexpr UINT kAddRetryMs = 1000;
@@ -40,33 +38,17 @@ HINSTANCE ModuleInstance() {
   return reinterpret_cast<HINSTANCE>(&__ImageBase);
 }
 
-std::vector<std::wstring> ArgumentsFrom(const COPYDATASTRUCT& packet) {
-  std::vector<std::wstring> arguments;
-  if (packet.lpData == nullptr || packet.cbData < sizeof(wchar_t)) {
-    return arguments;
-  }
-  const auto* text = static_cast<const wchar_t*>(packet.lpData);
-  const size_t length = packet.cbData / sizeof(wchar_t);
-  size_t start = 0;
-  for (size_t index = 0; index < length; ++index) {
-    if (text[index] != L'\0') continue;
-    arguments.emplace_back(text + start, index - start);
-    start = index + 1;
-  }
-  return arguments;
-}
-
 }  // namespace
 
-TrayHost::TrayHost(Callbacks callbacks)
-    : callbacks_(std::move(callbacks)), class_name_(HostWindowClass()) {
+TrayHost::TrayHost(Callbacks callbacks) : callbacks_(std::move(callbacks)) {
+  // Registered once per process; later hosts reuse it.
   WNDCLASSEXW window_class{};
   window_class.cbSize = sizeof(window_class);
   window_class.lpfnWndProc = WindowProc;
   window_class.hInstance = ModuleInstance();
-  window_class.lpszClassName = class_name_.c_str();
+  window_class.lpszClassName = kWindowClass;
   RegisterClassExW(&window_class);
-  window_ = CreateWindowExW(WS_EX_TOOLWINDOW, class_name_.c_str(),
+  window_ = CreateWindowExW(WS_EX_TOOLWINDOW, kWindowClass,
                             L"ShipGlows tray", WS_POPUP, 0, 0, 0, 0, nullptr,
                             nullptr, ModuleInstance(), this);
   taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
@@ -90,7 +72,6 @@ TrayHost::~TrayHost() {
   if (foreground_hook_ != nullptr) UnhookWinEvent(foreground_hook_);
   if (foreground_owner == this) foreground_owner = nullptr;
   if (window_ != nullptr) DestroyWindow(window_);
-  UnregisterClassW(class_name_.c_str(), ModuleInstance());
   if (icon_ != nullptr) DestroyIcon(icon_);
 }
 
@@ -232,26 +213,6 @@ LRESULT TrayHost::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == WM_TIMER && wparam == kAddRetryTimer) {
     if (!wanted_ || visible_ || Add() || ++add_attempts_ >= kMaxAddAttempts) {
       KillTimer(window_, kAddRetryTimer);
-    }
-    return 0;
-  }
-  if (message == WM_COPYDATA) {
-    const auto* packet = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
-    if (packet == nullptr || packet->dwData != kCommandLineCopyData) {
-      return FALSE;
-    }
-    // Answer the sender at once; handle it outside its SendMessage.
-    pending_command_lines_.push_back(ArgumentsFrom(*packet));
-    PostMessageW(window_, kSecondInstanceMessage, 0, 0);
-    return TRUE;
-  }
-  if (message == kSecondInstanceMessage) {
-    auto command_lines = std::move(pending_command_lines_);
-    pending_command_lines_.clear();
-    for (const auto& arguments : command_lines) {
-      if (callbacks_.on_second_instance) {
-        callbacks_.on_second_instance(arguments);
-      }
     }
     return 0;
   }
