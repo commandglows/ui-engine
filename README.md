@@ -73,16 +73,22 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   `CommandBarStrings.entryKindLabels[id]` (« Action », « App »), with
   `entryKinds[id]` as tooltip and spoken text; `hiddenKinds` leaves whole
   kinds out (`{'open'}` for actions only).
-- Actions panel (like Raycast's): `CommandBarEntry.actions`
+- Actions menu (like Claude Desktop's search palette): `CommandBarEntry.actions`
   (`CommandBarEntryAction`: `id`, `label`, `icon`, one-chord `shortcut`,
-  `group`, all JSON-safe) lists more things to do with a row, ungrouped
-  ones first, then one titled block per `group`. The panel view lives on
-  its own in `src/actions_panel.dart` (`CommandBarActionsPanel`, not
-  exported), so a shared floating menu can replace it later. Alt+Enter (Ctrl+K stays
-  the hotkey) or a right-click opens it on the highlighted row; it lists
-  Enter (`primaryLabel`), Shift+Enter (`secondaryLabel`) then the actions,
-  ↑/↓ and Enter choose, Escape or Alt+Enter close it, the footer shows
-  « Alt Enter actions » when the row has any. An action's `shortcut` also
+  `group`, `destructive`, `confirm`, all JSON-safe) lists more things to do
+  with a row, ungrouped ones first, then one titled block per `group`, then
+  the `destructive` ones in the error color after a separator. The panel
+  view lives on its own in `src/actions_panel.dart` (`CommandBarActionsPanel`,
+  not exported), so a shared floating menu can replace it later. Alt+Enter
+  (Ctrl+K stays the hotkey), a right-click or the « … » button shown on the
+  hovered or highlighted row opens it, anchored to the end of the row: a
+  header with the entry's label and a muted « section · badge · subtitle »
+  line, then Enter (`primaryLabel`), Shift+Enter (`secondaryLabel`) and the
+  actions, numbered 1–9 in keycaps. ↑/↓ and Enter choose, a digit runs its
+  line, Escape, ← or Alt+Enter close it; scrolling the list closes it too.
+  A `confirm` action asks for a second press first, its label replaced by
+  `CommandBarStrings.confirmAction` (« Press again to confirm »). The footer
+  shows « Alt Enter actions » when the row has any. An action's `shortcut` also
   runs it straight from the list. The choice carries
   `CommandBarChoice.action` (null for Enter and Shift+Enter, which keep
   working as before); actions run on a disabled row like the secondary
