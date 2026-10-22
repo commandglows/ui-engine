@@ -45,6 +45,45 @@ class CommandBarBehavior {
   /// choosing one puts it back in the field.
   final bool showQueryHistory;
 
+  /// Copy with the given options replaced, for an app that lets the user
+  /// turn some on or off.
+  CommandBarBehavior copyWith({
+    bool? fuzzyMatch,
+    bool? sortSectionsByMatch,
+    bool? tappablePrefixHints,
+    bool? restoreLastQuery,
+    bool? showQueryHistory,
+  }) => CommandBarBehavior(
+    fuzzyMatch: fuzzyMatch ?? this.fuzzyMatch,
+    sortSectionsByMatch: sortSectionsByMatch ?? this.sortSectionsByMatch,
+    tappablePrefixHints: tappablePrefixHints ?? this.tappablePrefixHints,
+    restoreLastQuery: restoreLastQuery ?? this.restoreLastQuery,
+    showQueryHistory: showQueryHistory ?? this.showQueryHistory,
+  );
+
+  /// JSON-safe map with the keys [fromJson] reads, for a bar in another
+  /// engine.
+  Map<String, bool> toJson() => {
+    'fuzzyMatch': fuzzyMatch,
+    'sortSectionsByMatch': sortSectionsByMatch,
+    'tappablePrefixHints': tappablePrefixHints,
+    'restoreLastQuery': restoreLastQuery,
+    'showQueryHistory': showQueryHistory,
+  };
+
+  /// Restores options from [json], as produced by [toJson]; null when [json]
+  /// is not a map. A missing option is off.
+  static CommandBarBehavior? fromJson(Object? json) {
+    if (json is! Map) return null;
+    return CommandBarBehavior(
+      fuzzyMatch: json['fuzzyMatch'] == true,
+      sortSectionsByMatch: json['sortSectionsByMatch'] == true,
+      tappablePrefixHints: json['tappablePrefixHints'] == true,
+      restoreLastQuery: json['restoreLastQuery'] == true,
+      showQueryHistory: json['showQueryHistory'] == true,
+    );
+  }
+
   @override
   bool operator ==(Object other) =>
       other is CommandBarBehavior &&

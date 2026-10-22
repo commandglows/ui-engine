@@ -433,7 +433,7 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
           sections: widget.sections,
           filters: widget.filters,
           strings: widget.strings,
-          behavior: widget.behavior,
+          behavior: controller.snapshot?.behavior ?? widget.behavior,
           queryHistory: controller.queryHistory,
           onQueryUsed: controller.useQuery,
           // The app registers the hotkey system-wide: it closes the window

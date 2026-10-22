@@ -15,6 +15,7 @@ class ShipglowsCommandBarSnapshot {
     required this.entries,
     this.recentIds = const <String>[],
     this.queryHistory = const <String>[],
+    this.behavior,
     this.brightness,
     this.locale,
     this.appWindowIds = const <String>{},
@@ -38,6 +39,7 @@ class ShipglowsCommandBarSnapshot {
       ],
       recentIds: _strings(json['recentIds']),
       queryHistory: _strings(json['queryHistory']),
+      behavior: CommandBarBehavior.fromJson(json['behavior']),
       brightness: switch (json['brightness']) {
         'dark' => Brightness.dark,
         'light' => Brightness.light,
@@ -62,6 +64,11 @@ class ShipglowsCommandBarSnapshot {
   /// included: the bar's `CommandBarView.queryHistory`.
   final List<String> queryHistory;
 
+  /// The bar's options as the app's settings set them now, so a change
+  /// reaches the floating bar without restarting it. Null: the options the
+  /// overlay was started with.
+  final CommandBarBehavior? behavior;
+
   /// Theme the bar follows. Null: the system brightness.
   final Brightness? brightness;
 
@@ -82,6 +89,7 @@ class ShipglowsCommandBarSnapshot {
     'entries': [for (final entry in entries) entry.toJson()],
     'recentIds': recentIds,
     'queryHistory': queryHistory,
+    'behavior': behavior?.toJson(),
     'brightness': brightness?.name,
     'locale': locale?.toLanguageTag(),
     'appWindowIds': appWindowIds.toList(),
