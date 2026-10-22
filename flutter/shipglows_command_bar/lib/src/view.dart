@@ -1495,8 +1495,8 @@ class _FilterButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onPressed;
 
-  /// The prefix that applies the filter when typed, shown small after the
-  /// label.
+  /// The prefix that applies the filter when typed, shown as a keycap
+  /// before the label.
   final String? prefix;
   final String? tooltip;
 
@@ -1505,8 +1505,8 @@ class _FilterButton extends StatelessWidget {
     final style = CommandBarThemeData.of(context);
     final textTheme = Theme.of(context).textTheme;
     final prefix = this.prefix;
-    // Drawn with the footer's keycaps; the active one stands out like the
-    // highlighted row's number.
+    // Drawn like a footer hint: the prefix keycap, then the plain label; the
+    // active one stands out like the highlighted row's number.
     final button = Semantics(
       button: true,
       selected: selected,
@@ -1526,16 +1526,17 @@ class _FilterButton extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  style.keycapBuilder(context, label),
                   if (prefix != null) ...[
+                    style.keycapBuilder(context, prefix),
                     const SizedBox(width: 6),
-                    Text(
-                      prefix,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: style.mutedColor,
-                      ),
-                    ),
                   ],
+                  Text(
+                    label,
+                    style: textTheme.labelSmall?.copyWith(
+                      color: selected ? style.textColor : style.mutedColor,
+                      fontWeight: selected ? FontWeight.w600 : null,
+                    ),
+                  ),
                 ],
               ),
             ),
