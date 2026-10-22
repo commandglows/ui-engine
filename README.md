@@ -150,7 +150,11 @@ own Flutter engine in its own window.
 - Revealed only after Dart has drawn the data passed to `show`.
 - Drag to move; edges resize (`resizable`); double-click on an edge restores
   the default size (eased, unless Windows animations are off); double-click
-  on the drag area maximizes (`doubleClickMaximizes`).
+  on the drag area maximizes (`doubleClickMaximizes`): the overlay fills the
+  work area of its monitor (taskbar left visible) and a second double-click
+  gives back its exact bounds. Dragging it while maximized restores its size
+  under the pointer. Win+Up/Down use the same maximize. The system maximize
+  is not used: it misplaced borderless and transparent overlays.
 - Live resize without flicker: the view draws its frame at the new size
   during `WM_NCCALCSIZE`, before Windows resizes the window, and nothing of
   the old client area is blitted (`WVR_VALIDRECTS`), so the content never

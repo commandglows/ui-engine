@@ -117,6 +117,9 @@ class OverlayWindowImpl : public OverlayWindow {
   void StartResize(const std::string& edge);
   void ResetSize();
   void ToggleMaximize();
+  // Whether the overlay fills its monitor's work area (|restore_bounds_|,
+  // or a system maximize).
+  bool Maximized() const;
   void NotifyVisibility(bool shown);
   void InvokeHost(const std::string& method,
                   std::unique_ptr<flutter::EncodableValue> arguments);
@@ -126,6 +129,10 @@ class OverlayWindowImpl : public OverlayWindow {
   std::unique_ptr<flutter::FlutterViewController> controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
   HWND previous_foreground_ = nullptr;
+  // Bounds before ToggleMaximize filled the work area; set while maximized.
+  // The system maximize is not used: on a borderless, possibly transparent
+  // window it misplaces the frame (outside the monitor, off the work area).
+  std::optional<RECT> restore_bounds_;
   HWND app_window_ = nullptr;
   bool prepare_failed_ = false;
   bool native_corners_ = false;

@@ -597,12 +597,30 @@ void OverlayWindowImpl::StartDrag() {
   ReleaseCapture();
   POINT cursor{};
   GetCursorPos(&cursor);
+  if (const auto saved = restore_bounds_) {
+    // Dragging a maximized overlay restores its size first, under the
+    // pointer at the same relative place, as a maximized window does.
+    restore_bounds_.reset();
+    RECT current{};
+    GetWindowRect(window_, &current);
+    const LONG width = saved->right - saved->left;
+    const LONG height = saved->bottom - saved->top;
+    const double ratio =
+        static_cast<double>(cursor.x - current.left) /
+        std::max<LONG>(1, current.right - current.left);
+    const LONG left = cursor.x - static_cast<LONG>(std::lround(ratio * width));
+    const LONG top =
+        cursor.y - std::min<LONG>(cursor.y - current.top, height / 2);
+    StopAnimation();
+    SetWindowPos(window_, nullptr, left, top, width, height,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+  }
   SendMessageW(window_, WM_NCLBUTTONDOWN, HTCAPTION,
                MAKELPARAM(cursor.x, cursor.y));
 }
 
 void OverlayWindowImpl::StartResize(const std::string& edge) {
-  if (!window_ || !config_.resizable || IsZoomed(window_)) return;
+  if (!window_ || !config_.resizable || Maximized()) return;
   static const std::map<std::string, WPARAM> kHits = {
       {"left", HTLEFT},         {"right", HTRIGHT},
       {"top", HTTOP},           {"bottom", HTBOTTOM},
@@ -622,6 +640,7 @@ void OverlayWindowImpl::ResetSize() {
   if (!window_ || !config_.resizable) return;
   size_.reset();
   SessionSizes().erase(config_.id);
+  restore_bounds_.reset();
   if (IsZoomed(window_)) ShowWindow(window_, SW_RESTORE);
   MoveTo(BoundsAround(default_width_, default_height_));
 }
@@ -678,7 +697,29 @@ void OverlayWindowImpl::StopAnimation() {
 
 void OverlayWindowImpl::ToggleMaximize() {
   if (!window_ || !config_.double_click_maximizes) return;
-  ShowWindow(window_, IsZoomed(window_) ? SW_RESTORE : SW_MAXIMIZE);
+  if (IsZoomed(window_)) {
+    ShowWindow(window_, SW_RESTORE);
+    return;
+  }
+  if (const auto saved = restore_bounds_) {
+    restore_bounds_.reset();
+    MoveTo(*saved);
+    return;
+  }
+  RECT current{};
+  if (!GetWindowRect(window_, &current)) return;
+  MONITORINFO info{sizeof(info)};
+  if (!GetMonitorInfoW(MonitorFromRect(&current, MONITOR_DEFAULTTONEAREST),
+                       &info)) {
+    return;
+  }
+  // The whole work area of the overlay's monitor, taskbar left visible.
+  restore_bounds_ = current;
+  MoveTo(info.rcWork);
+}
+
+bool OverlayWindowImpl::Maximized() const {
+  return restore_bounds_.has_value() || (window_ && IsZoomed(window_));
 }
 
 SIZE OverlayWindowImpl::OpeningSize(int width, int height) const {
@@ -692,7 +733,7 @@ SIZE OverlayWindowImpl::OpeningSize(int width, int height) const {
 void OverlayWindowImpl::Place(int width, int height) {
   default_width_ = width;
   default_height_ = height;
-  if (IsZoomed(window_)) return;
+  if (Maximized()) return;
   const SIZE size = OpeningSize(width, height);
   RECT anchor{};
   if (const auto position = LoadPosition()) {
@@ -815,7 +856,7 @@ void OverlayWindowImpl::UpdateRegion() {
 
 void OverlayWindowImpl::SaveBounds(bool size_changed) {
   if (!window_ || !IsWindowVisible(window_) || IsIconic(window_) ||
-      IsZoomed(window_)) {
+      Maximized()) {
     return;
   }
   RECT bounds{};
@@ -915,6 +956,15 @@ std::optional<LRESULT> OverlayWindowImpl::HandleFrameMessage(HWND hwnd,
       // after an Alt+key hotkey that opened the overlay made the first Tab
       // or Escape do nothing. Alt+Space (system menu) is unchanged.
       if ((wparam & 0xFFF0) == SC_KEYMENU && lparam == 0) return 0;
+      // Win+Up, Win+Down and the system menu use the overlay's own maximize.
+      if ((wparam & 0xFFF0) == SC_MAXIMIZE) {
+        if (!restore_bounds_) ToggleMaximize();
+        return 0;
+      }
+      if ((wparam & 0xFFF0) == SC_RESTORE && restore_bounds_) {
+        ToggleMaximize();
+        return 0;
+      }
       return std::nullopt;
     case WM_NCCALCSIZE: {
       // Borderless: the client area is the whole window.
