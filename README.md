@@ -858,9 +858,11 @@ const videosTour = GuideTour(
 );
 ```
 
-- `GuideStep.targetId`: the step points at that `GuideTarget`; the card sits
-  next to it (below, else above), the target is scrolled into view and kept
-  tracked while it moves. A target not on screen (narrow layout, offstage
+- `GuideStep.targetId`: the step points at that `GuideTarget`; a ring and a
+  pulsing halo mark it (still under reduce-motion). The card sits below it,
+  else above, else beside it, never over it; it is measured, kept inside the
+  safe area and scrolls when taller than the screen, so it is never cut. The
+  target is scrolled into view and tracked while it moves. A target not on screen (narrow layout, offstage
   tab) leaves the card floating at the bottom center.
 - `spotlight` (default on): dims the rest of the screen and absorbs taps
   there; the target stays usable. Off: a ring around the target only, the

@@ -268,8 +268,14 @@ class _GuideOverlay extends StatefulWidget {
 }
 
 class _GuideOverlayState extends State<_GuideOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final Ticker _ticker = createTicker((_) => _trackTarget());
+
+  /// Halo that grows and fades around the target, on a loop.
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
   late GuideController _controller;
   String? _stepKey;
   Rect? _targetRect;
@@ -299,6 +305,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
   void dispose() {
     _controller.removeListener(_onControllerChanged);
     _ticker.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
@@ -383,6 +390,9 @@ class _GuideOverlayState extends State<_GuideOverlay>
     final style = GuideThemeData.of(context);
     final target = step.targetId == null ? null : _targetRect;
     final hole = target?.inflate(style.spotlightPadding!);
+    _syncPulse(
+      animate: hole != null && !MediaQuery.disableAnimationsOf(context),
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -399,6 +409,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
                       radius: style.spotlightRadius!,
                       scrim: step.spotlight ? style.scrimColor : null,
                       ring: style.accentColor!,
+                      pulse: _pulse,
                     ),
                   ),
                 ),
@@ -438,6 +449,21 @@ class _GuideOverlayState extends State<_GuideOverlay>
         );
       },
     );
+  }
+
+  /// Runs the pulse while a target is shown; still with reduce-motion.
+  void _syncPulse({required bool animate}) {
+    if (animate == _pulse.isAnimating) return;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (animate && !_pulse.isAnimating) {
+        unawaited(_pulse.repeat());
+      } else if (!animate && _pulse.isAnimating) {
+        _pulse
+          ..stop()
+          ..value = 0;
+      }
+    });
   }
 
   /// Four tap-absorbing panels around the hole: the target stays usable.
@@ -480,12 +506,16 @@ class _SpotlightPainter extends CustomPainter {
     required this.radius,
     required this.scrim,
     required this.ring,
-  });
+    required this.pulse,
+  }) : super(repaint: pulse);
 
   final Rect hole;
   final double radius;
   final Color? scrim;
   final Color ring;
+
+  /// 0 → 1 on a loop: the halo grows and fades out.
+  final Animation<double> pulse;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -504,6 +534,20 @@ class _SpotlightPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
+    final t = Curves.easeOut.transform(pulse.value);
+    if (t > 0) {
+      final spread = 14 * t;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          hole.inflate(spread),
+          Radius.circular(radius + spread),
+        ),
+        Paint()
+          ..color = ring.withValues(alpha: 0.7 * (1 - t))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2 + 4 * (1 - t),
+      );
+    }
   }
 
   @override
@@ -511,7 +555,8 @@ class _SpotlightPainter extends CustomPainter {
       hole != oldDelegate.hole ||
       radius != oldDelegate.radius ||
       scrim != oldDelegate.scrim ||
-      ring != oldDelegate.ring;
+      ring != oldDelegate.ring ||
+      pulse != oldDelegate.pulse;
 }
 
 /// Puts the card next to the target (below, else above), or at the bottom
@@ -553,12 +598,22 @@ class _CardLayout extends SingleChildLayoutDelegate {
       x = target.center.dx - child.width / 2;
       final below = target.bottom + _gap;
       final above = target.top - _gap - child.height;
+      final right = target.right + _gap;
+      final left = target.left - _gap - child.width;
       if (below <= maxY) {
         y = below;
       } else if (above >= minY) {
         y = above;
+      } else if (right + child.width <= size.width - _margin) {
+        // No room above or below: beside the target, never over it.
+        x = right;
+        y = target.center.dy - child.height / 2;
+      } else if (left >= _margin) {
+        x = left;
+        y = target.center.dy - child.height / 2;
       } else {
-        y = maxY;
+        // Tall target on a small screen: the side with more room.
+        y = target.top - minY > size.height - target.bottom ? minY : maxY;
       }
     } else {
       x = (size.width - child.width) / 2;
