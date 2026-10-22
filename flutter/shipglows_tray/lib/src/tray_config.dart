@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:shipglows_menu/shipglows_menu_model.dart';
 
 import 'tray_items.dart';
 import 'tray_store.dart';
@@ -116,16 +117,14 @@ final class _FileImage extends ShipglowsTrayImage {
   Map<String, Object?> toMap() => {'kind': 'file', 'path': path};
 }
 
-/// Labels of the standard entries. `{app}` stands for the app name and
-/// `{version}` for its version.
+/// Labels of the tray: its standard entries ([menu], shared with the
+/// Flutter menu), « Ouvrir » and the close dialog. `{app}` stands for the
+/// app name and `{version}` for its version.
 @immutable
 class ShipglowsTrayStrings {
   const ShipglowsTrayStrings({
+    required this.menu,
     required this.open,
-    required this.settings,
-    required this.version,
-    required this.checkForUpdates,
-    required this.quit,
     required this.closeTitle,
     required this.closeMessage,
     required this.closeToTray,
@@ -139,11 +138,8 @@ class ShipglowsTrayStrings {
   });
 
   static const fr = ShipglowsTrayStrings(
+    menu: ShipglowsMenuStrings.fr,
     open: 'Ouvrir {app}',
-    settings: 'Paramètres…',
-    version: 'Version {version}',
-    checkForUpdates: 'Rechercher une mise à jour',
-    quit: 'Quitter {app}',
     closeTitle: 'Fermer {app} ?',
     closeMessage: 'Choisissez ce qui se passe quand vous fermez la fenêtre.',
     closeToTray: 'Réduire dans la zone de notification',
@@ -159,11 +155,8 @@ class ShipglowsTrayStrings {
   );
 
   static const en = ShipglowsTrayStrings(
+    menu: ShipglowsMenuStrings.en,
     open: 'Open {app}',
-    settings: 'Settings…',
-    version: 'Version {version}',
-    checkForUpdates: 'Check for updates',
-    quit: 'Quit {app}',
     closeTitle: 'Close {app}?',
     closeMessage: 'Choose what happens when you close the window.',
     closeToTray: 'Minimize to tray',
@@ -178,13 +171,16 @@ class ShipglowsTrayStrings {
     closeMinimize: 'Minimize to the taskbar',
   );
 
+  /// Labels of the shared standard entries.
+  final ShipglowsMenuStrings menu;
+
   final String open;
-  final String settings;
-  final String version;
-  final String checkForUpdates;
+  String get settings => menu.settings;
+  String get version => menu.version;
+  String get checkForUpdates => menu.checkForUpdates;
 
   /// Also the quit choice of the close dialog.
-  final String quit;
+  String get quit => menu.quit;
   final String closeTitle;
   final String closeMessage;
   final String closeToTray;
@@ -200,6 +196,7 @@ class ShipglowsTrayStrings {
   final String closeMinimize;
 
   ShipglowsTrayStrings copyWith({
+    ShipglowsMenuStrings? menu,
     String? open,
     String? settings,
     String? version,
@@ -216,11 +213,13 @@ class ShipglowsTrayStrings {
     String? closeAsk,
     String? closeMinimize,
   }) => ShipglowsTrayStrings(
+    menu: (menu ?? this.menu).copyWith(
+      settings: settings,
+      version: version,
+      checkForUpdates: checkForUpdates,
+      quit: quit,
+    ),
     open: open ?? this.open,
-    settings: settings ?? this.settings,
-    version: version ?? this.version,
-    checkForUpdates: checkForUpdates ?? this.checkForUpdates,
-    quit: quit ?? this.quit,
     closeTitle: closeTitle ?? this.closeTitle,
     closeMessage: closeMessage ?? this.closeMessage,
     closeToTray: closeToTray ?? this.closeToTray,
@@ -234,42 +233,81 @@ class ShipglowsTrayStrings {
   );
 }
 
-/// The entries every ShipGlows app shares, laid out around the app's own:
+/// The standard entries of the tray menu, laid out around the app's own:
 ///
 /// ```text
 /// Ouvrir <app>                 (bold)
 /// ───
 /// <app entries>
 /// ───
-/// <help entries>
+/// Envoyer un avis… · Manuel · Nouveautés · <help entries>
 /// ───
 /// Version 1.2.3 (4)            (greyed)
+/// À propos de <app>
 /// Rechercher une mise à jour
 /// Paramètres…
 /// ───
 /// Quitter <app>
 /// ```
 ///
-/// An entry whose callback is null is left out.
+/// An entry whose callback is null is left out. To show the same entries
+/// in a Flutter menu, declare a `ShipglowsAppMenu` once and pass it to
+/// [ShipglowsTrayStandardMenu.app].
 @immutable
 class ShipglowsTrayStandardMenu {
   const ShipglowsTrayStandardMenu({
     this.open = true,
     this.onSettings,
     this.onCheckForUpdates,
+    this.onFeedback,
+    this.onManual,
+    this.onWhatsNew,
+    this.onAbout,
     this.showVersion = true,
     this.version,
     this.help = const [],
     this.strings = ShipglowsTrayStrings.fr,
-  });
+  }) : app = null;
+
+  /// The entries of [app], labelled by its own strings; the tray quits
+  /// itself, so its `onQuit` is unused. The other entry fields stay null and
+  /// [strings] only labels « Ouvrir » and the close dialog.
+  const ShipglowsTrayStandardMenu.app(
+    ShipglowsAppMenu this.app, {
+    this.open = true,
+    this.strings = ShipglowsTrayStrings.fr,
+  }) : onSettings = null,
+       onCheckForUpdates = null,
+       onFeedback = null,
+       onManual = null,
+       onWhatsNew = null,
+       onAbout = null,
+       showVersion = true,
+       version = null,
+       help = const [];
 
   /// « Ouvrir <app> »: brings the main window to the front.
   final bool open;
+
+  /// The shared standard entries, given with [ShipglowsTrayStandardMenu.app].
+  final ShipglowsAppMenu? app;
 
   /// Called after the main window came to the front.
   final VoidCallback? onSettings;
 
   final VoidCallback? onCheckForUpdates;
+
+  /// « Envoyer un avis… », called after the main window came to the front.
+  final VoidCallback? onFeedback;
+
+  /// « Manuel ».
+  final VoidCallback? onManual;
+
+  /// « Nouveautés », called after the main window came to the front.
+  final VoidCallback? onWhatsNew;
+
+  /// « À propos de <app> », called after the main window came to the front.
+  final VoidCallback? onAbout;
 
   final bool showVersion;
 
@@ -277,21 +315,36 @@ class ShipglowsTrayStandardMenu {
   /// pubspec `version`, as `1.2.3 (4)`).
   final String? version;
 
-  /// Help entries (send feedback, manual, troubleshooting…) placed above
-  /// the version.
+  /// Help entries (troubleshooting…) placed above the version.
   final List<ShipglowsTrayItem> help;
 
   final ShipglowsTrayStrings strings;
+
+  /// The shared standard entries these stand for, [executableVersion]
+  /// (`1.2.3+4`) filling a missing version.
+  ShipglowsAppMenu appMenu(String appName, {String? executableVersion}) {
+    final menu =
+        app ??
+        ShipglowsAppMenu(
+          appName: appName,
+          version: version,
+          showVersion: showVersion,
+          onSettings: onSettings,
+          onCheckForUpdates: onCheckForUpdates,
+          onFeedback: onFeedback,
+          onManual: onManual,
+          onWhatsNew: onWhatsNew,
+          onAbout: onAbout,
+          help: help,
+          strings: strings.menu,
+        );
+    if (menu.version != null || executableVersion == null) return menu;
+    return menu.copyWith(version: formatShipglowsVersion(executableVersion));
+  }
 }
 
 /// Reserved ids of the standard entries.
-abstract final class ShipglowsTrayStandardIds {
-  static const open = 'shipglows.open';
-  static const settings = 'shipglows.settings';
-  static const version = 'shipglows.version';
-  static const checkForUpdates = 'shipglows.checkForUpdates';
-  static const quit = 'shipglows.quit';
-}
+typedef ShipglowsTrayStandardIds = ShipglowsMenuStandardIds;
 
 @immutable
 class ShipglowsTrayConfig {

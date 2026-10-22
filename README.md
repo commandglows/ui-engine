@@ -463,6 +463,92 @@ void commandBarMain() => runShipglowsCommandBarOverlay(
 The bar's engine registers no plugin and needs none. Icons travel as code
 points: `iconFor` must know every icon the app's entries use.
 
+## `flutter/shipglows_menu`
+
+Action menu used everywhere in an app, modelled on Raycast's ≡ menu: the
+same entries in the native tray menu and in a floating Flutter list
+anchored to a button, a right click or a « ⋯ » menu. Not tied to the
+command bar.
+
+- Model, pure Dart (`package:shipglows_menu/shipglows_menu_model.dart`):
+  `ShipglowsMenuAction` (id, label, icon, shortcut text such as
+  `Ctrl+Alt+K`, checked, disabled, search `keywords`, `onSelected`),
+  `ShipglowsMenuSeparator`, `ShipglowsMenuHeader` (a titled group runs to
+  the next separator or header; `ShipglowsMenuItem.group(title, items)`),
+  `ShipglowsMenuSubmenu`, and `ShipglowsMenu` (title, subtitle, items).
+  Everything but the callbacks round-trips through `toJson` / `fromJson`.
+- Icons: `ShipglowsMenuIcon` carries a Segoe Fluent / MDL2 glyph (drawn by
+  the tray) and a name (drawn by Flutter). Named constants (`settings`,
+  `feedback`, `manual`, `whatsNew`, `info`, `quit`…) map to Material icons
+  (`ShipglowsMenuIcons.material`, extended by `ShipglowsMenuTheme.icons`);
+  an icon with only a glyph is drawn with the Segoe font on Windows;
+  `ShipglowsMenuIcon.named('myapp.icon')` is for Flutter-only icons.
+- Standard entries declared once (`ShipglowsAppMenu`): Envoyer un avis… ·
+  Manuel · Nouveautés · help entries │ Version · À propos de <app> ·
+  Rechercher une mise à jour · Paramètres… │ Quitter <app>. Entries without
+  a callback are left out; reserved ids in `ShipglowsMenuStandardIds`;
+  labels in `ShipglowsMenuStrings.fr` / `.en`; `formatShipglowsVersion`
+  turns `1.2.3+4` into `1.2.3 (4)`.
+- Flutter list (`showShipglowsMenu`, `ShipglowsMenuButton`,
+  `ShipglowsMenuAnchor`, or `ShipglowsMenuPanel` to embed): title line (app
+  name and version), group titles, shortcuts as keys on the right,
+  « Rechercher une action… » filtering as you type (accents and case
+  ignored, keywords and group titles included, submenus searched too).
+  Keyboard: ↑/↓, Enter, → / ← into and out of submenus, Escape closes only
+  the menu (the key never reaches the window). Opens below its anchor, or
+  above with `preferAbove` (a bar's bottom-left ≡), on the side with room.
+  Returns the chosen id and calls the action's `onSelected` once closed.
+- Theme from the app's `ColorScheme`, customised with the
+  `ShipglowsMenuTheme` extension (colours, width, height, radius, row
+  height, shadows, label style, icons). Rows are 44 px minimum, with
+  button, header, selected and checked semantics; reduced motion removes
+  the fade.
+
+```yaml
+dependencies:
+  shipglows_menu:
+    path: ../../shipglows-ui-engine/flutter/shipglows_menu
+```
+
+```dart
+final appMenu = ShipglowsAppMenu(
+  appName: 'ContentGlows',
+  version: formatShipglowsVersion(packageInfo.version),
+  onSettings: () => router.go('/settings'),
+  onFeedback: openFeedback,
+  onManual: () => launchUrl(manualUrl),
+  onWhatsNew: showWhatsNew,
+  onAbout: showAbout,
+  onQuit: () => ShipglowsTray.instance.quit(),
+  shortcuts: {ShipglowsMenuStandardIds.settings: 'Ctrl+,'},
+);
+
+// Tray: the same standard entries.
+ShipglowsTray.instance.start(ShipglowsTrayConfig(
+  appName: 'ContentGlows',
+  standard: ShipglowsTrayStandardMenu.app(appMenu),
+));
+
+// In the app: a ≡ button at the bottom left of a bar.
+ShipglowsMenuButton(
+  preferAbove: true,
+  menu: appMenu.menu(actions: [
+    ...ShipglowsMenuItem.group('Capture', const [
+      ShipglowsMenuAction('capture.screenshot', 'Capture d’écran',
+          icon: ShipglowsMenuIcon.screenshot, shortcut: 'Ctrl+Shift+S'),
+    ]),
+  ]),
+  onSelected: runCommand,
+);
+
+// Or on a right click.
+ShipglowsMenuAnchor(
+  menu: rowMenu,
+  openOnSecondaryTap: true,
+  builder: (context, open) => ListTile(title: Text(row.title), onTap: open),
+);
+```
+
 ## `flutter/shipglows_tray`
 
 Notification area (tray) icon for desktop apps (Windows; no-op on mobile,
@@ -472,13 +558,25 @@ web, macOS and Linux). Native Win32, no third-party plugin.
   (127 characters), both changeable while running (`update`).
 - Standard menu every app completes, with separators and monochrome glyphs
   (Segoe Fluent Icons, Segoe MDL2 Assets on Windows 10) in the light or dark
-  theme of Windows apps: Ouvrir <app> (bold) │ app entries │ help entries │
-  Version (greyed, read from the executable) · Rechercher une mise à jour ·
+  theme of Windows apps: Ouvrir <app> (bold) │ app entries │ Envoyer un
+  avis… · Manuel · Nouveautés · help entries │ Version (greyed, read from
+  the executable) · À propos de <app> · Rechercher une mise à jour ·
   Paramètres… │ Quitter <app>. Entries without a callback are left out;
-  labels in French or English (`ShipglowsTrayStrings`).
-- App entries: `ShipglowsTrayAction` (glyph, disabled, check mark, shortcut
-  text, `showsMainWindow`), `ShipglowsTrayHeader` (greyed section title),
-  `ShipglowsTraySubmenu`, `ShipglowsTraySeparator`.
+  labels in French or English (`ShipglowsTrayStrings`, whose `menu` labels
+  are the shared `ShipglowsMenuStrings`).
+- Entries are the action menu model of
+  [`shipglows_menu`](#fluttershipglows_menu), re-exported:
+  `ShipglowsMenuAction` (icon, disabled, check mark, shortcut text,
+  `showsMainWindow`, `onSelected` called after the event),
+  `ShipglowsMenuHeader` (greyed section title), `ShipglowsMenuSubmenu`,
+  `ShipglowsMenuSeparator`. The former `ShipglowsTray*` names
+  (`ShipglowsTrayAction`, `ShipglowsTrayGlyph`, `ShipglowsTrayHeader`,
+  `ShipglowsTrayStandardIds`…) remain as aliases, and `glyph:` as a
+  deprecated name of `icon:`.
+- Shared standard entries: declare a `ShipglowsAppMenu` once and pass
+  `ShipglowsTrayStandardMenu.app(appMenu)`; the same object gives the
+  Flutter menu (`appMenu.menu(actions: …)`). The tray quits itself
+  (`onQuitRequested`), whatever the app menu's `onQuit`.
 - Click (or Enter on the icon): open the main window (default), the menu,
   an event, or a menu entry (`ShipglowsTrayClick`). Right click: the menu.
 - Every event carries `previousForeground`, the HWND of the last window in
@@ -510,10 +608,10 @@ dependencies:
 await ShipglowsTray.instance.start(ShipglowsTrayConfig(
   appName: 'ContentGlows',
   items: const [
-    ShipglowsTrayAction('capture.screenshot', 'Capture d’écran',
-        glyph: ShipglowsTrayGlyph.screenshot),
-    ShipglowsTrayAction('commandBar', 'Barre de commandes',
-        glyph: ShipglowsTrayGlyph.commandBar),
+    ShipglowsMenuAction('capture.screenshot', 'Capture d’écran',
+        icon: ShipglowsMenuIcon.screenshot),
+    ShipglowsMenuAction('commandBar', 'Barre de commandes',
+        icon: ShipglowsMenuIcon.commandBar),
   ],
   standard: ShipglowsTrayStandardMenu(
     onSettings: () => router.go('/settings'),

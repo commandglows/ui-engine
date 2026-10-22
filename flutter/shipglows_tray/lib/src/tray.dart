@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shipglows_menu/shipglows_menu_model.dart';
 
 import 'tray_close_dialog.dart';
 import 'tray_config.dart';
@@ -17,7 +18,7 @@ import 'tray_store.dart';
 ///   appName: 'ContentGlows',
 ///   items: const [
 ///     ShipglowsTrayAction('commandBar', 'Barre de commandes',
-///         glyph: ShipglowsTrayGlyph.commandBar),
+///         icon: ShipglowsMenuIcon.commandBar),
 ///   ],
 ///   standard: ShipglowsTrayStandardMenu(onSettings: openSettings),
 /// ));
@@ -26,7 +27,7 @@ import 'tray_store.dart';
 ///
 /// The standard entries (settings, check for updates, quit) are handled
 /// here and not emitted on [events]; « Ouvrir » is emitted
-/// (`ShipglowsTrayStandardIds.open`) once the window is in front.
+/// (`ShipglowsMenuStandardIds.open`) once the window is in front.
 ///
 /// Windows only; elsewhere every call does nothing, [start] returns false
 /// and [events] stays empty.
@@ -45,6 +46,7 @@ class ShipglowsTray {
   ShipglowsTrayConfig? _config;
   ShipglowsTrayStore? _store;
   String? _exeVersion;
+  List<ShipglowsMenuItem> _items = const [];
   bool _quitting = false;
   bool _askingToClose = false;
 
@@ -179,70 +181,34 @@ class ShipglowsTray {
     await _invoke<void>('dispose');
   }
 
-  Map<String, Object?> _payload(ShipglowsTrayConfig config) => {
-    'tooltip': config.tooltip ?? config.appName,
-    'icon': config.icon.toMap(),
-    'items': [for (final item in _menu(config)) item.toMap()],
-  };
+  Map<String, Object?> _payload(ShipglowsTrayConfig config) {
+    _items = _menu(config);
+    return {
+      'tooltip': config.tooltip ?? config.appName,
+      'icon': config.icon.toMap(),
+      'items': [for (final item in _items) trayNativeItem(item)],
+    };
+  }
 
-  List<ShipglowsTrayItem> _menu(ShipglowsTrayConfig config) {
+  List<ShipglowsMenuItem> _menu(ShipglowsTrayConfig config) {
     final standard = config.standard;
-    final strings = standard.strings;
-    String fill(String template) => template
-        .replaceAll('{app}', config.appName)
-        .replaceAll('{version}', _version(standard) ?? '');
-    final version = _version(standard);
-    return normalizeTraySeparators([
+    final shared = standard
+        .appMenu(config.appName, executableVersion: _exeVersion)
+        .copyWith(onQuit: () => unawaited(quit()));
+    return normalizeShipglowsMenuSeparators([
       if (standard.open)
-        ShipglowsTrayAction(
-          ShipglowsTrayStandardIds.open,
-          fill(strings.open),
-          glyph: ShipglowsTrayGlyph.open,
+        ShipglowsMenuAction(
+          ShipglowsMenuStandardIds.open,
+          standard.strings.open.replaceAll('{app}', config.appName),
+          icon: ShipglowsMenuIcon.open,
           showsMainWindow: true,
           isDefault: true,
         ),
-      const ShipglowsTraySeparator(),
+      const ShipglowsMenuSeparator(),
       ...config.items,
-      const ShipglowsTraySeparator(),
-      ...standard.help,
-      const ShipglowsTraySeparator(),
-      if (standard.showVersion && version != null && version.isNotEmpty)
-        ShipglowsTrayAction(
-          ShipglowsTrayStandardIds.version,
-          fill(strings.version),
-          glyph: ShipglowsTrayGlyph.info,
-          enabled: false,
-        ),
-      if (standard.onCheckForUpdates != null)
-        ShipglowsTrayAction(
-          ShipglowsTrayStandardIds.checkForUpdates,
-          fill(strings.checkForUpdates),
-          glyph: ShipglowsTrayGlyph.update,
-        ),
-      if (standard.onSettings != null)
-        ShipglowsTrayAction(
-          ShipglowsTrayStandardIds.settings,
-          fill(strings.settings),
-          glyph: ShipglowsTrayGlyph.settings,
-          showsMainWindow: true,
-        ),
-      const ShipglowsTraySeparator(),
-      ShipglowsTrayAction(
-        ShipglowsTrayStandardIds.quit,
-        fill(strings.quit),
-        glyph: ShipglowsTrayGlyph.quit,
-      ),
+      const ShipglowsMenuSeparator(),
+      ...shared.items(),
     ]);
-  }
-
-  /// `1.2.3+4` (Flutter's product version) as `1.2.3 (4)`.
-  String? _version(ShipglowsTrayStandardMenu standard) {
-    final raw = standard.version ?? _exeVersion;
-    if (raw == null || standard.version != null) return raw;
-    final parts = raw.split('+');
-    return parts.length == 2 && parts[1].isNotEmpty
-        ? '${parts[0]} (${parts[1]})'
-        : raw;
   }
 
   Future<void> _onCall(MethodCall call) async {
@@ -298,23 +264,23 @@ class ShipglowsTray {
   }
 
   void _onSelected(String id, int? previousForeground) {
-    final standard = _config?.standard;
+    final action = findShipglowsMenuAction(_items, id);
     switch (id) {
-      case ShipglowsTrayStandardIds.open:
-        // The window is already in front; the app may refresh it.
-        _events.add(
-          ShipglowsTrayItemSelected(id, previousForeground: previousForeground),
-        );
-      case ShipglowsTrayStandardIds.settings:
-        standard?.onSettings?.call();
-      case ShipglowsTrayStandardIds.checkForUpdates:
-        standard?.onCheckForUpdates?.call();
-      case ShipglowsTrayStandardIds.quit:
-        unawaited(quit());
+      case ShipglowsMenuStandardIds.settings ||
+          ShipglowsMenuStandardIds.checkForUpdates ||
+          ShipglowsMenuStandardIds.feedback ||
+          ShipglowsMenuStandardIds.manual ||
+          ShipglowsMenuStandardIds.whatsNew ||
+          ShipglowsMenuStandardIds.about ||
+          ShipglowsMenuStandardIds.quit:
+        // Standard entries carry their callback (quit: the tray's own).
+        action?.onSelected?.call();
       default:
+        // « Ouvrir »: the window is already in front; the app may refresh it.
         _events.add(
           ShipglowsTrayItemSelected(id, previousForeground: previousForeground),
         );
+        action?.onSelected?.call();
     }
   }
 
