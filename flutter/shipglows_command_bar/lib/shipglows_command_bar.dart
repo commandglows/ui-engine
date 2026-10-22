@@ -7,6 +7,7 @@ library;
 
 export 'src/behavior.dart';
 export 'src/command.dart';
+export 'src/practice.dart';
 export 'src/query.dart';
 export 'src/recents.dart';
 export 'src/scope.dart';

@@ -87,6 +87,16 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
     state; « or » between alternatives, « then » inside a sequence (`G N`).
   - `keysText` for what is not a key (« Glisser-déposer », « Q S D F… »),
     `note` for muted words after the keys (« dans la bibliothèque »).
+  - « S'entraîner » (`CommandBarShortcutPractice`, also usable on its own):
+    one card per shortcut of the listed groups (the search narrows them),
+    in random order; the user presses the keys from memory. Checked against
+    the hint's `bindings`, else its labels (Ctrl/Maj/Alt/Win, named keys in
+    English or French, F1–F24, letters, symbols whatever the layout,
+    sequences). Keys Windows takes first (Win, Alt+Tab, Alt+F4, Ctrl+Alt+Del,
+    an app's global hotkey) or labels it cannot read ask the user to rate
+    themselves. « Afficher la réponse » sends the card to review; the end
+    shows the score and replays the missed cards. While it runs, the scope
+    leaves every key to it.
   - Opened with `CommandBarController.showShortcuts()`, F1
     (`shortcutsOnF1`) or « ? » outside text fields
     (`shortcutsOnQuestionMark`), both off by default;

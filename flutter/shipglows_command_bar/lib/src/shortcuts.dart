@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'command.dart';
+import 'practice.dart';
 import 'query.dart';
 import 'scope.dart';
 import 'strings.dart';
@@ -243,7 +244,17 @@ class _ShortcutsSheet extends StatefulWidget {
 }
 
 class _ShortcutsSheetState extends State<_ShortcutsSheet> {
+  final TextEditingController _search = TextEditingController();
   String _query = '';
+
+  /// Whether the practice replaces the list, on the cards [_visible] gives.
+  bool _practicing = false;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   /// Groups whose title, label, keys or note hold every word of the query,
   /// accents folded.
@@ -321,91 +332,121 @@ class _ShortcutsSheetState extends State<_ShortcutsSheet> {
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: TextField(
-                      autofocus: true,
-                      onChanged: (value) => setState(() => _query = value),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: style.textColor,
+                  if (_practicing)
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: CommandBarShortcutPractice(
+                          groups: visible,
+                          strings: strings,
+                          onExit: () => setState(() => _practicing = false),
+                        ),
                       ),
-                      decoration: InputDecoration(
-                        hintText: strings.shortcutsSearchHint,
-                        hintStyle: textTheme.bodyMedium?.copyWith(
-                          color: style.mutedColor,
+                    )
+                  else ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: TextField(
+                        controller: _search,
+                        autofocus: true,
+                        onChanged: (value) => setState(() => _query = value),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: style.textColor,
                         ),
-                        prefixIcon: Icon(
-                          Icons.search_rounded,
-                          color: style.iconColor,
+                        decoration: InputDecoration(
+                          hintText: strings.shortcutsSearchHint,
+                          hintStyle: textTheme.bodyMedium?.copyWith(
+                            color: style.mutedColor,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            color: style.iconColor,
+                          ),
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                         ),
-                        filled: false,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
                       ),
                     ),
-                  ),
-                  Divider(height: 1, color: style.borderColor),
-                  Flexible(
-                    child: visible.isEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Text(
-                              strings.shortcutsNoMatch,
-                              textAlign: TextAlign.center,
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: style.mutedColor,
+                    Divider(height: 1, color: style.borderColor),
+                    Flexible(
+                      child: visible.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Text(
+                                strings.shortcutsNoMatch,
+                                textAlign: TextAlign.center,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: style.mutedColor,
+                                ),
                               ),
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (final group in visible) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      top: 16,
-                                      bottom: 6,
-                                    ),
-                                    child: Semantics(
-                                      header: true,
-                                      child: Text(
-                                        group.title.toUpperCase(),
-                                        style: textTheme.labelSmall?.copyWith(
-                                          color: style.mutedColor,
-                                          letterSpacing: 0.8,
-                                          fontWeight: FontWeight.w600,
+                            )
+                          : SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (final group in visible) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: 16,
+                                        bottom: 6,
+                                      ),
+                                      child: Semantics(
+                                        header: true,
+                                        child: Text(
+                                          group.title.toUpperCase(),
+                                          style: textTheme.labelSmall?.copyWith(
+                                            color: style.mutedColor,
+                                            letterSpacing: 0.8,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  for (final hint in group.hints)
-                                    _ShortcutRow(
-                                      hint: hint,
-                                      strings: strings,
-                                      stacked: stacked,
-                                      keysWidth: keysWidth,
-                                    ),
+                                    for (final hint in group.hints)
+                                      _ShortcutRow(
+                                        hint: hint,
+                                        strings: strings,
+                                        stacked: stacked,
+                                        keysWidth: keysWidth,
+                                      ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                  ),
+                    ),
+                  ],
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 4, 12, 12),
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            strings.shortcutsTypingNote,
-                            style: textTheme.labelSmall?.copyWith(
-                              color: style.mutedColor,
-                            ),
-                          ),
+                          child: _practicing
+                              ? const SizedBox.shrink()
+                              : Text(
+                                  strings.shortcutsTypingNote,
+                                  style: textTheme.labelSmall?.copyWith(
+                                    color: style.mutedColor,
+                                  ),
+                                ),
                         ),
                         const SizedBox(width: 12),
+                        if (_practicing)
+                          TextButton(
+                            onPressed: () =>
+                                setState(() => _practicing = false),
+                            child: Text(strings.practiceBack),
+                          )
+                        else if (CommandBarShortcutPractice.cardCount(
+                              visible,
+                            ) >
+                            0)
+                          TextButton.icon(
+                            onPressed: () => setState(() => _practicing = true),
+                            icon: const Icon(Icons.school_outlined, size: 18),
+                            label: Text(strings.practice),
+                          ),
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
                           child: Text(strings.shortcutsClose),
@@ -423,18 +464,18 @@ class _ShortcutsSheetState extends State<_ShortcutsSheet> {
   }
 }
 
-class _ShortcutRow extends StatelessWidget {
-  const _ShortcutRow({
+/// The keys of [hint] as the shortcuts sheet shows them: keycaps, « or »
+/// between alternatives, « then » inside a sequence, then its
+/// [CommandBarShortcutHint.keysText] and [CommandBarShortcutHint.note].
+class CommandBarShortcutKeys extends StatelessWidget {
+  const CommandBarShortcutKeys({
+    super.key,
     required this.hint,
-    required this.strings,
-    required this.stacked,
-    required this.keysWidth,
+    this.strings = CommandBarStrings.en,
   });
 
   final CommandBarShortcutHint hint;
   final CommandBarStrings strings;
-  final bool stacked;
-  final double keysWidth;
 
   /// Keycaps of one shortcut label: a chord, or the steps of a sequence
   /// joined by « then ».
@@ -458,7 +499,7 @@ class _ShortcutRow extends StatelessWidget {
     final joinStyle = textTheme.labelSmall?.copyWith(color: style.mutedColor);
     final keysText = hint.keysText;
     final note = hint.note;
-    final keys = Wrap(
+    return Wrap(
       spacing: 6,
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -478,6 +519,29 @@ class _ShortcutRow extends StatelessWidget {
         if (note != null) Text(note, style: joinStyle),
       ],
     );
+  }
+}
+
+class _ShortcutRow extends StatelessWidget {
+  const _ShortcutRow({
+    required this.hint,
+    required this.strings,
+    required this.stacked,
+    required this.keysWidth,
+  });
+
+  final CommandBarShortcutHint hint;
+  final CommandBarStrings strings;
+  final bool stacked;
+  final double keysWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = CommandBarThemeData.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final keysText = hint.keysText;
+    final note = hint.note;
+    final keys = CommandBarShortcutKeys(hint: hint, strings: strings);
     final label = Text(
       hint.label,
       style: textTheme.bodyMedium?.copyWith(color: style.textColor),

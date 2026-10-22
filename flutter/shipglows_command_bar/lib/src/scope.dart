@@ -9,6 +9,7 @@ import 'behavior.dart';
 import 'browser_guard.dart'
     if (dart.library.js_interop) 'browser_guard_web.dart';
 import 'command.dart';
+import 'practice.dart';
 import 'recents.dart';
 import 'shortcuts.dart';
 import 'size_store.dart';
@@ -359,7 +360,8 @@ class _CommandBarScopeState extends State<CommandBarScope>
   }
 
   bool _onKey(KeyEvent event) {
-    if (!mounted) return false;
+    // The practice checks every key itself.
+    if (!mounted || CommandBarShortcutPractice.isActive) return false;
     if (event is KeyDownEvent && _onBarKey(event)) return true;
     // App-wide bindings ([shortcuts]), while nothing covers the app.
     final shortcuts = widget.shortcuts;

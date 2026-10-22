@@ -29,6 +29,23 @@ class CommandBarStrings {
     this.shortcutsThen = 'then',
     this.shortcutsTypingNote =
         'Shortcuts without Ctrl or Alt pause while you type in a field.',
+    this.practice = 'Practice',
+    this.practiceCard = 'Card {index} of {count}',
+    this.practicePrompt = 'Press the shortcut from memory.',
+    this.practiceSelfPrompt =
+        'Windows or the app may catch this one before the practice: try it, '
+        'then rate yourself.',
+    this.practiceRight = 'Right!',
+    this.practiceWrong = 'You pressed {keys}. Try again or show the answer.',
+    this.practiceShowAnswer = 'Show the answer',
+    this.practiceGotIt = 'I got it',
+    this.practiceReview = 'To review',
+    this.practiceNext = 'Next card',
+    this.practiceSummary = '{right} of {count} right',
+    this.practiceAgain = 'Review the missed ones',
+    this.practiceRestart = 'Start over',
+    this.practiceBack = 'Back to the list',
+    this.shiftKey = 'Shift',
   });
 
   /// English texts.
@@ -74,6 +91,23 @@ class CommandBarStrings {
     shortcutsTypingNote:
         'Les raccourcis sans Ctrl ni Alt sont en pause pendant la saisie '
         'dans un champ.',
+    practice: "S'entraîner",
+    practiceCard: 'Carte {index} / {count}',
+    practicePrompt: 'Tape le raccourci de mémoire.',
+    practiceSelfPrompt:
+        "Windows ou l'app peut intercepter celui-ci : essaie-le, puis "
+        'évalue-toi.',
+    practiceRight: 'Bravo !',
+    practiceWrong: 'Tu as tapé {keys}. Essaie encore ou affiche la réponse.',
+    practiceShowAnswer: 'Afficher la réponse',
+    practiceGotIt: "Je l'ai réussi",
+    practiceReview: 'À revoir',
+    practiceNext: 'Carte suivante',
+    practiceSummary: '{right} sur {count} réussis',
+    practiceAgain: 'Revoir les ratés',
+    practiceRestart: 'Recommencer',
+    practiceBack: 'Retour à la liste',
+    shiftKey: 'Maj',
   );
 
   /// Accessible name of the dialog.
@@ -145,6 +179,51 @@ class CommandBarStrings {
   /// Shortcuts sheet: note under the list.
   final String shortcutsTypingNote;
 
+  /// Shortcuts sheet: button that starts the practice.
+  final String practice;
+
+  /// Practice: progress; `{index}` and `{count}`.
+  final String practiceCard;
+
+  /// Practice: what to do on a card.
+  final String practicePrompt;
+
+  /// Practice: a card whose keys cannot be checked here.
+  final String practiceSelfPrompt;
+
+  /// Practice: the keys were right.
+  final String practiceRight;
+
+  /// Practice: wrong keys; `{keys}` is what was pressed.
+  final String practiceWrong;
+
+  /// Practice: reveals the keys (the card goes to review).
+  final String practiceShowAnswer;
+
+  /// Practice: self-rating, success.
+  final String practiceGotIt;
+
+  /// Practice: self-rating, to review.
+  final String practiceReview;
+
+  /// Practice: next card.
+  final String practiceNext;
+
+  /// Practice: score at the end; `{right}` and `{count}`.
+  final String practiceSummary;
+
+  /// Practice: restarts with the cards to review.
+  final String practiceAgain;
+
+  /// Practice: restarts with every card.
+  final String practiceRestart;
+
+  /// Practice: back to the shortcuts list.
+  final String practiceBack;
+
+  /// Name of the Shift key, in typed keys.
+  final String shiftKey;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -170,6 +249,21 @@ class CommandBarStrings {
     String? shortcutsOr,
     String? shortcutsThen,
     String? shortcutsTypingNote,
+    String? practice,
+    String? practiceCard,
+    String? practicePrompt,
+    String? practiceSelfPrompt,
+    String? practiceRight,
+    String? practiceWrong,
+    String? practiceShowAnswer,
+    String? practiceGotIt,
+    String? practiceReview,
+    String? practiceNext,
+    String? practiceSummary,
+    String? practiceAgain,
+    String? practiceRestart,
+    String? practiceBack,
+    String? shiftKey,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -194,5 +288,20 @@ class CommandBarStrings {
     shortcutsOr: shortcutsOr ?? this.shortcutsOr,
     shortcutsThen: shortcutsThen ?? this.shortcutsThen,
     shortcutsTypingNote: shortcutsTypingNote ?? this.shortcutsTypingNote,
+    practice: practice ?? this.practice,
+    practiceCard: practiceCard ?? this.practiceCard,
+    practicePrompt: practicePrompt ?? this.practicePrompt,
+    practiceSelfPrompt: practiceSelfPrompt ?? this.practiceSelfPrompt,
+    practiceRight: practiceRight ?? this.practiceRight,
+    practiceWrong: practiceWrong ?? this.practiceWrong,
+    practiceShowAnswer: practiceShowAnswer ?? this.practiceShowAnswer,
+    practiceGotIt: practiceGotIt ?? this.practiceGotIt,
+    practiceReview: practiceReview ?? this.practiceReview,
+    practiceNext: practiceNext ?? this.practiceNext,
+    practiceSummary: practiceSummary ?? this.practiceSummary,
+    practiceAgain: practiceAgain ?? this.practiceAgain,
+    practiceRestart: practiceRestart ?? this.practiceRestart,
+    practiceBack: practiceBack ?? this.practiceBack,
+    shiftKey: shiftKey ?? this.shiftKey,
   );
 }
