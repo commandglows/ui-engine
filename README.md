@@ -597,3 +597,45 @@ if (!result.applied) {
 
 One `ShipglowsHotkeys` per app, in the main engine. Adding the package adds a
 native plugin: the app needs a full restart, not a hot reload.
+
+## `flutter/shipglows_settings`
+
+User settings (not business data), merged from CommandGlows (sync engine),
+ContentGlows (offline queue, per-account cache, partial writes), BeatGlows
+(atomic files, secrets apart) and DreamGlows (web storage, test isolation).
+
+- Each setting is declared once as a `SettingKey` (id, type, default,
+  `SettingScope.device` or `.account`). The id is the field name everywhere:
+  device file, Firestore document, REST payload. Bad stored data reads as the
+  default.
+- `SettingsSchema(version:, migrations:)` upgrades stored values, device and
+  remote, before use.
+- `SettingsController.open(importLegacy:)` loads the device copy; on a fresh
+  device it imports the old storage once (secure storage keys,
+  SharedPreferences).
+- `set`, `reset`, `edit` (batch): saved on the device before returning
+  (throws `SettingsStorageException`), then only the changed fields are
+  pushed. A pending field keeps its device value until the remote accepts it;
+  every other field follows the remote.
+- `setAccount(SettingsAccount(id:, remote:))`: one device copy per account,
+  never mixed. The first sign-in on a device adopts the signed-out values only
+  if the account has no remote copy yet. `forgetAccount` deletes a copy.
+- Retry: 30 s doubling to 5 min, on app resume and on `sync()`;
+  `SettingsRemoteAuthException` stops until the account changes.
+- `status` (`SyncStatus`), `listenable(key)` (notifies only for that key),
+  `SettingBuilder`, `SettingSwitchTile`, `SettingsSyncChip` (French labels by
+  default, `SettingsSyncLabels.en`).
+- Storage ports: `FileSettingsStorage(directory)` (native, temp file then
+  rename), `MemorySettingsStorage`, `CallbackSettingsStorage` (IndexedDB,
+  SharedPreferences). Remote ports: `CallbackSettingsRemote` (REST client,
+  blob store), `MemorySettingsRemote` (tests, two devices).
+- Secrets never go in a `SettingKey`: `SecretStore` is the interface for the
+  app's secure storage.
+
+## `flutter/shipglows_settings_firestore`
+
+`FirestoreSettingsRemote(document, decorate:)`: merged writes with a server
+`updatedAt`, `null` deletes the field, live `snapshots()` without local
+echoes, Timestamps read as ISO text, `permission-denied` mapped to
+`SettingsRemoteAuthException`. `decorate` adds derived fields for security
+rules.

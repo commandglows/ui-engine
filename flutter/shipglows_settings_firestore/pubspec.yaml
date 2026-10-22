@@ -1,0 +1,20 @@
+name: shipglows_settings_firestore
+description: Firestore remote for shipglows_settings, one document per account.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  cloud_firestore: ^7.0.0
+  flutter:
+    sdk: flutter
+  shipglows_settings:
+    path: ../shipglows_settings
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

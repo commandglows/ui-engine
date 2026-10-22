@@ -43,6 +43,8 @@ do nothing or fall back to plain Flutter.
 | `shipglows_hotkeys` | System-wide hotkeys, saved choices, conflicts reported | Win32 | none yet |
 | `shipglows_tray` | Notification area icon, standard menu, close-or-hide dialog, single instance | Win32 | DreamGlows |
 | `shipglows_diagnostics` | Crash net: `FlutterError.onError` + `PlatformDispatcher.onError` chained, masked event buffer, « Copier le diagnostic » report, optional `crash.log` (256 KB, `.1` rotation, engine label); Sentry stays in the app via `onReport` | no | BeatGlows |
+| `shipglows_settings` | Typed user settings (`SettingKey`, `SettingsSchema` + migrations), device-first `SettingsController`, per-field push, per-account device copies, retry with backoff, `SyncStatus`, `SettingsSyncChip`; remote and storage are ports | no | none yet |
+| `shipglows_settings_firestore` | `SettingsRemote` over one Firestore document per account (`users/{uid}/settings/profile`) | via plugin dep | none yet |
 
 ## Cross-Package Contracts
 
