@@ -6,7 +6,7 @@ component, consumed as a path dependency:
 ```yaml
 dependencies:
   shipglows_command_bar:
-    path: ../../ui-engine/flutter/shipglows_command_bar
+    path: ../../shipglows-ui-engine/flutter/shipglows_command_bar
 ```
 
 Each package keeps its own dependencies: an app that uses only the command bar
@@ -90,7 +90,7 @@ on top of [`window_manager`](https://pub.dev/packages/window_manager).
 ```yaml
 dependencies:
   shipglows_window:
-    path: ../../ui-engine/flutter/shipglows_window
+    path: ../../shipglows-ui-engine/flutter/shipglows_window
 ```
 
 ```dart
@@ -157,6 +157,11 @@ own Flutter engine in its own window.
 - Windows 11 rounded corners, border color and shadow (DWM).
   `ShipglowsOverlayHost.setFrame` changes the dark frame, border and
   background colors while the overlay runs (theme changes).
+- `transparent: true`: a see-through window with no system corners, border,
+  shadow or background (same composition attribute as `window_manager`'s
+  transparent background). The overlay draws its whole shape and paints no
+  background of its own (`ShipglowsOverlayHost.transparent`); its transparent
+  margin still moves and resizes the window but does not pass clicks through.
 - Alt+F4 and a plain Escape ask the overlay to close (`onRequestClose`,
   default: hide), whichever window holds the keyboard; `closeOnEscape = false`
   for an overlay with its own Escape handling. A dialog or menu above the
@@ -212,16 +217,18 @@ on close. Escape and a click outside close it.
   `ShipglowsCommandBarOverlayApp` for an app that calls `runApp` itself.
 - The frame (dark mode, border, background) follows the bar's theme
   (`CommandBarThemeData`).
-  `surfaceBuilder` wraps the bar in the app's own surface (card outline,
-  margin, hard shadow) inside the window; with
-  `defaultOptions(transparent: true)` the window itself has no background,
-  corners or shadow, so only that surface shows.
+- App surface: `surfaceBuilder` (on `runShipglowsCommandBarOverlay` and
+  `ShipglowsCommandBarOverlayApp`) wraps the bar in the app's own surface,
+  such as a card outline with a margin and a hard shadow. With
+  `defaultOptions(transparent: true)` the window has no background, corners
+  or shadow of its own, so only that surface shows over the desktop; keep a
+  margin in the surface for the shadow and as a drag handle.
 - Window options: `ShipglowsCommandBarWindow.defaultOptions(appFolder: …)`.
 
 ```yaml
 dependencies:
   shipglows_command_bar_window:
-    path: ../../ui-engine/flutter/shipglows_command_bar_window
+    path: ../../shipglows-ui-engine/flutter/shipglows_command_bar_window
 ```
 
 ```dart
@@ -256,6 +263,33 @@ void commandBarMain() => runShipglowsCommandBarOverlay(
   darkTheme: darkTheme,
   iconFor: (codePoint) => myIcons[codePoint],
   supportedLocales: const [Locale('en'), Locale('fr')],
+);
+```
+
+Card surface on a transparent window (as CommandGlows does):
+
+```dart
+// App engine
+final bar = ShipglowsCommandBarWindow(
+  entrypoint: 'commandBarMain',
+  options: ShipglowsCommandBarWindow.defaultOptions(
+    appFolder: 'MyApp',
+    transparent: true,
+  ),
+);
+
+// Bar engine
+@pragma('vm:entry-point')
+void commandBarMain() => runShipglowsCommandBarOverlay(
+  sections: (locale) => mySections(locale),
+  surfaceBuilder: (context, bar) => Padding(
+    // Room for the hard shadow; the margin also moves the window.
+    padding: const EdgeInsets.fromLTRB(4, 4, 12, 12),
+    child: DecoratedBox(
+      decoration: myCardDecoration(context), // outline + offset shadow
+      child: ClipRRect(borderRadius: BorderRadius.circular(24), child: bar),
+    ),
+  ),
 );
 ```
 
