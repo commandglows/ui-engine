@@ -19,6 +19,10 @@ class CommandBarStrings {
     required this.openCommandBar,
     this.prefixTooltip = 'Type « {prefix} » then Space',
     this.prefixTooltipNoSpace = 'Type « {prefix} »',
+    this.shortcutsTitle = 'Keyboard shortcuts',
+    this.shortcutsPage = 'On this page',
+    this.shortcutsEverywhere = 'Everywhere',
+    this.shortcutsClose = 'Close',
   });
 
   /// English texts.
@@ -53,6 +57,10 @@ class CommandBarStrings {
     openCommandBar: 'Ouvrir la barre de commandes',
     prefixTooltip: 'Tape « {prefix} » puis Espace',
     prefixTooltipNoSpace: 'Tape « {prefix} »',
+    shortcutsTitle: 'Raccourcis clavier',
+    shortcutsPage: 'Sur cette page',
+    shortcutsEverywhere: 'Partout',
+    shortcutsClose: 'Fermer',
   );
 
   /// Accessible name of the dialog.
@@ -97,6 +105,18 @@ class CommandBarStrings {
   /// Tooltip of a tappable prefix hint whose filter needs no space.
   final String prefixTooltipNoSpace;
 
+  /// Title of the shortcuts sheet, also its entry in the bar.
+  final String shortcutsTitle;
+
+  /// Shortcuts sheet: group of the current screen's commands.
+  final String shortcutsPage;
+
+  /// Shortcuts sheet: group of the app-wide commands.
+  final String shortcutsEverywhere;
+
+  /// Shortcuts sheet: close button.
+  final String shortcutsClose;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -113,6 +133,10 @@ class CommandBarStrings {
     String? openCommandBar,
     String? prefixTooltip,
     String? prefixTooltipNoSpace,
+    String? shortcutsTitle,
+    String? shortcutsPage,
+    String? shortcutsEverywhere,
+    String? shortcutsClose,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -128,5 +152,9 @@ class CommandBarStrings {
     openCommandBar: openCommandBar ?? this.openCommandBar,
     prefixTooltip: prefixTooltip ?? this.prefixTooltip,
     prefixTooltipNoSpace: prefixTooltipNoSpace ?? this.prefixTooltipNoSpace,
+    shortcutsTitle: shortcutsTitle ?? this.shortcutsTitle,
+    shortcutsPage: shortcutsPage ?? this.shortcutsPage,
+    shortcutsEverywhere: shortcutsEverywhere ?? this.shortcutsEverywhere,
+    shortcutsClose: shortcutsClose ?? this.shortcutsClose,
   );
 }

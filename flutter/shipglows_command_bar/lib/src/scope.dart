@@ -10,6 +10,7 @@ import 'browser_guard.dart'
     if (dart.library.js_interop) 'browser_guard_web.dart';
 import 'command.dart';
 import 'recents.dart';
+import 'shortcuts.dart';
 import 'size_store.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -122,6 +123,36 @@ class CommandBarRegistry extends ChangeNotifier {
   void withdraw(Object owner) {
     if (_byOwner.remove(owner) != null) notifyListeners();
   }
+
+  final Map<Object, _ShortcutContribution> _shortcutsByOwner =
+      <Object, _ShortcutContribution>{};
+
+  /// Shortcut groups of the active [CommandBarShortcuts], in the order they
+  /// mounted.
+  List<CommandBarShortcutGroup> get shortcutGroups => [
+    for (final contribution in _shortcutsByOwner.values)
+      if (contribution.isActive()) ...contribution.groups,
+  ];
+
+  /// Replaces the shortcut groups of [owner], listed only while [isActive]
+  /// returns true. Read when the sheet opens, so listeners hear nothing.
+  void publishShortcuts(
+    Object owner,
+    List<CommandBarShortcutGroup> groups, {
+    bool Function()? isActive,
+  }) {
+    if (groups.isEmpty) {
+      withdrawShortcuts(owner);
+      return;
+    }
+    _shortcutsByOwner[owner] = _ShortcutContribution(
+      List<CommandBarShortcutGroup>.unmodifiable(groups),
+      isActive ?? _always,
+    );
+  }
+
+  /// Removes the shortcut groups of [owner], if any.
+  void withdrawShortcuts(Object owner) => _shortcutsByOwner.remove(owner);
 }
 
 bool _always() => true;
@@ -130,6 +161,13 @@ class _Contribution {
   const _Contribution(this.commands, this.isActive);
 
   final List<CommandBarCommand> commands;
+  final bool Function() isActive;
+}
+
+class _ShortcutContribution {
+  const _ShortcutContribution(this.groups, this.isActive);
+
+  final List<CommandBarShortcutGroup> groups;
   final bool Function() isActive;
 }
 
@@ -160,6 +198,14 @@ abstract interface class CommandBarController {
 
   /// Closes the bar, if it is open.
   void close();
+
+  /// What the shortcuts sheet lists now: the current screen's shortcuts
+  /// first, then the app-wide ones.
+  List<CommandBarShortcutGroup> shortcutGroups();
+
+  /// Opens the shortcuts sheet with [shortcutGroups], unless it is open
+  /// already.
+  Future<void> showShortcuts();
 }
 
 /// Gives the subtree a command bar opened with Ctrl/⌘+K.
@@ -189,6 +235,10 @@ class CommandBarScope extends StatefulWidget {
     this.sizeStore,
     this.behavior,
     this.opener,
+    this.shortcuts,
+    this.shortcutsOnF1 = false,
+    this.shortcutsOnQuestionMark = false,
+    this.shortcutsCommandSection,
   });
 
   /// App-wide commands, built with the scope's context.
@@ -241,6 +291,22 @@ class CommandBarScope extends StatefulWidget {
   /// the scope's. The in-app bar when null.
   final CommandBarOpener? opener;
 
+  /// App-wide keys that are not commands (Space plays or pauses), listed
+  /// last in the shortcuts sheet. Screens add theirs with
+  /// [CommandBarShortcuts].
+  final List<CommandBarShortcutGroup> Function(BuildContext context)?
+  shortcuts;
+
+  /// Whether F1 opens and closes the shortcuts sheet.
+  final bool shortcutsOnF1;
+
+  /// Whether « ? » opens and closes the shortcuts sheet, outside text fields.
+  final bool shortcutsOnQuestionMark;
+
+  /// Section of the « Keyboard shortcuts » entry
+  /// ([commandBarShortcutsCommandId]) in the bar; no entry when null.
+  final String? shortcutsCommandSection;
+
   /// The controller of the nearest scope, or null when there is none.
   static CommandBarController? maybeOf(BuildContext context) => context
       .getInheritedWidgetOfExactType<_CommandBarScopeMarker>()
@@ -258,6 +324,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
   final MemoryCommandBarSize _memorySize = MemoryCommandBarSize();
   final CommandBarBrowserGuard _browserGuard = CommandBarBrowserGuard();
   Route<CommandBarChoice>? _route;
+  Route<void>? _shortcutsRoute;
 
   CommandBarRecentsStore get _recents => widget.recents ?? _memoryRecents;
 
@@ -291,8 +358,17 @@ class _CommandBarScopeState extends State<CommandBarScope>
   }
 
   bool _onKey(KeyEvent event) {
-    if (!widget.hotkey || !mounted) return false;
-    if (event is! KeyDownEvent || event.logicalKey != LogicalKeyboardKey.keyK) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (_isShortcutsKey(event)) {
+      if (_shortcutsRoute != null) {
+        _closeShortcuts();
+        return true;
+      }
+      if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+      unawaited(showShortcuts());
+      return true;
+    }
+    if (!widget.hotkey || event.logicalKey != LogicalKeyboardKey.keyK) {
       return false;
     }
     final keyboard = HardwareKeyboard.instance;
@@ -311,12 +387,120 @@ class _CommandBarScopeState extends State<CommandBarScope>
     return true;
   }
 
+  bool _isShortcutsKey(KeyEvent event) {
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isControlPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isAltPressed) {
+      return false;
+    }
+    if (widget.shortcutsOnF1 &&
+        event.logicalKey == LogicalKeyboardKey.f1 &&
+        !keyboard.isShiftPressed) {
+      return true;
+    }
+    // « ? » is text in a field.
+    return widget.shortcutsOnQuestionMark &&
+        event.character == '?' &&
+        FocusManager.instance.primaryFocus?.context
+                ?.findAncestorWidgetOfExactType<EditableText>() ==
+            null;
+  }
+
+  List<String> get _shortcutsKeys => [
+    if (widget.shortcutsOnF1) 'F1',
+    if (widget.shortcutsOnQuestionMark) '?',
+  ];
+
+  CommandBarCommand? _shortcutsCommand() {
+    final section = widget.shortcutsCommandSection;
+    if (section == null) return null;
+    return CommandBarCommand(
+      id: commandBarShortcutsCommandId,
+      label: widget.strings.shortcutsTitle,
+      section: section,
+      icon: Icons.keyboard_rounded,
+      shortcuts: _shortcutsKeys,
+      run: (_) => showShortcuts(),
+    );
+  }
+
   List<CommandBarCommand> _commands() {
     final seen = <String>{};
     return [
-      for (final command in [...widget.commands(context), ...registry.commands])
+      for (final command in [
+        ...widget.commands(context),
+        ...registry.commands,
+        ?_shortcutsCommand(),
+      ])
         if (seen.add(command.id)) command,
     ];
+  }
+
+  @override
+  List<CommandBarShortcutGroup> shortcutGroups() {
+    CommandBarShortcutHint? hintOf(CommandBarCommand command) =>
+        command.shortcuts.isEmpty
+        ? null
+        : CommandBarShortcutHint(
+            shortcuts: command.shortcuts,
+            label: command.label,
+          );
+    final strings = widget.strings;
+    final page = registry.commands;
+    final pageIds = {for (final command in page) command.id};
+    final groups = [
+      CommandBarShortcutGroup(
+        title: strings.shortcutsPage,
+        hints: [for (final command in page) ?hintOf(command)],
+      ),
+      ...registry.shortcutGroups,
+      CommandBarShortcutGroup(
+        title: strings.shortcutsEverywhere,
+        hints: [
+          if (widget.hotkey)
+            CommandBarShortcutHint(
+              shortcuts: [commandBarHotkeyKeys().join('+')],
+              label: strings.openCommandBar,
+            ),
+          if (_shortcutsKeys.isNotEmpty)
+            CommandBarShortcutHint(
+              shortcuts: _shortcutsKeys,
+              label: strings.shortcutsTitle,
+            ),
+          for (final command in widget.commands(context))
+            if (!pageIds.contains(command.id)) ?hintOf(command),
+        ],
+      ),
+      ...?widget.shortcuts?.call(context),
+    ];
+    return [
+      for (final group in groups)
+        if (group.hints.isNotEmpty) group,
+    ];
+  }
+
+  @override
+  Future<void> showShortcuts() async {
+    if (_shortcutsRoute != null || !mounted) return;
+    await showCommandBarShortcuts(
+      context,
+      groups: shortcutGroups(),
+      strings: widget.strings,
+      onRoute: (route) => _shortcutsRoute = route,
+    );
+    _shortcutsRoute = null;
+  }
+
+  void _closeShortcuts() {
+    final route = _shortcutsRoute;
+    final owner = route?.navigator;
+    if (route == null || owner == null || !route.isActive) return;
+    if (route.isCurrent) {
+      owner.pop();
+    } else {
+      owner.removeRoute(route);
+    }
   }
 
   @override

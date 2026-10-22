@@ -71,6 +71,44 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
 - `CommandBarView.fillHeight`: the bar takes all the height it is given (the
   list grows, the footer stays at the bottom), for a window of its own; off,
   it is as tall as its content, as in a dialog.
+- Shortcuts sheet, built from the same registry, so it follows the current
+  screen and teaches its keys: « On this page » (the contributed commands
+  that have `shortcuts`), the screen's other keys (`CommandBarShortcuts`
+  around it, groups of `CommandBarShortcutHint`), then « Everywhere »
+  (Ctrl/⌘+K, the sheet's own keys, app-wide commands) and the scope's
+  `shortcuts:` groups (Space plays or pauses). Opened with
+  `CommandBarController.showShortcuts()`, F1 (`shortcutsOnF1`) or « ? »
+  outside text fields (`shortcutsOnQuestionMark`), both off by default;
+  `shortcutsCommandSection` adds a « Keyboard shortcuts » entry to the bar.
+  With a floating bar, list `commandBarShortcutsCommandId` as an entry that
+  brings the main window forward and call `showShortcuts()` when chosen.
+  `showCommandBarShortcuts` shows a list built elsewhere.
+
+```dart
+CommandBarScope(
+  commands: appCommands,
+  strings: CommandBarStrings.fr,
+  shortcutsOnF1: true,
+  shortcutsCommandSection: 'actions',
+  shortcuts: (context) => [
+    CommandBarShortcutGroup(title: 'Lecture', hints: [
+      CommandBarShortcutHint(shortcuts: ['Space'], label: 'Lecture ou pause'),
+    ]),
+  ],
+  child: shell,
+);
+
+// A screen
+CommandBarShortcuts(
+  groups: [
+    CommandBarShortcutGroup(title: 'Écoute et tablature', hints: [
+      CommandBarShortcutHint(shortcuts: ['Ctrl+←', 'Ctrl+→'], label: 'Reculer ou avancer de 5 secondes'),
+      CommandBarShortcutHint(shortcuts: ['[', ']'], label: 'Poser le début (A) ou la fin (B) de la boucle'),
+    ]),
+  ],
+  child: CommandBarContribution(commands: screenCommands, child: screen),
+);
+```
 
 ## `flutter/shipglows_window`
 
