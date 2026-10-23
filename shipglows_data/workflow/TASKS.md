@@ -8,7 +8,6 @@
 - [ ] `shipglows_hotkeys`: no consumer yet.
 - [ ] `shipglows_window` frame theme: in BeatGlows, CommandGlows, ContentGlows and the ShipGlows app, drop the template `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED` in `win32_window.cpp` (the frame already follows the app theme through `ShipglowsWindowFrame`).
 - [ ] `shipglows_diagnostics`: migrate DreamGlows (`path_flutter/lib/src/crash_log.dart`, engine labels main/capture), then ContentGlows, CommandGlows, ReplayGlows (Sentry through `onReport`, their Sentry/auth/backend lines through `addSection`) and the ShipGlows app; put `ShipglowsDiagnosticsPanel` in each settings page and `ShipglowsDiagnosticsButton` in error views.
-- [ ] `shipglows_diagnostics` in BeatGlows: operator to check the header bug button (copy, check mark) and the « Voir le diagnostic » command.
 - [ ] `shipglows_guide`: widget tests (progress, first-visit trigger, target placement); more ReplayGlows screens (Notes, Play) once the Feed pilot is validated.
 - [ ] `shipglows_onboarding`: push ui-engine (operator approval), then pin ReplayGlows `app/pubspec.lock` on that commit and drop its local `pubspec_overrides.yaml`.
 - [ ] `shipglows_onboarding`: migrate the CommunityGlows Flutter introduction (`communityglows/flutter/lib/features/onboarding/`, language → welcome → account → access; keep its `communityglows.ios.onboarding.v1` state or map it to the gate); widget tests (gate scope/replay, skip to last page, narrow layout).
@@ -26,7 +25,7 @@
 
 - [x] 2026-10-22: `shipglows_window` frame follows the app theme (audit candidate 3): DWM dark mode, caption and text colors from `ShipglowsWindowFrame`, resent on theme change. DreamGlows pilot drops `ApplyWindowChrome` and `setWindowTheme` (the capture overlay keeps `setCaptureTheme`). Checked through `s` with Windows in dark: app light gives `DWMWA_USE_IMMERSIVE_DARK_MODE` 0 and a light frame, app dark gives 1 and a dark frame. Windows in light not tested (system setting).
 
-- [x] 2026-10-22: `shipglows_diagnostics` package; BeatGlows pilot replaces `lib/core/diagnostics/crash_log.dart` (same `crash.log`), launched through `s start -FlutterDevice windows` (running, debug). 2026-10-23: copy button, settings panel and preview dialog added after a survey of the 6 apps; BeatGlows gets a header button and two command-bar entries (Aide).
+- [x] 2026-10-22: `shipglows_diagnostics` package; BeatGlows pilot replaces `lib/core/diagnostics/crash_log.dart` (same `crash.log`), launched through `s start -FlutterDevice windows` (running, debug). 2026-10-23: copy button, settings panel and preview dialog added after a survey of the 6 apps; BeatGlows gets a header button and two command-bar entries (Aide). Header button copies the report, checked by the operator.
 
 - [x] 2026-10-22: `shipglows_flutter_zoom` moved from `shipglows-email-engine/packages` to `flutter/`, same package name; the 6 consumers point to the new path. Ctrl+= / Ctrl+- added, `keyboardZoomStep` 0.05 (CommunityGlows reference); Ctrl+= / Ctrl+- / Ctrl+0 checked by the operator in CommandGlows run through `s`.
 
