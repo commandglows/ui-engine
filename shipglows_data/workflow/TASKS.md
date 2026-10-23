@@ -2,7 +2,7 @@
 
 ## Open
 
-- [ ] `shipglows_tray` in DreamGlows: add `ShipglowsTrayCloseSetting` to the settings panel once its pending rework is committed.
+- [ ] `shipglows_tray` launch at startup: check a real launch at sign-in stays hidden in the tray (only the switch and the Run entry are verified).
 - [ ] `shipglows_tray`: wire CommandGlows after its command bar migration; operator to decide whether closing hides to the tray (it quits today).
 - [ ] `shipglows_tray`: wire ContentGlows after its command bar migration; remove the tray part of `resident_shell` and `resident_shell_menu_test.cpp`, keep the hotkeys and the Auth0/shell-task gate.
 - [ ] `shipglows_hotkeys`: no consumer yet.
@@ -16,6 +16,8 @@
 - [ ] `shipglows_sync`: unit tests of `reconcileSnapshots`, `SyncProgress` and the controller review/recovery (on operator request).
 
 ## Done
+
+- [x] 2026-10-23: `shipglows_tray` launch at Windows sign-in (a99d300); DreamGlows settings get a « Fenêtre » section with the close choice and the startup switch (dreamglows b4bef16). Run through `s`: the switch writes `HKCU\…\Run\DreamGlows` = `"…\dreamglows_windows.exe" --launched-at-startup` and removes it when turned off.
 
 - [x] 2026-10-23: `shipglows_sync` package ported from CommunityGlows (review of device vs account at first sync, recovery copies, `needsReview` / `unreachable`, first-sync progress, shared widgets FR/EN); `shipglows_settings` builds on it. CommandGlows wired (account page panel, review prompt and progress above the routes); managed Windows debug session running.
 
