@@ -923,7 +923,12 @@ class _CommandBarViewState extends State<CommandBarView> {
                 strings.entryKinds[entry.kind?.id],
             compact: behavior.compactRows,
             highlighted: itemIndex == highlight,
-            number: showNumbers && itemIndex < _numberedRows
+            // A row with its own shortcut shows that one only: two near
+            // identical keycaps would read as a duplicate.
+            number:
+                showNumbers &&
+                    itemIndex < _numberedRows &&
+                    entry.shortcuts.isEmpty
                 ? itemIndex + 1
                 : null,
             onTap: () => _chooseItem(itemIndex, secondary: false),
