@@ -1436,15 +1436,17 @@ class CommandBarTile extends StatelessWidget {
                   ],
                   for (final shortcut in entry.shortcuts) ...[
                     const SizedBox(width: 8),
-                    CommandBarKeys(keys: commandShortcutKeys(shortcut)),
+                    CommandBarKeys(
+                      keys: commandShortcutKeys(shortcut),
+                      quiet: !highlighted,
+                    ),
                   ],
                   if (number != null) ...[
                     const SizedBox(width: 8),
-                    Opacity(
-                      opacity: highlighted ? 1 : 0.6,
-                      child: CommandBarKeys(
-                        keys: [commandBarPrimaryModifierLabel(), '$number'],
-                      ),
+                    CommandBarKeys(
+                      keys: [commandBarPrimaryModifierLabel(), '$number'],
+                      quiet: !highlighted,
+                      fadedOpacity: 0.6,
                     ),
                   ],
                   if (actionsButton case final button?) ...[
@@ -1532,10 +1534,9 @@ class _FilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = CommandBarThemeData.of(context);
     final prefix = this.prefix;
     // One keycap like the footer's, holding the prefix then the label; the
-    // active one is fully opaque, like the highlighted row's number.
+    // inactive ones are quiet, like the keys of the other rows.
     final button = Semantics(
       button: true,
       selected: selected,
@@ -1546,12 +1547,10 @@ class _FilterButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.all(2),
-            child: Opacity(
-              opacity: selected ? 1 : 0.5,
-              child: style.keycapBuilder(
-                context,
-                prefix == null ? label : '$prefix $label',
-              ),
+            child: CommandBarKeys(
+              keys: [prefix == null ? label : '$prefix $label'],
+              quiet: !selected,
+              fadedOpacity: 0.5,
             ),
           ),
         ),

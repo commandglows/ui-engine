@@ -31,6 +31,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     this.maxWidth,
     this.maxHeight,
     this.keycapBuilder,
+    this.quietKeycapBuilder,
   });
 
   /// Dialog surface.
@@ -79,6 +80,11 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
   /// Draws one keycap; [CommandBarKeycap] when null.
   final CommandBarKeycapBuilder? keycapBuilder;
 
+  /// Draws the keys that are not in focus: those of the rows other than the
+  /// highlighted one and of the inactive filters. When null they are drawn
+  /// by [keycapBuilder], faded.
+  final CommandBarKeycapBuilder? quietKeycapBuilder;
+
   @override
   CommandBarThemeData copyWith({
     Color? backgroundColor,
@@ -96,6 +102,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     double? maxWidth,
     double? maxHeight,
     CommandBarKeycapBuilder? keycapBuilder,
+    CommandBarKeycapBuilder? quietKeycapBuilder,
   }) => CommandBarThemeData(
     backgroundColor: backgroundColor ?? this.backgroundColor,
     barrierColor: barrierColor ?? this.barrierColor,
@@ -113,6 +120,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     maxWidth: maxWidth ?? this.maxWidth,
     maxHeight: maxHeight ?? this.maxHeight,
     keycapBuilder: keycapBuilder ?? this.keycapBuilder,
+    quietKeycapBuilder: quietKeycapBuilder ?? this.quietKeycapBuilder,
   );
 
   @override
@@ -142,6 +150,9 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       maxWidth: lerpDouble(maxWidth, other.maxWidth, t),
       maxHeight: lerpDouble(maxHeight, other.maxHeight, t),
       keycapBuilder: t < 0.5 ? keycapBuilder : other.keycapBuilder,
+      quietKeycapBuilder: t < 0.5
+          ? quietKeycapBuilder
+          : other.quietKeycapBuilder,
     );
   }
 
@@ -170,6 +181,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       keycapBuilder:
           data.keycapBuilder ??
           (context, label) => CommandBarKeycap(label: label),
+      quietKeycapBuilder: data.quietKeycapBuilder,
     );
   }
 }
@@ -193,6 +205,7 @@ class ResolvedCommandBarTheme {
     required this.maxWidth,
     required this.maxHeight,
     required this.keycapBuilder,
+    required this.quietKeycapBuilder,
   });
 
   final Color backgroundColor;
@@ -210,6 +223,7 @@ class ResolvedCommandBarTheme {
   final double maxWidth;
   final double maxHeight;
   final CommandBarKeycapBuilder keycapBuilder;
+  final CommandBarKeycapBuilder? quietKeycapBuilder;
 }
 
 /// Default keycap: the shared [ShipglowsKeycap], so the bar's keys look
@@ -226,15 +240,29 @@ class CommandBarKeycap extends StatelessWidget {
 
 /// Keycaps of [keys], side by side.
 class CommandBarKeys extends StatelessWidget {
-  const CommandBarKeys({super.key, required this.keys});
+  const CommandBarKeys({
+    super.key,
+    required this.keys,
+    this.quiet = false,
+    this.fadedOpacity = 1,
+  });
 
   /// Labels of the keys, in order.
   final List<String> keys;
 
+  /// Keys out of focus: drawn by the theme's quiet builder when it has one,
+  /// otherwise by the usual one at [fadedOpacity].
+  final bool quiet;
+
+  /// Opacity of [quiet] keys when the theme has no quiet builder.
+  final double fadedOpacity;
+
   @override
   Widget build(BuildContext context) {
-    final builder = CommandBarThemeData.of(context).keycapBuilder;
-    return Row(
+    final style = CommandBarThemeData.of(context);
+    final quietBuilder = quiet ? style.quietKeycapBuilder : null;
+    final builder = quietBuilder ?? style.keycapBuilder;
+    final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < keys.length; i++) ...[
@@ -243,6 +271,9 @@ class CommandBarKeys extends StatelessWidget {
         ],
       ],
     );
+    return quiet && quietBuilder == null && fadedOpacity < 1
+        ? Opacity(opacity: fadedOpacity, child: row)
+        : row;
   }
 }
 
