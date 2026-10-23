@@ -152,16 +152,20 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     PositionedDirectional(
                       top: pad,
                       start: pad,
-                      child: _ProgressBar(
-                        current: _current,
-                        total: _pages.length,
-                        label: widget.strings.progress,
-                        stepLabel: (i) => widget.strings.goToStep.replaceAll(
-                          '{step}',
-                          '${i + 1}',
+                      end: pad,
+                      // Many pages on a phone: the bar shrinks to the card.
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: _ProgressBar(
+                          current: _current,
+                          total: _pages.length,
+                          label: widget.strings.progress,
+                          stepLabel: (i) => widget.strings.goToStep
+                              .replaceAll('{step}', '${i + 1}'),
+                          onTap: _go,
+                          look: look,
                         ),
-                        onTap: _go,
-                        look: look,
                       ),
                     ),
                   ],
