@@ -871,7 +871,7 @@ widget (spotlight, « this control is for… », « try it »), one-step tips,
 shown on a screen's first visit and replayable. Extracted from the
 ContentGlows guided tour. No dependency besides Flutter: routing, storage and
 translations are the app's, passed as callbacks. Not the first-launch
-onboarding (`shipglows-onboarding-engine`).
+onboarding (`shipglows_onboarding`).
 
 ### Tours and steps
 
@@ -982,3 +982,67 @@ GuideTarget(id: 'videos.filter', child: IconButton(...))      // pointable
   primary button takes focus, Esc pauses (closes a tip), every button is
   44 px at least, icons are excluded from semantics, reduce-motion turns the
   card's entrance and the scroll to the target off.
+
+## `flutter/shipglows_onboarding`
+
+First-run introduction: one fixed two-column card (texts and actions on the
+left, a preview on the right) under a segmented progress bar, shown once per
+account and replayable. Extracted from the ReplayGlows introduction. A
+teaser of what the app does, not a walkthrough of its controls (that is
+`shipglows_guide`). No dependency besides Flutter and `shipglows_theme`:
+texts, previews, storage and the signed-in account are the app's.
+
+- `OnboardingPage`: `title`, optional `eyebrow`, `leading` (icon badge),
+  `description` (`descriptionLines` keeps a series aligned), `note` (italic
+  word from the maker), `body` (status, links), `preview` builder.
+  `centered` for feature pages, `scrollable` for a page whose body grows,
+  `showBack` / `showSkip`, `primaryLabel` / `primaryArrow`.
+- `OnboardingLanguagePage`: first page, one button per
+  `OnboardingLanguageOption` (label and greeting in its own language), a
+  specimen of the greetings as preview; picking one moves on.
+- `OnboardingFlow(pages:, strings:, onFinish:)`: Skip jumps to the last page,
+  done segments of the progress bar go back, focus follows the title. Pages
+  can be rebuilt (new language, a status that loads): the current one is kept
+  by index. Below `narrowWidth` the card is one scrolling column without
+  preview.
+- `OnboardingGate`: due once per `setScope(userId)` and `version`
+  (`onboarding_completed:v1:<user>`), `complete()`, `replay()` for
+  Preferences. Signed out (null scope) never shows it. Keys go through an
+  `OnboardingCompletionStore` (`Memory…`, `Callback…` for
+  `SharedPreferences`).
+- `OnboardingOverlay(pending:, introduction:, child:)` from
+  `MaterialApp.builder`.
+- Texts: `OnboardingStrings.en`, `.fr`, or the app's own.
+- Look: `OnboardingThemeData` theme extension (title, description, eyebrow,
+  skip and specimen styles merged onto the defaults, `progressGradient`,
+  radii, card size, motion); fallbacks from `ShipglowsTheme`. Motion is off
+  when the platform asks to reduce it.
+
+```dart
+OnboardingFlow(
+  strings: OnboardingStrings.forLocale(locale),
+  onFinish: gate.complete,
+  pages: [
+    OnboardingLanguagePage(
+      id: 'language',
+      title: 'Choose your language',
+      options: const [
+        OnboardingLanguageOption(
+            locale: Locale('fr'), label: 'Français', greeting: 'Bonjour'),
+        OnboardingLanguageOption(
+            locale: Locale('en'), label: 'English', greeting: 'Hello'),
+      ],
+      onSelected: setLocale,
+    ),
+    OnboardingPage(
+      id: 'welcome',
+      title: 'Welcome',
+      description: '…',
+      preview: (_) => const AppMark(),
+      showBack: false,
+      primaryLabel: 'Get started',
+    ),
+    // one page per feature, then the access summary
+  ],
+)
+```
