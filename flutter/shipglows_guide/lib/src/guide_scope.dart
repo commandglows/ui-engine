@@ -268,8 +268,12 @@ class _GuideOverlay extends StatefulWidget {
 }
 
 class _GuideOverlayState extends State<_GuideOverlay>
-    with TickerProviderStateMixin {
-  late final Ticker _ticker = createTicker((_) => _trackTarget());
+    with SingleTickerProviderStateMixin {
+  /// Whether the step's target is followed: re-measured after every frame
+  /// the app draws, without asking for frames itself, so an absent target or
+  /// reduce-motion leaves the screen idle (a per-frame ticker never settled).
+  bool _tracking = false;
+  bool _trackScheduled = false;
 
   /// Halo that grows and fades around the target, on a loop.
   late final AnimationController _pulse = AnimationController(
@@ -304,7 +308,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
   @override
   void dispose() {
     _controller.removeListener(_onControllerChanged);
-    _ticker.dispose();
+    _tracking = false;
     _pulse.dispose();
     super.dispose();
   }
@@ -332,13 +336,24 @@ class _GuideOverlayState extends State<_GuideOverlay>
       _drag = Offset.zero;
       _targetRect = null;
       final targetId = step?.targetId;
+      _tracking = targetId != null;
       if (targetId != null) {
-        if (!_ticker.isActive) _ticker.start();
+        _scheduleTrack();
         _revealTarget(targetId);
-      } else if (_ticker.isActive) {
-        _ticker.stop();
       }
     }
+  }
+
+  /// One pending post-frame check at a time; it re-arms while tracking.
+  void _scheduleTrack() {
+    if (_trackScheduled) return;
+    _trackScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _trackScheduled = false;
+      if (!_tracking || !mounted) return;
+      _trackTarget();
+      _scheduleTrack();
+    });
   }
 
   /// Scrolls the target into view once its screen is laid out.
@@ -386,7 +401,11 @@ class _GuideOverlayState extends State<_GuideOverlay>
   Widget build(BuildContext context) {
     final tour = _controller.activeTour;
     final step = _controller.activeStep;
-    if (tour == null || step == null) return const SizedBox.shrink();
+    if (tour == null || step == null) {
+      // A tour ended on a shown target: its halo must not loop hidden.
+      _syncPulse(animate: false);
+      return const SizedBox.shrink();
+    }
     final style = GuideThemeData.of(context);
     final target = step.targetId == null ? null : _targetRect;
     final hole = target?.inflate(style.spotlightPadding!);
