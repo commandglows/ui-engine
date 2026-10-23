@@ -1,7 +1,7 @@
 ---
 artifact: technical_context
 metadata_schema_version: "1.0"
-artifact_version: "1.1.0"
+artifact_version: "1.2.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
 updated: "2026-10-23"
@@ -21,6 +21,7 @@ supersedes: []
 evidence:
   - "2026-10-22: package list from flutter/, consumers from the apps' pubspec.yaml path dependencies."
   - "2026-10-23: shipglows_onboarding added (eef4566, 5390abd), ReplayGlows consumer (5711efc)."
+  - "2026-10-23: shipglows_sync added (2b6f624, 61a6d87); CommandGlows recorded as consumer of shipglows_sync, shipglows_settings and shipglows_settings_firestore (f0f6eeb9)."
 next_review: "2027-01-22"
 next_step: "Update the consumer column when an app adopts or drops a package."
 ---
