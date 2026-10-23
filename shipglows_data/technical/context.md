@@ -1,7 +1,7 @@
 ---
 artifact: technical_context
 metadata_schema_version: "1.0"
-artifact_version: "1.0.0"
+artifact_version: "1.1.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
 updated: "2026-10-23"
@@ -20,6 +20,7 @@ depends_on: []
 supersedes: []
 evidence:
   - "2026-10-22: package list from flutter/, consumers from the apps' pubspec.yaml path dependencies."
+  - "2026-10-23: shipglows_onboarding added (eef4566, 5390abd), ReplayGlows consumer (5711efc)."
 next_review: "2027-01-22"
 next_step: "Update the consumer column when an app adopts or drops a package."
 ---
@@ -46,6 +47,7 @@ do nothing or fall back to plain Flutter.
 | `shipglows_settings` | Typed user settings (`SettingKey`, `SettingsSchema` + migrations), device-first `SettingsController`, per-field push, per-account device copies, retry with backoff, `SyncStatus`, `SettingsSyncChip`; remote and storage are ports | no | none yet |
 | `shipglows_settings_firestore` | `SettingsRemote` over one Firestore document per account (`users/{uid}/settings/profile`) | via plugin dep | none yet |
 | `shipglows_guide` | In-app guidance: tours across routes, coach marks on a `GuideTarget` (spotlight, « try it »), one-step tips, first-visit `GuideTrigger`, progress in a `GuideStore`, navigation through app or scope callbacks; extracted from the ContentGlows guided tour | no | ContentGlows (publish tour, legacy `inapp_tour_*` keys), ReplayGlows (Feed coach marks) |
+| `shipglows_onboarding` | First-run introduction: two-column card of `OnboardingPage`s (language, welcome, features, access) with previews, segmented progress bar, narrow single-column layout, per-account `OnboardingGate` over an `OnboardingCompletionStore`, `OnboardingThemeData`; extracted from the ReplayGlows introduction | no | ReplayGlows (web; key `onboarding_completed:v1:<user>`) |
 
 ## Cross-Package Contracts
 

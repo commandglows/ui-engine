@@ -9,8 +9,12 @@
 - [ ] `shipglows_window` frame theme: in BeatGlows, CommandGlows, ContentGlows and the ShipGlows app, drop the template `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED` in `win32_window.cpp` (the frame already follows the app theme through `ShipglowsWindowFrame`).
 - [ ] `shipglows_diagnostics`: migrate DreamGlows (`path_flutter/lib/src/crash_log.dart`, engine labels main/capture), then ContentGlows, CommandGlows, ReplayGlows (Sentry through `onReport`) and the ShipGlows app; add a « Copier le diagnostic » entry where the app has none.
 - [ ] `shipglows_guide`: widget tests (progress, first-visit trigger, target placement); more ReplayGlows screens (Notes, Play) once the Feed pilot is validated.
+- [ ] `shipglows_onboarding`: push ui-engine (operator approval), then pin ReplayGlows `app/pubspec.lock` on that commit and drop its local `pubspec_overrides.yaml`.
+- [ ] `shipglows_onboarding`: migrate the CommunityGlows Flutter introduction (`communityglows/flutter/lib/features/onboarding/`, language → welcome → account → access; keep its `communityglows.ios.onboarding.v1` state or map it to the gate); widget tests (gate scope/replay, skip to last page, narrow layout).
 
 ## Done
+
+- [x] 2026-10-23: `shipglows_onboarding` package (eef4566), extracted from the ReplayGlows introduction; progress bar shrinks to the card on phones (5390abd). ReplayGlows (5711efc) checked in the managed web session, signed in, at 1440 px and 375 px: replay from Preferences, language pick, skip, finish, completion key kept. Android and Windows not run.
 
 - [x] 2026-10-23: `shipglows_guide` package (extracted from the ContentGlows guided tour): targets with spotlight and pulsing halo, card placed below, above or beside the target and never cut, one-step tips, first-visit trigger, app or scope routing. ContentGlows (4 steps, managed Windows session, demo mode) and ReplayGlows (Feed, managed web session, signed in) checked on screen.
 
