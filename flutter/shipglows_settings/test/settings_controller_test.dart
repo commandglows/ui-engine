@@ -339,4 +339,17 @@ void main() {
       controller.dispose();
     });
   });
+
+  test('reload takes a change written by another window', () async {
+    final storage = MemorySettingsStorage();
+    final main = controllerFor(storage);
+    final bar = controllerFor(storage);
+    await main.open();
+    await bar.open();
+
+    await main.set(theme, ThemeMode.dark);
+    expect(bar.get(theme), ThemeMode.system);
+    await bar.reload();
+    expect(bar.get(theme), ThemeMode.dark);
+  });
 }

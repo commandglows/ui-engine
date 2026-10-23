@@ -859,6 +859,11 @@ ContentGlows (offline queue, per-account cache, partial writes), BeatGlows
   rename), `MemorySettingsStorage`, `CallbackSettingsStorage` (IndexedDB,
   SharedPreferences). Remote ports: `CallbackSettingsRemote` (REST client,
   blob store), `MemorySettingsRemote` (tests, two devices).
+- Several windows (one Flutter engine each: command bar, quick capture):
+  `FileSettingsStorage` is a `WatchableSettingsStorage`, so every
+  controller on the same folder reloads a bucket another window wrote;
+  `reload()` does it by hand for other storages. Fields pending in a window
+  keep its value.
 - Secrets never go in a `SettingKey`: `SecretStore` (`read`, `write`,
   `delete`, from BeatGlows) is the interface for the app's secure storage,
   plugged in with `CallbackSecretStore` over `flutter_secure_storage`;

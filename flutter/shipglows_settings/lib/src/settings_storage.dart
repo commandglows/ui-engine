@@ -12,6 +12,14 @@ abstract interface class SettingsStorage {
   Future<void> delete(String bucket);
 }
 
+/// A storage whose buckets can change from outside the controller: another
+/// window of the same app (its own Flutter engine), another process. The
+/// controller reloads a shown bucket when it changes.
+abstract interface class WatchableSettingsStorage implements SettingsStorage {
+  /// Names of the buckets written, by anyone (own writes included).
+  Stream<String> watch();
+}
+
 /// In memory only: tests, previews, demo mode.
 class MemorySettingsStorage implements SettingsStorage {
   MemorySettingsStorage([Map<String, Map<String, Object?>>? initial])

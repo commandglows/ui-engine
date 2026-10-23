@@ -141,6 +141,11 @@ class SettingsController extends ChangeNotifier
   bool _open = false;
   bool _disposed = false;
   final Map<String, _SettingListenable<Object?>> _listenables = {};
+  StreamSubscription<String>? _storageWatch;
+
+  /// Own writes in flight: a change seen meanwhile is reloaded after them.
+  int _writes = 0;
+  bool _reloadAfterWrites = false;
   SyncReview? _review;
   bool _resolving = false;
   SyncReviewError? _reviewError;
@@ -208,7 +213,65 @@ class SettingsController extends ChangeNotifier
     if (observeAppLifecycle) {
       WidgetsBinding.instance.addObserver(this);
     }
+    final storage = _storage;
+    if (storage is WatchableSettingsStorage) {
+      _storageWatch = storage.watch().listen(
+        _storageChanged,
+        onError: (Object error) =>
+            onError?.call('settings_local_watch_error', error),
+      );
+    }
     _changed();
+  }
+
+  /// Reads the shown buckets again, for a change made outside this
+  /// controller (another window's engine, another process). Fields pending
+  /// here keep their value; every other one takes the stored value.
+  Future<void> reload() async {
+    final shownDevice = _device;
+    final shownAccount = _account;
+    final device = await _load(shownDevice.name);
+    final account = await _load(shownAccount.name);
+    // An account switched meanwhile already loaded its own copy.
+    if (!identical(shownAccount, _account) || _disposed) return;
+    var changed = false;
+    if (device != null) changed = _takeStored(shownDevice, device) || changed;
+    if (account != null) changed = _takeStored(shownAccount, account) || changed;
+    if (!changed) return;
+    _changed();
+    if (_account.pending.isNotEmpty) unawaited(sync());
+  }
+
+  void _storageChanged(String bucket) {
+    if (bucket != _device.name && bucket != _account.name) return;
+    if (_writes > 0) {
+      _reloadAfterWrites = true;
+      return;
+    }
+    unawaited(reload());
+  }
+
+  bool _takeStored(_Bucket shown, _Bucket stored) {
+    var changed = false;
+    final ids = {...shown.values.keys, ...stored.values.keys};
+    for (final id in ids) {
+      if (shown.pending.contains(id) ||
+          shown.pending.any((entry) => entry.startsWith('$id/'))) {
+        continue;
+      }
+      final value = stored.values[id];
+      if (_sameJson(shown.values[id], value)) continue;
+      changed = true;
+      if (value == null) {
+        shown.values.remove(id);
+      } else {
+        shown.values[id] = value;
+      }
+    }
+    for (final entry in stored.pending) {
+      if (shown.pending.add(entry)) changed = true;
+    }
+    return changed;
   }
 
   /// The value of [key] (its default until set, or when the stored data is
@@ -509,6 +572,7 @@ class SettingsController extends ChangeNotifier
   void dispose() {
     _disposed = true;
     _stopRemote();
+    unawaited(_storageWatch?.cancel());
     if (_open && observeAppLifecycle) {
       WidgetsBinding.instance.removeObserver(this);
     }
@@ -1002,12 +1066,19 @@ class SettingsController extends ChangeNotifier
   }
 
   Future<void> _persist(_Bucket bucket, {bool rethrowError = true}) async {
+    _writes++;
     try {
       await _storage.write(bucket.name, bucket.toJson(schema.version));
     } catch (error) {
       final failure = SettingsStorageException('write', bucket.name, error);
       onError?.call('settings_local_write_error', failure);
       if (rethrowError) throw failure;
+    } finally {
+      _writes--;
+      if (_writes == 0 && _reloadAfterWrites && !_disposed) {
+        _reloadAfterWrites = false;
+        unawaited(reload());
+      }
     }
   }
 
