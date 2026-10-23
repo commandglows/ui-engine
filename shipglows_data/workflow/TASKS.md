@@ -12,6 +12,8 @@
 
 ## Done
 
+- [x] 2026-10-23: `shipglows_guide` package (extracted from the ContentGlows guided tour): targets with spotlight and pulsing halo, card placed below, above or beside the target and never cut, one-step tips, first-visit trigger, app or scope routing. ContentGlows (4 steps, managed Windows session, demo mode) and ReplayGlows (Feed, managed web session, signed in) checked on screen.
+
 - [x] 2026-10-22: `shipglows_window` frame follows the app theme (audit candidate 3): DWM dark mode, caption and text colors from `ShipglowsWindowFrame`, resent on theme change. DreamGlows pilot drops `ApplyWindowChrome` and `setWindowTheme` (the capture overlay keeps `setCaptureTheme`). Checked through `s` with Windows in dark: app light gives `DWMWA_USE_IMMERSIVE_DARK_MODE` 0 and a light frame, app dark gives 1 and a dark frame. Windows in light not tested (system setting).
 
 - [x] 2026-10-22: `shipglows_diagnostics` package; BeatGlows pilot replaces `lib/core/diagnostics/crash_log.dart` (same `crash.log`), launched through `s start -FlutterDevice windows` (running, debug).
