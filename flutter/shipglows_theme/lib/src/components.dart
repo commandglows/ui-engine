@@ -5,10 +5,21 @@ import 'theme.dart';
 /// One key, such as `Ctrl` or `Entrée`: the label on a small raised face,
 /// drawn from the [ShipglowsTheme] key roles.
 class ShipglowsKeycap extends StatelessWidget {
-  const ShipglowsKeycap(this.label, {super.key});
+  const ShipglowsKeycap(
+    this.label, {
+    super.key,
+    this.backgroundColor,
+    this.foregroundColor,
+  });
 
   /// Text of the key.
   final String label;
+
+  /// Face and label colors over [ShipglowsTheme.keyBackground] and
+  /// [ShipglowsTheme.keyForeground], for a package theme that lets an app
+  /// recolor its keys (`ShipglowsMenuTheme.keycapColor`).
+  final Color? backgroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -19,10 +30,12 @@ class ShipglowsKeycap extends StatelessWidget {
         minWidth: theme.keyMinSize,
         minHeight: theme.keyMinSize,
       ),
-      padding: EdgeInsets.symmetric(horizontal: theme.keyPaddingX),
-      alignment: Alignment.center,
+      padding: EdgeInsets.symmetric(
+        horizontal: theme.keyPaddingX,
+        vertical: theme.keyPaddingY,
+      ),
       decoration: BoxDecoration(
-        color: theme.keyBackground,
+        color: backgroundColor ?? theme.keyBackground,
         borderRadius: BorderRadius.circular(theme.radiusSm),
         // A rounded border must keep one color, so the key's depth is a hard
         // shadow under it.
@@ -31,12 +44,19 @@ class ShipglowsKeycap extends StatelessWidget {
           BoxShadow(color: theme.keyShadow, offset: Offset(0, theme.keyDepth)),
         ],
       ),
-      child: Text(
-        label,
-        maxLines: 1,
-        style: base
-            .copyWith(color: theme.keyForeground, fontWeight: FontWeight.w600)
-            .merge(theme.keyLabelStyle),
+      // Sized to its label: an unfactored alignment would stretch the key to
+      // the whole width a Wrap or Column offers.
+      child: Center(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: Text(
+          label,
+          maxLines: 1,
+          style: base
+              .copyWith(fontWeight: FontWeight.w600)
+              .merge(theme.keyLabelStyle)
+              .copyWith(color: foregroundColor ?? theme.keyForeground),
+        ),
       ),
     );
   }
@@ -102,12 +122,23 @@ class ShipglowsKeyButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(theme.radiusSm),
-          child: Padding(
-            padding: const EdgeInsets.all(2),
-            child: AnimatedOpacity(
-              opacity: selected ? 1 : 0.5,
-              duration: theme.motionFast,
-              child: face,
+          // The face stays small; the tap target keeps the control height.
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: theme.controlMinHeight,
+              minHeight: theme.controlMinHeight,
+            ),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: AnimatedOpacity(
+                  opacity: selected ? 1 : 0.5,
+                  duration: theme.motionFast,
+                  child: face,
+                ),
+              ),
             ),
           ),
         ),
@@ -141,7 +172,7 @@ class ShipglowsKeyHint extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         ShipglowsKeys(keys, keyBuilder: keyBuilder),
-        SizedBox(width: theme.spaceXs + 2),
+        SizedBox(width: theme.spaceXs),
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall

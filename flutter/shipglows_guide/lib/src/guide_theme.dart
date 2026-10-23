@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shipglows_theme/shipglows_theme.dart';
 
 /// Look of the guide card and spotlight. Every null value falls back on the
-/// `ColorScheme`.
+/// app's shared `ShipglowsTheme` roles (its `ColorScheme` when it declares
+/// none).
 @immutable
 class GuideThemeData extends ThemeExtension<GuideThemeData> {
   const GuideThemeData({

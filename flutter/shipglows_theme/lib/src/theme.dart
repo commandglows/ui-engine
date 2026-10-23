@@ -42,6 +42,7 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     this.keyMinSize = 22,
     this.keyDepth = 1,
     this.keyPaddingX = 6,
+    this.keyPaddingY = 2,
     this.keyLabelStyle,
     this.controlMinHeight = 44,
     this.motionFast = const Duration(milliseconds: 120),
@@ -162,7 +163,11 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
   /// Space on each side of a keycap's label.
   final double keyPaddingX;
 
-  /// Keycap label, over the bold `labelSmall` of the text theme.
+  /// Space above and below a keycap's label.
+  final double keyPaddingY;
+
+  /// Keycap label, over the bold `labelSmall` of the text theme. Its color
+  /// is ignored: the label always takes [keyForeground].
   final TextStyle? keyLabelStyle;
 
   /// Minimum height of a control, at least the touch target.
@@ -206,6 +211,7 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     double? keyMinSize,
     double? keyDepth,
     double? keyPaddingX,
+    double? keyPaddingY,
     TextStyle? keyLabelStyle,
     double? controlMinHeight,
     Duration? motionFast,
@@ -241,6 +247,7 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     keyMinSize: keyMinSize ?? this.keyMinSize,
     keyDepth: keyDepth ?? this.keyDepth,
     keyPaddingX: keyPaddingX ?? this.keyPaddingX,
+    keyPaddingY: keyPaddingY ?? this.keyPaddingY,
     keyLabelStyle: keyLabelStyle ?? this.keyLabelStyle,
     controlMinHeight: controlMinHeight ?? this.controlMinHeight,
     motionFast: motionFast ?? this.motionFast,
@@ -283,6 +290,7 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
       keyMinSize: d(keyMinSize, other.keyMinSize),
       keyDepth: d(keyDepth, other.keyDepth),
       keyPaddingX: d(keyPaddingX, other.keyPaddingX),
+      keyPaddingY: d(keyPaddingY, other.keyPaddingY),
       keyLabelStyle: TextStyle.lerp(keyLabelStyle, other.keyLabelStyle, t),
       controlMinHeight: d(controlMinHeight, other.controlMinHeight),
       motionFast: t < 0.5 ? motionFast : other.motionFast,

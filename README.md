@@ -26,15 +26,20 @@ ThemeData(extensions: [ShipglowsTheme(surface: …, keyBorder: …, …)])
 ```
 
 Without one, `ShipglowsTheme.of(context)` (or `.from(themeData)`) derives the
-roles from the `ColorScheme`, which is exactly the shared packages' former
-default look.
+roles from the `ColorScheme`: the former default look of the command bar,
+guide and title bar. The menu changed to match the bar: its highlighted row
+is `secondaryContainer` (was a 10 % `onSurface` tint), its keys are the shared
+keycap on `surface`, its corners follow `radiusLg` (16, was 12) and its rows
+`radiusMd` (10, was 8).
 
 Base components drawn from the roles, the same everywhere:
 
-- `ShipglowsKeycap('Entrée')`: one key; `ShipglowsKeys(['Ctrl', 'K'])`.
+- `ShipglowsKeycap('Entrée')`: one key, sized to its label;
+  `ShipglowsKeys(['Ctrl', 'K'])`. The command bar and the menu draw their
+  keys with it.
 - `ShipglowsKeyButton(label: 'c Presse-papiers', onPressed: …, selected: …)`:
-  a button drawn as one keycap holding its whole text; the selected one is
-  opaque, the others fade.
+  a button drawn as one keycap holding its whole text, with a tap target of
+  `controlMinHeight`; the selected one is opaque, the others fade.
 - `ShipglowsKeyHint(keys: ['Alt', 'Entrée'], label: 'actions')`: a footer
   hint.
 

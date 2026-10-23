@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:shipglows_theme/shipglows_theme.dart';
 
 /// Customises the Flutter action menu. Every null field falls back to the
-/// app's `ColorScheme` and `TextTheme`.
+/// app's shared [ShipglowsTheme] roles (its `ColorScheme` when it declares
+/// none) and its `TextTheme`.
 ///
 /// ```dart
 /// ThemeData(extensions: const [ShipglowsMenuTheme(width: 340)])
@@ -132,6 +133,7 @@ class ResolvedShipglowsMenuTheme {
     required this.width,
     required this.maxHeight,
     required this.radius,
+    required this.rowRadius,
     required this.rowHeight,
     required this.shadows,
     required this.labelStyle,
@@ -157,6 +159,7 @@ class ResolvedShipglowsMenuTheme {
       width: custom.width ?? 300,
       maxHeight: custom.maxHeight ?? 440,
       radius: custom.radius ?? roles.radiusLg,
+      rowRadius: roles.radiusMd,
       rowHeight: math.max(44, custom.rowHeight ?? roles.controlMinHeight),
       shadows:
           custom.shadows ??
@@ -184,6 +187,9 @@ class ResolvedShipglowsMenuTheme {
   final double width;
   final double maxHeight;
   final double radius;
+
+  /// Corner radius of a highlighted row, the same as the command bar's rows.
+  final double rowRadius;
   final double rowHeight;
   final List<BoxShadow> shadows;
   final TextStyle labelStyle;

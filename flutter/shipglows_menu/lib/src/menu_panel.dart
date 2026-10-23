@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shipglows_theme/shipglows_theme.dart';
 
 import 'app_menu.dart';
 import 'menu_icons.dart';
@@ -544,7 +545,7 @@ class _Tile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: highlighted && enabled ? style.highlightColor : null,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(style.rowRadius),
             ),
             child: Row(
               children: [
@@ -589,6 +590,8 @@ class _Tile extends StatelessWidget {
   }
 }
 
+/// The shared [ShipglowsKeycap], so the menu's keys look like every other
+/// key of the app; the menu theme only recolors it.
 class _Keycap extends StatelessWidget {
   const _Keycap(this.label, {required this.style});
 
@@ -596,22 +599,9 @@ class _Keycap extends StatelessWidget {
   final ResolvedShipglowsMenuTheme style;
 
   @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: style.keycapColor,
-      borderRadius: BorderRadius.circular(5),
-      border: Border.all(color: style.borderColor),
-    ),
-    child: Text(
-      label,
-      style: style.labelStyle.copyWith(
-        color: style.keycapForegroundColor,
-        fontSize: (style.labelStyle.fontSize ?? 14) * 0.8,
-        fontWeight: FontWeight.w500,
-      ),
-    ),
+  Widget build(BuildContext context) => ShipglowsKeycap(
+    label,
+    backgroundColor: style.keycapColor,
+    foregroundColor: style.keycapForegroundColor,
   );
 }
