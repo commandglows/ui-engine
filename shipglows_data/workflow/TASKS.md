@@ -11,7 +11,7 @@
 - [ ] `shipglows_guide`: widget tests (progress, first-visit trigger, target placement); more ReplayGlows screens (Notes, Play) once the Feed pilot is validated.
 - [ ] `shipglows_onboarding`: push ui-engine (operator approval), then pin ReplayGlows `app/pubspec.lock` on that commit and drop its local `pubspec_overrides.yaml`.
 - [ ] `shipglows_onboarding`: migrate the CommunityGlows Flutter introduction (`communityglows/flutter/lib/features/onboarding/`, language → welcome → account → access; keep its `communityglows.ios.onboarding.v1` state or map it to the gate); widget tests (gate scope/replay, skip to last page, narrow layout).
-- [ ] `shipglows_sync` in CommandGlows: check on screen (account page panel, review dialog on a first sign-in with different settings, progress overlay, recovery restore); the managed debug session starts without error but the screen was not inspected.
+- [ ] `shipglows_sync` in CommandGlows: check on screen the review dialog (first sign-in on a device whose settings differ from the account), the progress overlay and a recovery restore. The account page panel was checked on 2026-10-23 (signed-in account, « Synchronisé », French tooltip date, manual sync from the chip).
 - [ ] `shipglows_sync`: adopt it in the other apps using account settings (CommunityGlows Flutter `features/sync/cloud_sync.dart`, ContentGlows, DreamGlows), then for business data through `SyncSnapshot.collections`.
 - [ ] `shipglows_sync`: unit tests of `reconcileSnapshots`, `SyncProgress` and the controller review/recovery (on operator request).
 

@@ -64,6 +64,7 @@ class SyncStrings {
     required this.restoreFailed,
     required this.dropRecovery,
     required this.cancel,
+    this.formatTime,
   });
 
   // Status chip.
@@ -138,6 +139,10 @@ class SyncStrings {
   final String restoreFailed;
   final String dropRecovery;
   final String cancel;
+
+  /// Date and time in these strings' language; `null` uses the app's
+  /// `MaterialLocalizations` (English when the app declares no locale).
+  final String Function(DateTime value)? formatTime;
 
   /// Chip label of [status].
   String statusLabel(SyncStatus status) => switch (status.health) {
@@ -250,6 +255,7 @@ class SyncStrings {
     restoreFailed: 'La copie n’a pas pu être restaurée.',
     dropRecovery: 'Supprimer les copies',
     cancel: 'Annuler',
+    formatTime: _frenchTime,
   );
 
   static const en = SyncStrings(
@@ -342,4 +348,11 @@ class SyncStrings {
 
   static SyncStrings forLocale(Locale locale) =>
       locale.languageCode == 'fr' ? fr : en;
+}
+
+/// `23/10/2026 13:52`, local time.
+String _frenchTime(DateTime value) {
+  final t = value.toLocal();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(t.day)}/${two(t.month)}/${t.year} ${two(t.hour)}:${two(t.minute)}';
 }

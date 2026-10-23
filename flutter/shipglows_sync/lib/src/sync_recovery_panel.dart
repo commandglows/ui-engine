@@ -39,7 +39,7 @@ class SyncRecoveryPanel extends StatelessWidget {
           Text(
             strings.recoverySavedOn.replaceAll(
               '{date}',
-              formatSyncTime(context, recovery.savedAt),
+              formatSyncTime(context, recovery.savedAt, strings),
             ),
             style: muted,
           ),

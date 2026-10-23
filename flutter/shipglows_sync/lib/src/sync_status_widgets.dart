@@ -3,8 +3,14 @@ import 'package:flutter/material.dart';
 import 'sync_status.dart';
 import 'sync_strings.dart';
 
-/// Local date and time of [value], in the app's language.
-String formatSyncTime(BuildContext context, DateTime value) {
+/// Local date and time of [value], in [strings]' language when they give a
+/// format, otherwise in the app's.
+String formatSyncTime(
+  BuildContext context,
+  DateTime value, [
+  SyncStrings? strings,
+]) {
+  if (strings?.formatTime case final format?) return format(value);
   final local = MaterialLocalizations.of(context);
   final time = value.toLocal();
   return '${local.formatShortDate(time)} '
@@ -44,7 +50,7 @@ class SyncStatusChip extends StatelessWidget {
             ? label
             : strings.lastSynced.replaceAll(
                 '{time}',
-                formatSyncTime(context, last),
+                formatSyncTime(context, last, strings),
               ),
         child: Semantics(
           button: onPressed != null,
