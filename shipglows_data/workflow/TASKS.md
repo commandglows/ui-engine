@@ -16,7 +16,7 @@
 
 ## Done
 
-- [x] 2026-10-23: `shipglows_tray` launch at Windows sign-in (a99d300); DreamGlows settings get a « Fenêtre » section with the close choice and the startup switch (dreamglows b4bef16). Run through `s`: the switch writes `HKCU\…\Run\DreamGlows` = `"…\dreamglows_windows.exe" --launched-at-startup` and removes it when turned off. The Debug exe launched with `--launched-at-startup` keeps the main window hidden (capture tab and tray icon only); a second launch brings it back.
+- [x] 2026-10-23: `shipglows_tray` launch at Windows sign-in (a99d300); DreamGlows settings get a « Fenêtre » section with the close choice and the startup switch (dreamglows b4bef16). Run through `s`: the switch writes `HKCU\…\Run\DreamGlows` = `"…\dreamglows_windows.exe" --launched-at-startup` and removes it when turned off. The Debug exe launched with `--launched-at-startup` keeps the main window hidden (capture tab and tray icon only); a second launch brings it back. Then the startup window became a user choice (hidden / minimized / open, saved in `tray.json`): each mode checked by launching the Debug exe with the flag; `tray.json` was never written before (bad path escaping), fixed.
 
 - [x] 2026-10-23: `shipglows_sync` package ported from CommunityGlows (review of device vs account at first sync, recovery copies, `needsReview` / `unreachable`, first-sync progress, shared widgets FR/EN); `shipglows_settings` builds on it. CommandGlows wired (account page panel, review prompt and progress above the routes); managed Windows debug session running.
 

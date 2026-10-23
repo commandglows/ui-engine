@@ -640,10 +640,13 @@ web, macOS and Linux). Native Win32, no third-party plugin.
 - Launch at Windows sign-in (`setLaunchAtStartup`, `launchAtStartup`): an
   entry `<appName>` under `HKCU\…\CurrentVersion\Run` starting this
   executable with `--launched-at-startup`; turned off in Task Manager reads
-  as off, and turning it on again clears that. Such a launch keeps the main
-  window hidden in the tray until the user opens it
-  (`hideWhenLaunchedAtStartup`, default true; `launchedAtStartup` tells the
-  app). `ShipglowsTrayStartupSetting` is the settings switch.
+  as off, and turning it on again clears that. After such a launch the main
+  window starts as the user chose (`ShipglowsTrayStartupWindow`): hidden in
+  the tray until opened (default; minimized while the icon is missing),
+  minimized in the taskbar, or open. The choice is kept with the close
+  behavior (`startupWindow` / `setStartupWindow`, default from the config);
+  `launchedAtStartup` tells the app. `ShipglowsTrayStartupSetting` is the
+  settings switch plus that choice.
 - Icon back after an Explorer restart, retried for a minute when the
   taskbar is not ready at sign-in.
 - Single instance: a later launch hands its command line to the running app

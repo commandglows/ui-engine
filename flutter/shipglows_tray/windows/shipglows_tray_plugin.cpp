@@ -24,9 +24,13 @@ namespace {
 constexpr char kChannel[] = "shipglows_tray";
 // IDI_APP_ICON of the Flutter Windows runner template.
 constexpr int kAppIconResource = 101;
+// Posted to the main window to minimize it once its launch show is dropped.
+constexpr UINT kMinimizeAtLaunch = WM_APP + 0x5A3;
 
 enum class CloseBehavior { kAsk, kHideToTray, kMinimize, kQuit };
 enum class PrimaryClick { kOpenMainWindow, kMenu, kEvent, kItem };
+// How the main window starts after a launch at sign-in.
+enum class StartupWindow { kHidden, kMinimized, kShown };
 
 CloseBehavior CloseBehaviorFrom(const std::string& name) {
   if (name == "ask") return CloseBehavior::kAsk;
@@ -169,10 +173,14 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
       quitting_ = false;
       started_ = true;
       const bool visible = host_->Show();
-      if (visible && !startup_handled_ &&
-          BoolField(arguments, "hideWhenLaunchedAtStartup", true) &&
-          LaunchedAtStartup()) {
-        StayHiddenAtLaunch();
+      if (!startup_handled_ && LaunchedAtStartup()) {
+        const std::string startup = StringField(arguments, "startupWindow");
+        // Hidden needs the icon to come back through; minimized otherwise.
+        if (startup == "minimized" || (startup != "shown" && !visible)) {
+          StartAtLaunch(StartupWindow::kMinimized);
+        } else if (startup != "shown") {
+          StartAtLaunch(StartupWindow::kHidden);
+        }
       }
       startup_handled_ = true;
       result->Success(flutter::EncodableValue(visible));
@@ -243,6 +251,7 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
 
   void ShowMainWindow() {
     suppress_show_ = false;
+    minimize_at_launch_ = false;
     const HWND window = MainWindow();
     if (window == nullptr) return;
     ActivateWindowForUser(window, window);
@@ -258,16 +267,20 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     ShowWindow(window, host_ && host_->visible() ? SW_HIDE : SW_MINIMIZE);
   }
 
-  // Launched by Windows at sign-in: the window waits in the tray. The runner
-  // shows it on its first frame, often after this; that show is dropped
-  // until the window is opened through the tray (or ShipglowsTray.show).
-  void StayHiddenAtLaunch() {
+  // Launched by Windows at sign-in: the window waits in the tray, or
+  // minimized in the taskbar. The runner shows it on its first frame, often
+  // after this. Hidden, that show is dropped until the window is opened
+  // through the tray (or ShipglowsTray.showMainWindow); minimized, it becomes
+  // a minimize.
+  void StartAtLaunch(StartupWindow mode) {
     const HWND window = MainWindow();
     if (window != nullptr && IsWindowVisible(window)) {
-      ShowWindow(window, SW_HIDE);
-    } else {
-      suppress_show_ = true;
+      ShowWindow(window,
+                 mode == StartupWindow::kHidden ? SW_HIDE : SW_MINIMIZE);
+      return;
     }
+    suppress_show_ = true;
+    minimize_at_launch_ = mode == StartupWindow::kMinimized;
   }
 
   static flutter::EncodableValue LaunchAtStartupValue(
@@ -293,8 +306,18 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   std::optional<LRESULT> HandleTopLevelMessage(HWND window, UINT message,
                                                WPARAM, LPARAM lparam) {
     if (message == WM_WINDOWPOSCHANGING && suppress_show_) {
-      reinterpret_cast<WINDOWPOS*>(lparam)->flags &= ~SWP_SHOWWINDOW;
+      auto* position = reinterpret_cast<WINDOWPOS*>(lparam);
+      if ((position->flags & SWP_SHOWWINDOW) && minimize_at_launch_) {
+        suppress_show_ = false;
+        minimize_at_launch_ = false;
+        PostMessageW(window, kMinimizeAtLaunch, 0, 0);
+      }
+      position->flags &= ~SWP_SHOWWINDOW;
       return std::nullopt;
+    }
+    if (message == kMinimizeAtLaunch) {
+      ShowWindow(window, SW_SHOWMINNOACTIVE);
+      return 0;
     }
     if (message != WM_CLOSE || !started_) return std::nullopt;
     if (quitting_) {
@@ -419,6 +442,8 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   // Whether the first "start" already looked at a launch at sign-in.
   bool startup_handled_ = false;
   bool suppress_show_ = false;
+  // The dropped launch show becomes a minimize.
+  bool minimize_at_launch_ = false;
 };
 
 }  // namespace

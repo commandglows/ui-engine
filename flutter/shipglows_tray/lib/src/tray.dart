@@ -42,6 +42,7 @@ class ShipglowsTray {
   final _iconVisible = ValueNotifier(false);
   final _closeBehavior = ValueNotifier(ShipglowsTrayCloseBehavior.ask);
   final _launchAtStartup = ValueNotifier(false);
+  final _startupWindow = ValueNotifier(ShipglowsTrayStartupWindow.hidden);
   final _sessionStore = ShipglowsTrayMemoryStore();
 
   ShipglowsTrayConfig? _config;
@@ -74,6 +75,11 @@ class ShipglowsTray {
   /// Read by [start].
   ValueListenable<bool> get launchAtStartup => _launchAtStartup;
 
+  /// How the main window starts after a launch at sign-in: the user's saved
+  /// choice, else `ShipglowsTrayConfig.startupWindow`.
+  ValueListenable<ShipglowsTrayStartupWindow> get startupWindow =>
+      _startupWindow;
+
   /// Whether Windows launched this process at sign-in, known after [start].
   bool get launchedAtStartup => _launchedAtStartup;
 
@@ -88,6 +94,8 @@ class ShipglowsTray {
         config.store ??
         (folder == null ? _sessionStore : ShipglowsTrayFileStore(folder));
     _closeBehavior.value = await _store!.load() ?? config.closeBehavior;
+    _startupWindow.value =
+        await _store!.loadStartupWindow() ?? config.startupWindow;
     _exeVersion ??= await _invoke<String>('version');
     _readLaunchAtStartup(
       await _invoke<Map<Object?, Object?>>('launchAtStartup', {
@@ -100,7 +108,7 @@ class ShipglowsTray {
           'closeBehavior': _closeBehavior.value.name,
           'secondInstanceShowsMainWindow': config.secondInstanceShowsMainWindow,
           'hasQuitHandler': config.onQuitRequested != null,
-          'hideWhenLaunchedAtStartup': config.hideWhenLaunchedAtStartup,
+          'startupWindow': _startupWindow.value.name,
           ...config.primaryClick.toMap(),
         }) ??
         false;
@@ -130,7 +138,7 @@ class ShipglowsTray {
       closeDialogContext: current.closeDialogContext,
       primaryClick: current.primaryClick,
       secondInstanceShowsMainWindow: current.secondInstanceShowsMainWindow,
-      hideWhenLaunchedAtStartup: current.hideWhenLaunchedAtStartup,
+      startupWindow: current.startupWindow,
       onQuitRequested: current.onQuitRequested,
     );
     _config = next;
@@ -163,6 +171,15 @@ class ShipglowsTray {
     });
     _readLaunchAtStartup(state);
     return state?['written'] == true;
+  }
+
+  /// Changes how the main window starts after the next launch at sign-in,
+  /// and keeps it in the store. Returns false when it could not be saved
+  /// (it still applies until the app quits).
+  Future<bool> setStartupWindow(ShipglowsTrayStartupWindow window) async {
+    if (!isSupported || _config == null) return false;
+    _startupWindow.value = window;
+    return await _store?.saveStartupWindow(window) ?? false;
   }
 
   void _readLaunchAtStartup(Map<Object?, Object?>? state) {

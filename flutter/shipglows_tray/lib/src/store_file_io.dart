@@ -4,7 +4,7 @@ import 'dart:io';
 File? _file(String appFolder) {
   final roaming = Platform.environment['APPDATA'];
   if (roaming == null || roaming.isEmpty || appFolder.isEmpty) return null;
-  return File('$roaming\$appFolder\tray.json');
+  return File('$roaming\\$appFolder\\tray.json');
 }
 
 /// The decoded file; null when it is missing or not JSON.

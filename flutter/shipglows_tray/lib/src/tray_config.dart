@@ -24,6 +24,21 @@ enum ShipglowsTrayCloseBehavior {
   quit,
 }
 
+/// How the main window starts when Windows launches the app at sign-in
+/// (`ShipglowsTray.setLaunchAtStartup`). A normal launch always shows it.
+enum ShipglowsTrayStartupWindow {
+  /// Hidden in the tray until the user opens it; minimized while the icon is
+  /// missing. Show it with `ShipglowsTray.showMainWindow`: other ways of
+  /// showing it are ignored until then.
+  hidden,
+
+  /// Minimized in the taskbar.
+  minimized,
+
+  /// Shown as usual.
+  shown,
+}
+
 /// What a click on the icon (or Enter on it from the keyboard) does. The
 /// right click always opens the menu.
 @immutable
@@ -136,7 +151,10 @@ class ShipglowsTrayStrings {
     required this.closeAsk,
     required this.closeMinimize,
     required this.launchAtStartup,
-    required this.launchAtStartupHint,
+    required this.startupWindow,
+    required this.startupHidden,
+    required this.startupMinimized,
+    required this.startupShown,
   });
 
   static const fr = ShipglowsTrayStrings(
@@ -155,7 +173,10 @@ class ShipglowsTrayStrings {
     closeAsk: 'Me demander',
     closeMinimize: 'Réduire dans la barre des tâches',
     launchAtStartup: 'Lancer {app} au démarrage de Windows',
-    launchAtStartupHint: 'Il attend dans la zone de notification.',
+    startupWindow: 'Au démarrage, la fenêtre est',
+    startupHidden: 'Cachée dans la zone de notification',
+    startupMinimized: 'Réduite dans la barre des tâches',
+    startupShown: 'Ouverte',
   );
 
   static const en = ShipglowsTrayStrings(
@@ -174,7 +195,10 @@ class ShipglowsTrayStrings {
     closeAsk: 'Ask me',
     closeMinimize: 'Minimize to the taskbar',
     launchAtStartup: 'Launch {app} when Windows starts',
-    launchAtStartupHint: 'It waits in the system tray.',
+    startupWindow: 'At startup, the window is',
+    startupHidden: 'Hidden in the system tray',
+    startupMinimized: 'Minimized to the taskbar',
+    startupShown: 'Open',
   );
 
   /// Labels of the shared standard entries.
@@ -201,9 +225,14 @@ class ShipglowsTrayStrings {
   final String closeAsk;
   final String closeMinimize;
 
-  /// Label and hint of `ShipglowsTrayStartupSetting`.
+  /// Labels of `ShipglowsTrayStartupSetting`: the switch, then the choice
+  /// [startupWindow] among [startupHidden], [startupMinimized] and
+  /// [startupShown].
   final String launchAtStartup;
-  final String launchAtStartupHint;
+  final String startupWindow;
+  final String startupHidden;
+  final String startupMinimized;
+  final String startupShown;
 
   ShipglowsTrayStrings copyWith({
     ShipglowsMenuStrings? menu,
@@ -223,7 +252,10 @@ class ShipglowsTrayStrings {
     String? closeAsk,
     String? closeMinimize,
     String? launchAtStartup,
-    String? launchAtStartupHint,
+    String? startupWindow,
+    String? startupHidden,
+    String? startupMinimized,
+    String? startupShown,
   }) => ShipglowsTrayStrings(
     menu: (menu ?? this.menu).copyWith(
       settings: settings,
@@ -243,7 +275,10 @@ class ShipglowsTrayStrings {
     closeAsk: closeAsk ?? this.closeAsk,
     closeMinimize: closeMinimize ?? this.closeMinimize,
     launchAtStartup: launchAtStartup ?? this.launchAtStartup,
-    launchAtStartupHint: launchAtStartupHint ?? this.launchAtStartupHint,
+    startupWindow: startupWindow ?? this.startupWindow,
+    startupHidden: startupHidden ?? this.startupHidden,
+    startupMinimized: startupMinimized ?? this.startupMinimized,
+    startupShown: startupShown ?? this.startupShown,
   );
 }
 
@@ -374,7 +409,7 @@ class ShipglowsTrayConfig {
     this.closeDialogContext,
     this.primaryClick = ShipglowsTrayClick.openMainWindow,
     this.secondInstanceShowsMainWindow = true,
-    this.hideWhenLaunchedAtStartup = true,
+    this.startupWindow = ShipglowsTrayStartupWindow.hidden,
     this.onQuitRequested,
   });
 
@@ -395,8 +430,9 @@ class ShipglowsTrayConfig {
   /// `ShipglowsTray.setCloseBehavior`), which wins from then on.
   final ShipglowsTrayCloseBehavior closeBehavior;
 
-  /// Keeps the user's close choice in `%APPDATA%\<appFolder>\tray.json`;
-  /// without it (and without [store]) the choice lasts until the app quits.
+  /// Keeps the user's choices (closing, startup window) in
+  /// `%APPDATA%\<appFolder>\tray.json`; without it (and without [store])
+  /// they last until the app quits.
   final String? appFolder;
 
   /// Replaces the file store of [appFolder].
@@ -413,11 +449,9 @@ class ShipglowsTrayConfig {
   /// (with the runner's `ShipglowsTrayForwardToPrimary`).
   final bool secondInstanceShowsMainWindow;
 
-  /// Whether a launch at Windows sign-in (`ShipglowsTray.setLaunchAtStartup`)
-  /// keeps the main window hidden in the tray until the user opens it. Show
-  /// it with `ShipglowsTray.showMainWindow`: other ways of showing it are
-  /// ignored until then.
-  final bool hideWhenLaunchedAtStartup;
+  /// Used until the user saves a choice (`ShipglowsTrayStartupSetting`, or
+  /// `ShipglowsTray.setStartupWindow`), which wins from then on.
+  final ShipglowsTrayStartupWindow startupWindow;
 
   /// Called before quitting (menu, `ShipglowsTray.quit`, or closing with
   /// [ShipglowsTrayCloseBehavior.quit]) to save or tear down; false keeps
