@@ -28,7 +28,7 @@
 
 - [x] 2026-10-22: `shipglows_diagnostics` package; BeatGlows pilot replaces `lib/core/diagnostics/crash_log.dart` (same `crash.log`), launched through `s start -FlutterDevice windows` (running, debug). 2026-10-23: copy button, settings panel and preview dialog added after a survey of the 6 apps; BeatGlows gets a header button and two command-bar entries (Aide).
 
-- [x] 2026-10-22: `shipglows_flutter_zoom` moved from `shipglows-email-engine/packages` to `flutter/`, same package name; the 6 consumers point to the new path. Ctrl+= / Ctrl+- added, `keyboardZoomStep` 0.05 (CommunityGlows reference).
+- [x] 2026-10-22: `shipglows_flutter_zoom` moved from `shipglows-email-engine/packages` to `flutter/`, same package name; the 6 consumers point to the new path. Ctrl+= / Ctrl+- added, `keyboardZoomStep` 0.05 (CommunityGlows reference); Ctrl+= / Ctrl+- / Ctrl+0 checked by the operator in CommandGlows run through `s`.
 
 - [x] 2026-10-22: DreamGlows on `shipglows_tray` (dreamglows d353882, ui-engine 3321ace): compiled and run through `s`, icon « DreamGlows » in the notification area, a second launch exits in 0.2 s and leaves one instance; menu checked by the operator; Quitter closes cleanly after the shutdown crash fix (2d88ef7), checked by the operator; the X opens the close-or-hide dialog (c27961e, dreamglows 8d700e8), checked by the operator.
 
