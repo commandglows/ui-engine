@@ -32,6 +32,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     this.maxHeight,
     this.keycapBuilder,
     this.quietKeycapBuilder,
+    this.activeFilterKeycapBuilder,
   });
 
   /// Dialog surface.
@@ -85,6 +86,11 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
   /// by [keycapBuilder], faded.
   final CommandBarKeycapBuilder? quietKeycapBuilder;
 
+  /// Draws the key of the active filter, so it can stand out from the
+  /// others (filled, for instance). When null it is drawn by
+  /// [keycapBuilder].
+  final CommandBarKeycapBuilder? activeFilterKeycapBuilder;
+
   @override
   CommandBarThemeData copyWith({
     Color? backgroundColor,
@@ -103,6 +109,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     double? maxHeight,
     CommandBarKeycapBuilder? keycapBuilder,
     CommandBarKeycapBuilder? quietKeycapBuilder,
+    CommandBarKeycapBuilder? activeFilterKeycapBuilder,
   }) => CommandBarThemeData(
     backgroundColor: backgroundColor ?? this.backgroundColor,
     barrierColor: barrierColor ?? this.barrierColor,
@@ -121,6 +128,8 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     maxHeight: maxHeight ?? this.maxHeight,
     keycapBuilder: keycapBuilder ?? this.keycapBuilder,
     quietKeycapBuilder: quietKeycapBuilder ?? this.quietKeycapBuilder,
+    activeFilterKeycapBuilder:
+        activeFilterKeycapBuilder ?? this.activeFilterKeycapBuilder,
   );
 
   @override
@@ -153,6 +162,9 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       quietKeycapBuilder: t < 0.5
           ? quietKeycapBuilder
           : other.quietKeycapBuilder,
+      activeFilterKeycapBuilder: t < 0.5
+          ? activeFilterKeycapBuilder
+          : other.activeFilterKeycapBuilder,
     );
   }
 
@@ -182,6 +194,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
           data.keycapBuilder ??
           (context, label) => CommandBarKeycap(label: label),
       quietKeycapBuilder: data.quietKeycapBuilder,
+      activeFilterKeycapBuilder: data.activeFilterKeycapBuilder,
     );
   }
 }
@@ -206,6 +219,7 @@ class ResolvedCommandBarTheme {
     required this.maxHeight,
     required this.keycapBuilder,
     required this.quietKeycapBuilder,
+    required this.activeFilterKeycapBuilder,
   });
 
   final Color backgroundColor;
@@ -224,6 +238,7 @@ class ResolvedCommandBarTheme {
   final double maxHeight;
   final CommandBarKeycapBuilder keycapBuilder;
   final CommandBarKeycapBuilder? quietKeycapBuilder;
+  final CommandBarKeycapBuilder? activeFilterKeycapBuilder;
 }
 
 /// Default keycap: the shared [ShipglowsKeycap], so the bar's keys look

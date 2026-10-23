@@ -1535,6 +1535,10 @@ class _FilterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prefix = this.prefix;
+    final text = prefix == null ? label : '$prefix $label';
+    final active = selected
+        ? CommandBarThemeData.of(context).activeFilterKeycapBuilder
+        : null;
     // One keycap like the footer's, holding the prefix then the label; the
     // inactive ones are quiet, like the keys of the other rows.
     final button = Semantics(
@@ -1547,11 +1551,13 @@ class _FilterButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.all(2),
-            child: CommandBarKeys(
-              keys: [prefix == null ? label : '$prefix $label'],
-              quiet: !selected,
-              fadedOpacity: 0.5,
-            ),
+            child: active != null
+                ? active(context, text)
+                : CommandBarKeys(
+                    keys: [text],
+                    quiet: !selected,
+                    fadedOpacity: 0.5,
+                  ),
           ),
         ),
       ),
