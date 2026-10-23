@@ -270,51 +270,55 @@ class _TrashViewState<T> extends State<TrashView<T>> {
     final strings = widget.strings;
     final visible = _visible();
     final canEmpty = widget.onEmptyTrash != null && widget.items.isNotEmpty;
+    // Left-aligned: the column would otherwise center the toolbar.
     final toolbar = Padding(
       padding: widget.padding,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 320),
-            child: TextField(
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search_rounded),
-                hintText: strings.searchHint,
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  hintText: strings.searchHint,
+                ),
+                onChanged: (value) => setState(() => _query = value),
               ),
-              onChanged: (value) => setState(() => _query = value),
             ),
-          ),
-          if (widget.filters.isNotEmpty)
-            DropdownButton<int?>(
-              value: _filter,
-              items: [
-                DropdownMenuItem<int?>(child: Text(strings.allFilter)),
-                for (var i = 0; i < widget.filters.length; i++)
-                  DropdownMenuItem<int?>(
-                    value: i,
-                    child: Text(widget.filters[i].label),
-                  ),
-              ],
-              onChanged: (value) => setState(() => _filter = value),
-            ),
-          if (canEmpty)
-            _emptying
-                ? const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+            if (widget.filters.isNotEmpty)
+              DropdownButton<int?>(
+                value: _filter,
+                items: [
+                  DropdownMenuItem<int?>(child: Text(strings.allFilter)),
+                  for (var i = 0; i < widget.filters.length; i++)
+                    DropdownMenuItem<int?>(
+                      value: i,
+                      child: Text(widget.filters[i].label),
                     ),
-                  )
-                : TextButton.icon(
-                    onPressed: _emptyTrash,
-                    icon: const Icon(Icons.delete_sweep_outlined),
-                    label: Text(strings.emptyTrash),
-                  ),
-        ],
+                ],
+                onChanged: (value) => setState(() => _filter = value),
+              ),
+            if (canEmpty)
+              _emptying
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : TextButton.icon(
+                      onPressed: _emptyTrash,
+                      icon: const Icon(Icons.delete_sweep_outlined),
+                      label: Text(strings.emptyTrash),
+                    ),
+          ],
+        ),
       ),
     );
     final Widget body;
