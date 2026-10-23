@@ -1,6 +1,6 @@
 /// Undo, redo and trash for ShipGlows Flutter apps.
 ///
-/// - [UndoHistory]: undo/redo stacks of snapshots for an editor.
+/// - [UndoRedoHistory]: undo/redo stacks of snapshots for an editor.
 /// - [UndoShortcuts]: Ctrl/⌘+Z, Ctrl/⌘+Shift+Z and Ctrl+Y, text fields left
 ///   alone.
 /// - [UndoWindow], [PendingUndo] and [showUndoSnackBar]: act at once, offer

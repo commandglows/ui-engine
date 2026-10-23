@@ -58,12 +58,13 @@ class TrashFilter<T> {
 enum TrashOperation { restore, deletePermanently, emptyTrash }
 
 /// Asks before an irreversible operation; true goes ahead.
-typedef TrashConfirm = Future<bool> Function(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required String confirmLabel,
-});
+typedef TrashConfirm =
+    Future<bool> Function(
+      BuildContext context, {
+      required String title,
+      required String message,
+      required String confirmLabel,
+    });
 
 /// The body of a trash screen: search, filter, restore, delete permanently,
 /// empty the trash. The app keeps the data (server, local database) and its
@@ -370,8 +371,9 @@ class _TrashViewState<T> extends State<TrashView<T>> {
     final date = deletedAt == null
         ? '—'
         : widget.formatDate?.call(context, deletedAt) ??
-              MaterialLocalizations.of(context)
-                  .formatMediumDate(deletedAt.toLocal());
+              MaterialLocalizations.of(
+                context,
+              ).formatMediumDate(deletedAt.toLocal());
     final days = entry.daysRemaining(now: widget.now?.call());
     if (days == null) {
       return deletedAt == null

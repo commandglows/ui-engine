@@ -878,7 +878,7 @@ rules.
 Undo, redo and trash, extracted from ContentGlows. No dependency beyond
 Flutter.
 
-- `UndoHistory<T>`: undo/redo stacks of snapshots for an editor. `record(before)`
+- `UndoRedoHistory<T>`: undo/redo stacks of snapshots for an editor. `record(before)`
   before each change (clears redo), `undo(current)` / `redo(current)` return
   the step to restore, `pop()` for an undo-only history. `group(before,
   change, changed:)` folds a batch (an AI pass) into one step, and records

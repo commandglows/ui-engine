@@ -17,8 +17,8 @@ class UndoStep<T> {
 /// [redo] take the current state and hand back the step to restore. Both
 /// stacks keep at most [limit] steps, dropping the oldest. Snapshots must be
 /// immutable (or copied by the caller): the history stores them as given.
-class UndoHistory<T> extends ChangeNotifier {
-  UndoHistory({this.limit = 50}) : assert(limit > 0);
+class UndoRedoHistory<T> extends ChangeNotifier {
+  UndoRedoHistory({this.limit = 50}) : assert(limit > 0);
 
   /// Maximum number of steps kept on each stack.
   final int limit;
