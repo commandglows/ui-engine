@@ -1,10 +1,10 @@
 ---
 artifact: research_note
 metadata_schema_version: "1.0"
-artifact_version: "1.0.0"
+artifact_version: "1.1.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
-updated: "2026-10-22"
+updated: "2026-10-23"
 status: active
 source_skill: sg-engineering
 scope: desktop-shell-audit
@@ -20,6 +20,7 @@ depends_on: []
 supersedes: []
 evidence:
   - "2026-10-22: lecture seule des pubspec, lib/ et windows/runner de ContentGlows, CommandGlows, DreamGlows (+ path_flutter), BeatGlows, ShipGlows app, ReplayGlows ; CommunityGlows (Tauri) comme référence. Rien lancé, rien construit."
+  - "2026-10-23: candidat 5 livré (ui-engine ea6ec1a), vérifié au clavier dans CommandGlows."
 next_review: "2027-01-22"
 next_step: "Choisir le premier candidat (diagnostics ou réglages) et ouvrir sa tâche dans TASKS.md."
 ---
@@ -156,6 +157,8 @@ Déjà couverts par un paquet existant, à migrer plutôt qu'à créer :
 - Ajouter Ctrl+= / Ctrl+- (absents partout), bornes et pas configurables
   (CoG : 75–150 %, pas de 5).
 - Dépendances : aucune ; `shipglows_window` persiste déjà le zoom.
+- **Livré le 2026-10-22** : `flutter/shipglows_flutter_zoom` (nom inchangé),
+  `keyboardZoomStep` 0,05, Ctrl+= / Ctrl+- vérifiés dans CommandGlows.
 
 ### 6. `shipglows_ui_states` — Dart
 
