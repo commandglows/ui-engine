@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shipglows_theme/shipglows_theme.dart';
 
 /// Visual tokens of the title bar; each app passes its own brand values.
 @immutable
@@ -17,12 +18,13 @@ class ShipglowsTitleBarStyle {
 
   /// Blends the bar into the app: scaffold background, on-surface glyphs.
   factory ShipglowsTitleBarStyle.fromTheme(ThemeData theme) {
-    final scheme = theme.colorScheme;
+    // Glyphs follow the app's shared text role.
+    final text = ShipglowsTheme.from(theme).text;
     return ShipglowsTitleBarStyle(
       background: theme.scaffoldBackgroundColor,
-      foreground: scheme.onSurface,
-      hoverBackground: scheme.onSurface.withValues(alpha: 0.08),
-      pressedBackground: scheme.onSurface.withValues(alpha: 0.14),
+      foreground: text,
+      hoverBackground: text.withValues(alpha: 0.08),
+      pressedBackground: text.withValues(alpha: 0.14),
     );
   }
 

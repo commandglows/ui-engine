@@ -1,6 +1,7 @@
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
+import 'package:shipglows_theme/shipglows_theme.dart';
 
 /// Look of the guide card and spotlight. Every null value falls back on the
 /// `ColorScheme`.
@@ -45,20 +46,22 @@ class GuideThemeData extends ThemeExtension<GuideThemeData> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final own = theme.extension<GuideThemeData>();
-    final accent = own?.accentColor ?? scheme.primary;
+    // Missing values follow the app's shared roles.
+    final roles = ShipglowsTheme.from(theme);
+    final accent = own?.accentColor ?? roles.accent;
     return GuideThemeData(
       accentColor: accent,
       onAccentColor:
           own?.onAccentColor ??
-          (accent == scheme.primary
-              ? scheme.onPrimary
+          (accent == roles.accent
+              ? roles.onAccent
               : ThemeData.estimateBrightnessForColor(accent) == Brightness.dark
               ? Colors.white
               : Colors.black),
-      surfaceColor: own?.surfaceColor ?? scheme.surfaceContainerHigh,
+      surfaceColor: own?.surfaceColor ?? roles.surfaceRaised,
       scrimColor: own?.scrimColor ?? scheme.scrim.withValues(alpha: 0.55),
       maxWidth: own?.maxWidth ?? 420,
-      borderRadius: own?.borderRadius ?? 16,
+      borderRadius: own?.borderRadius ?? roles.radiusLg,
       spotlightPadding: own?.spotlightPadding ?? 6,
       spotlightRadius: own?.spotlightRadius ?? 12,
       floatingBottomOffset: own?.floatingBottomOffset ?? 96,

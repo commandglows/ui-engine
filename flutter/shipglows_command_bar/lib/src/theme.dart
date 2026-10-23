@@ -2,6 +2,7 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shipglows_theme/shipglows_theme.dart';
 
 /// Builds one keycap, for an app that draws its own.
 typedef CommandBarKeycapBuilder =
@@ -10,7 +11,8 @@ typedef CommandBarKeycapBuilder =
 /// Look of the command bar, set once in the app theme:
 /// `ThemeData(extensions: [CommandBarThemeData(...)])`.
 ///
-/// Every value is optional; a missing one comes from the [ColorScheme].
+/// Every value is optional; a missing one comes from the app's shared
+/// [ShipglowsTheme] (its [ColorScheme] when it declares none).
 @immutable
 class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
   const CommandBarThemeData({
@@ -144,27 +146,25 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
   }
 
   /// The theme of [context] with every missing value filled from its
-  /// [ColorScheme].
+  /// [ShipglowsTheme].
   static ResolvedCommandBarTheme of(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final roles = ShipglowsTheme.of(context);
     final data =
         theme.extension<CommandBarThemeData>() ?? const CommandBarThemeData();
     return ResolvedCommandBarTheme(
-      backgroundColor: data.backgroundColor ?? scheme.surfaceContainerHigh,
-      barrierColor:
-          data.barrierColor ?? scheme.scrim.withValues(alpha: 0.32),
-      highlightColor: data.highlightColor ?? scheme.secondaryContainer,
-      borderColor: data.borderColor ?? scheme.outlineVariant,
-      textColor: data.textColor ?? scheme.onSurface,
-      mutedColor: data.mutedColor ?? scheme.onSurfaceVariant,
-      iconColor: data.iconColor ?? scheme.onSurfaceVariant,
-      highlightedIconColor:
-          data.highlightedIconColor ?? scheme.onSecondaryContainer,
+      backgroundColor: data.backgroundColor ?? roles.surfaceRaised,
+      barrierColor: data.barrierColor ?? roles.scrim,
+      highlightColor: data.highlightColor ?? roles.highlight,
+      borderColor: data.borderColor ?? roles.border,
+      textColor: data.textColor ?? roles.text,
+      mutedColor: data.mutedColor ?? roles.textMuted,
+      iconColor: data.iconColor ?? roles.icon,
+      highlightedIconColor: data.highlightedIconColor ?? roles.onHighlight,
       highlightIndicatorColor: data.highlightIndicatorColor,
-      radius: data.radius ?? 16,
-      rowRadius: data.rowRadius ?? 10,
-      rowMinHeight: data.rowMinHeight ?? 44,
+      radius: data.radius ?? roles.radiusLg,
+      rowRadius: data.rowRadius ?? roles.radiusMd,
+      rowMinHeight: data.rowMinHeight ?? roles.controlMinHeight,
       maxWidth: data.maxWidth ?? 640,
       maxHeight: data.maxHeight ?? 520,
       keycapBuilder:
@@ -212,7 +212,8 @@ class ResolvedCommandBarTheme {
   final CommandBarKeycapBuilder keycapBuilder;
 }
 
-/// Default keycap: the label in a small outlined box.
+/// Default keycap: the shared [ShipglowsKeycap], so the bar's keys look
+/// like every other key of the app.
 class CommandBarKeycap extends StatelessWidget {
   const CommandBarKeycap({super.key, required this.label});
 
@@ -220,30 +221,7 @@ class CommandBarKeycap extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(6),
-        // A rounded border must keep one color, so the key's depth is a hard
-        // shadow under it.
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: [BoxShadow(color: scheme.outline, offset: const Offset(0, 1))],
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: scheme.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ShipglowsKeycap(label);
 }
 
 /// Keycaps of [keys], side by side.

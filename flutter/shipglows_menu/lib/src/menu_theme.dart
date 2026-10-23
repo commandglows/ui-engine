@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
+import 'package:shipglows_theme/shipglows_theme.dart';
 
 /// Customises the Flutter action menu. Every null field falls back to the
 /// app's `ColorScheme` and `TextTheme`.
@@ -142,21 +143,21 @@ class ResolvedShipglowsMenuTheme {
     final scheme = theme.colorScheme;
     final custom =
         theme.extension<ShipglowsMenuTheme>() ?? const ShipglowsMenuTheme();
-    final foreground = custom.foregroundColor ?? scheme.onSurface;
+    // Every value the menu theme leaves out follows the app's shared roles.
+    final roles = ShipglowsTheme.from(theme);
+    final foreground = custom.foregroundColor ?? roles.text;
     return ResolvedShipglowsMenuTheme._(
-      backgroundColor: custom.backgroundColor ?? scheme.surfaceContainerHigh,
-      borderColor: custom.borderColor ?? scheme.outlineVariant,
-      highlightColor:
-          custom.highlightColor ?? scheme.onSurface.withValues(alpha: 0.10),
+      backgroundColor: custom.backgroundColor ?? roles.surfaceRaised,
+      borderColor: custom.borderColor ?? roles.border,
+      highlightColor: custom.highlightColor ?? roles.highlight,
       foregroundColor: foreground,
-      mutedColor: custom.mutedColor ?? scheme.onSurfaceVariant,
-      keycapColor: custom.keycapColor ?? scheme.surfaceContainerHighest,
-      keycapForegroundColor:
-          custom.keycapForegroundColor ?? scheme.onSurfaceVariant,
+      mutedColor: custom.mutedColor ?? roles.textMuted,
+      keycapColor: custom.keycapColor ?? roles.keyBackground,
+      keycapForegroundColor: custom.keycapForegroundColor ?? roles.keyForeground,
       width: custom.width ?? 300,
       maxHeight: custom.maxHeight ?? 440,
-      radius: custom.radius ?? 12,
-      rowHeight: math.max(44, custom.rowHeight ?? 44),
+      radius: custom.radius ?? roles.radiusLg,
+      rowHeight: math.max(44, custom.rowHeight ?? roles.controlMinHeight),
       shadows:
           custom.shadows ??
           [

@@ -12,6 +12,40 @@ dependencies:
 Each package keeps its own dependencies: an app that uses only the command bar
 never pulls `window_manager`.
 
+## `flutter/shipglows_theme`
+
+One theme for every app and package. `ShipglowsTheme` (a `ThemeExtension`)
+holds the semantic roles: surfaces, text, icons, border/line, highlight,
+accent, danger, focus, scrim, keycap face, shape, spacing, control height and
+motion. Each app fills it once from its own brand tokens (generated from its
+design-token source, as its Astro site does) and adds it to
+`ThemeData.extensions`, light and dark:
+
+```dart
+ThemeData(extensions: [ShipglowsTheme(surface: …, keyBorder: …, …)])
+```
+
+Without one, `ShipglowsTheme.of(context)` (or `.from(themeData)`) derives the
+roles from the `ColorScheme`, which is exactly the shared packages' former
+default look.
+
+Base components drawn from the roles, the same everywhere:
+
+- `ShipglowsKeycap('Entrée')`: one key; `ShipglowsKeys(['Ctrl', 'K'])`.
+- `ShipglowsKeyButton(label: 'c Presse-papiers', onPressed: …, selected: …)`:
+  a button drawn as one keycap holding its whole text; the selected one is
+  opaque, the others fade.
+- `ShipglowsKeyHint(keys: ['Alt', 'Entrée'], label: 'actions')`: a footer
+  hint.
+
+The command bar, `shipglows_menu`, `shipglows_guide` and the
+`shipglows_window` title bar read these roles for every value their own theme
+extension leaves out, so one declaration dresses them all alike; a package
+theme (`CommandBarThemeData`, `ShipglowsMenuTheme`, `GuideThemeData`) keeps
+only what is specific to it. Rule: a new shared component takes its colors,
+radii, spacing and keys from `ShipglowsTheme`, never from raw values or its
+own palette.
+
 ## `flutter/shipglows_command_bar`
 
 Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
