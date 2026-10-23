@@ -26,6 +26,7 @@ class ShipglowsWindowSession with WindowListener, WidgetsBindingObserver {
   bool _loaded = false;
   Timer? _saveTimer;
   Timer? _captureTimer;
+  Future<void>? _writing;
   String? _pendingLocation;
   Set<String> _restorableLocations = const {};
   double _minimumZoom = 0.75;
@@ -178,7 +179,42 @@ class ShipglowsWindowSession with WindowListener, WidgetsBindingObserver {
     _saveTimer = Timer(const Duration(milliseconds: 400), _write);
   }
 
-  Future<void> _write() async {
+  /// Writes the pending changes now instead of waiting for the save delay.
+  ///
+  /// Cancels the pending timers, captures the window bounds when a capture
+  /// was scheduled, then writes the session if something is left to write and
+  /// waits for any write in progress. Call it before quitting, e.g. in
+  /// `ShipglowsTrayConfig`:
+  ///
+  /// ```dart
+  /// onQuitRequested: () async {
+  ///   await ShipglowsWindowSession.instance.flush();
+  ///   return true;
+  /// },
+  /// ```
+  ///
+  /// Never throws: failures go to the `onError` given to [restore]. A no-op
+  /// before [restore].
+  Future<void> flush() async {
+    if (!_loaded) return;
+    final capture = _captureTimer;
+    if (capture != null && capture.isActive) {
+      capture.cancel();
+      await _captureBounds();
+    }
+    final save = _saveTimer;
+    if (save != null && save.isActive) {
+      save.cancel();
+      await _write();
+    }
+    await _writing;
+  }
+
+  /// Chains writes so two never hit the file at once.
+  Future<void> _write() =>
+      _writing = (_writing ?? Future<void>.value()).then((_) => _writeFile());
+
+  Future<void> _writeFile() async {
     final file = _file;
     if (file == null) return;
     try {

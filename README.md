@@ -301,6 +301,20 @@ FlutterZoomViewport(
 // Once the user may see it: final page = session.takePendingLocation();
 ```
 
+Changes are written 400 ms later. Before quitting, `flush()` writes them now
+(never throws, errors go to `onError`), e.g. with
+[`shipglows_tray`](#fluttershipglows_tray):
+
+```dart
+ShipglowsTrayConfig(
+  // …
+  onQuitRequested: () async {
+    await ShipglowsWindowSession.instance.flush();
+    return true;
+  },
+);
+```
+
 Each app passes its own brand tokens through `ShipglowsTitleBarStyle`.
 
 ## `flutter/shipglows_flutter_zoom`
