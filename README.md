@@ -859,8 +859,11 @@ ContentGlows (offline queue, per-account cache, partial writes), BeatGlows
   rename), `MemorySettingsStorage`, `CallbackSettingsStorage` (IndexedDB,
   SharedPreferences). Remote ports: `CallbackSettingsRemote` (REST client,
   blob store), `MemorySettingsRemote` (tests, two devices).
-- Secrets never go in a `SettingKey`: `SecretStore` is the interface for the
-  app's secure storage.
+- Secrets never go in a `SettingKey`: `SecretStore` (`read`, `write`,
+  `delete`, from BeatGlows) is the interface for the app's secure storage,
+  plugged in with `CallbackSecretStore` over `flutter_secure_storage`;
+  `MemorySecretStore` for tests. The app deletes the secrets a setting no
+  longer needs (S3 keys when the storage choice leaves S3).
 
 ## `flutter/shipglows_settings_firestore`
 
