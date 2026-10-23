@@ -779,6 +779,33 @@ if (!result.applied) {
 One `ShipglowsHotkeys` per app, in the main engine. Adding the package adds a
 native plugin: the app needs a full restart, not a hot reload.
 
+## `flutter/shipglows_sync`
+
+Device-to-account sync, ported from CommunityGlows (`cloudReconciliation.ts`,
+`NativeSyncReview.vue`, `postAuthSyncFeedback.ts`). No dependency beyond
+Flutter; `shipglows_settings` builds on it, and business-data stores can too.
+
+- `SyncStatus` / `SyncHealth`: localOnly, synced, pending, syncing,
+  needsReview, unreachable, failed. `SyncSource`: anything with a `status`
+  and `sync()`.
+- `reconcileSnapshots(device, account, choices:)` on two `SyncSnapshot`s
+  (`fields`, and `collections` of records by stable id): union; a value or
+  record set differently on both sides is a `SyncConflict`, resolved per key
+  (`fields/theme`, `profiles/p1`) with `SyncSide.device` or `.account`.
+  `fingerprint` tells whether a side changed before confirming.
+- `SyncReviewHost` (`review`, `resolveReview`, `reviewError`: changed or
+  failed) and `SyncRecoveryHost` (`recovery`, `restoreRecovery`,
+  `dropRecovery`); `SyncRecovery` is JSON for the store's own storage.
+- `SyncProgress`: first-sync steps, each shown at least 1 s, the « ready »
+  notice hides after 3 s.
+- Widgets: `SyncStatusChip` (tap syncs or opens the review),
+  `SyncIssueBanner` (retry, sign in, compare), `SyncReviewPrompt` (opens the
+  review once per new comparison) and `showSyncReviewDialog` (keep device or
+  account for all or per difference, « Rester en local »),
+  `SyncProgressOverlay`, `SyncRecoveryPanel`. Texts: `SyncStrings.fr` (default),
+  `.en`, `forLocale`; `labelOf` / `describe` name settings and values in the
+  app's words.
+
 ## `flutter/shipglows_settings`
 
 User settings (not business data), merged from CommandGlows (sync engine),
@@ -799,13 +826,25 @@ ContentGlows (offline queue, per-account cache, partial writes), BeatGlows
   pushed. A pending field keeps its device value until the remote accepts it;
   every other field follows the remote.
 - `setAccount(SettingsAccount(id:, remote:))`: one device copy per account,
-  never mixed. The first sign-in on a device adopts the signed-out values only
-  if the account has no remote copy yet. `forgetAccount` deletes a copy.
+  never mixed. The first sign-in on a device unites the signed-out values with
+  the account's (`shipglows_sync`): a value set on one side only is kept;
+  values set differently on both sides put the status in `needsReview` until
+  `resolveReview(choices)`, and the device values stay in use meanwhile.
+  `reviewFirstSync: false` keeps the former rule (the account replaces the
+  signed-out values). `forgetAccount` deletes a copy and its recovery.
+- Before applying a review, copies of both sides are saved as a
+  `SyncRecovery` (bucket `recovery.account.<id>`, never sent);
+  `restoreRecovery(side)` puts one back here and in the account,
+  `dropRecovery` deletes them.
+- `progress` (`SyncProgress`): steps of an account's first sync on this device
+  (waiting, received, applied, ready), for `SyncProgressOverlay`.
 - Retry: 30 s doubling to 5 min, on app resume and on `sync()`;
   `SettingsRemoteAuthException` stops until the account changes.
-- `status` (`SyncStatus`), `listenable(key)` (notifies only for that key),
-  `SettingBuilder`, `SettingSwitchTile`, `SettingsSyncChip` (French labels by
-  default, `SettingsSyncLabels.en`).
+- `status` (`SyncStatus`: also `unreachable` when the account was never read
+  on this device), `listenable(key)` (notifies only for that key),
+  `SettingBuilder`, `SettingSwitchTile`. The controller is a `SyncSource`,
+  `SyncReviewHost` and `SyncRecoveryHost`: the sync widgets come from
+  `shipglows_sync`.
 - Storage ports: `FileSettingsStorage(directory)` (native, temp file then
   rename), `MemorySettingsStorage`, `CallbackSettingsStorage` (IndexedDB,
   SharedPreferences). Remote ports: `CallbackSettingsRemote` (REST client,
