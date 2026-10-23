@@ -1000,6 +1000,8 @@ texts, previews, storage and the signed-in account are the app's.
 - `OnboardingLanguagePage`: first page, one button per
   `OnboardingLanguageOption` (label and greeting in its own language), a
   specimen of the greetings as preview; picking one moves on.
+- `OnboardingStatements`: labelled statements (mission, vision, goal) for a
+  page `body`, with `scrollable: true`.
 - `OnboardingFlow(pages:, strings:, onFinish:)`: Skip jumps to the last page,
   done segments of the progress bar go back, focus follows the title. Pages
   can be rebuilt (new language, a status that loads): the current one is kept
