@@ -1,6 +1,9 @@
 #include "tray_menu.h"
 
+#include <CommCtrl.h>
 #include <ShellScalingApi.h>
+#include <UIAutomation.h>
+#include <oleacc.h>
 
 #include <cstring>
 #include <memory>
@@ -128,6 +131,174 @@ std::wstring EscapeMnemonics(const std::wstring& label) {
     escaped.push_back(character);
   }
   return escaped;
+}
+
+// The standard MSAA object of a menu window, passed through unchanged.
+// UiaProviderFromIAccessible refuses oleacc's own objects; this wrapper is
+// what lets UI Automation bridge them.
+class MenuAccessible : public IAccessible {
+ public:
+  explicit MenuAccessible(IAccessible* inner) : inner_(inner) {}
+
+  // IUnknown
+  STDMETHODIMP QueryInterface(REFIID iid, void** object) override {
+    if (object == nullptr) return E_POINTER;
+    if (iid == IID_IUnknown || iid == IID_IDispatch || iid == IID_IAccessible) {
+      *object = static_cast<IAccessible*>(this);
+      AddRef();
+      return S_OK;
+    }
+    *object = nullptr;
+    return E_NOINTERFACE;
+  }
+  STDMETHODIMP_(ULONG) AddRef() override {
+    return InterlockedIncrement(&references_);
+  }
+  STDMETHODIMP_(ULONG) Release() override {
+    const ULONG remaining = InterlockedDecrement(&references_);
+    if (remaining == 0) delete this;
+    return remaining;
+  }
+
+  // IDispatch
+  STDMETHODIMP GetTypeInfoCount(UINT* count) override {
+    return inner_->GetTypeInfoCount(count);
+  }
+  STDMETHODIMP GetTypeInfo(UINT index, LCID lcid, ITypeInfo** info) override {
+    return inner_->GetTypeInfo(index, lcid, info);
+  }
+  STDMETHODIMP GetIDsOfNames(REFIID iid, LPOLESTR* names, UINT count,
+                             LCID lcid, DISPID* ids) override {
+    return inner_->GetIDsOfNames(iid, names, count, lcid, ids);
+  }
+  STDMETHODIMP Invoke(DISPID id, REFIID iid, LCID lcid, WORD flags,
+                      DISPPARAMS* params, VARIANT* result, EXCEPINFO* error,
+                      UINT* argument) override {
+    return inner_->Invoke(id, iid, lcid, flags, params, result, error,
+                          argument);
+  }
+
+  // IAccessible
+  STDMETHODIMP get_accParent(IDispatch** parent) override {
+    return inner_->get_accParent(parent);
+  }
+  STDMETHODIMP get_accChildCount(long* count) override {
+    return inner_->get_accChildCount(count);
+  }
+  STDMETHODIMP get_accChild(VARIANT child, IDispatch** dispatch) override {
+    return inner_->get_accChild(child, dispatch);
+  }
+  STDMETHODIMP get_accName(VARIANT child, BSTR* name) override {
+    return inner_->get_accName(child, name);
+  }
+  STDMETHODIMP get_accValue(VARIANT child, BSTR* value) override {
+    return inner_->get_accValue(child, value);
+  }
+  STDMETHODIMP get_accDescription(VARIANT child, BSTR* description) override {
+    return inner_->get_accDescription(child, description);
+  }
+  STDMETHODIMP get_accRole(VARIANT child, VARIANT* role) override {
+    return inner_->get_accRole(child, role);
+  }
+  STDMETHODIMP get_accState(VARIANT child, VARIANT* state) override {
+    return inner_->get_accState(child, state);
+  }
+  STDMETHODIMP get_accHelp(VARIANT child, BSTR* help) override {
+    return inner_->get_accHelp(child, help);
+  }
+  STDMETHODIMP get_accHelpTopic(BSTR* file, VARIANT child,
+                                long* topic) override {
+    return inner_->get_accHelpTopic(file, child, topic);
+  }
+  STDMETHODIMP get_accKeyboardShortcut(VARIANT child, BSTR* shortcut) override {
+    return inner_->get_accKeyboardShortcut(child, shortcut);
+  }
+  STDMETHODIMP get_accFocus(VARIANT* child) override {
+    return inner_->get_accFocus(child);
+  }
+  STDMETHODIMP get_accSelection(VARIANT* children) override {
+    return inner_->get_accSelection(children);
+  }
+  STDMETHODIMP get_accDefaultAction(VARIANT child, BSTR* action) override {
+    return inner_->get_accDefaultAction(child, action);
+  }
+  STDMETHODIMP accSelect(long flags, VARIANT child) override {
+    return inner_->accSelect(flags, child);
+  }
+  STDMETHODIMP accLocation(long* left, long* top, long* width, long* height,
+                           VARIANT child) override {
+    return inner_->accLocation(left, top, width, height, child);
+  }
+  STDMETHODIMP accNavigate(long direction, VARIANT start,
+                           VARIANT* end) override {
+    return inner_->accNavigate(direction, start, end);
+  }
+  STDMETHODIMP accHitTest(long x, long y, VARIANT* child) override {
+    return inner_->accHitTest(x, y, child);
+  }
+  STDMETHODIMP accDoDefaultAction(VARIANT child) override {
+    return inner_->accDoDefaultAction(child);
+  }
+  STDMETHODIMP put_accName(VARIANT child, BSTR name) override {
+    return inner_->put_accName(child, name);
+  }
+  STDMETHODIMP put_accValue(VARIANT child, BSTR value) override {
+    return inner_->put_accValue(child, value);
+  }
+
+ private:
+  ~MenuAccessible() { inner_->Release(); }
+
+  IAccessible* inner_;
+  LONG references_ = 1;
+};
+
+// Popup menu windows (#32768) leave WM_GETOBJECT unanswered, and UI
+// Automation's own menu proxy then sees an empty pane: Narrator and test
+// tools find no items, although MSAA lists them. Answering UI Automation
+// with that MSAA object, bridged, gives each item its text (shortcut
+// included), state and the separators.
+constexpr UINT_PTR kMenuAccessibilitySubclass = 1;
+
+LRESULT CALLBACK MenuWindowProc(HWND window, UINT message, WPARAM wparam,
+                                LPARAM lparam, UINT_PTR, DWORD_PTR) {
+  if (message == WM_GETOBJECT &&
+      static_cast<DWORD>(lparam) == static_cast<DWORD>(UiaRootObjectId)) {
+    IAccessible* standard = nullptr;
+    if (SUCCEEDED(CreateStdAccessibleObject(
+            window, OBJID_CLIENT, IID_IAccessible,
+            reinterpret_cast<void**>(&standard)))) {
+      auto* accessible = new MenuAccessible(standard);
+      IRawElementProviderSimple* provider = nullptr;
+      const HRESULT bridged = UiaProviderFromIAccessible(
+          accessible, CHILDID_SELF, UIA_PFIA_DEFAULT, &provider);
+      accessible->Release();
+      if (SUCCEEDED(bridged)) {
+        const LRESULT result =
+            UiaReturnRawElementProvider(window, wparam, lparam, provider);
+        provider->Release();
+        return result;
+      }
+    }
+  }
+  if (message == WM_NCDESTROY) {
+    RemoveWindowSubclass(window, MenuWindowProc, kMenuAccessibilitySubclass);
+  }
+  return DefSubclassProc(window, message, wparam, lparam);
+}
+
+// Subclasses each menu window, submenus included, as the menu loop creates
+// it on this thread, before any client can query it.
+LRESULT CALLBACK MenuCreationHook(int code, WPARAM wparam, LPARAM lparam) {
+  if (code == HCBT_CREATEWND) {
+    const HWND window = reinterpret_cast<HWND>(wparam);
+    wchar_t class_name[8] = {};
+    if (GetClassNameW(window, class_name, 8) > 0 &&
+        std::wcscmp(class_name, L"#32768") == 0) {
+      SetWindowSubclass(window, MenuWindowProc, kMenuAccessibilitySubclass, 0);
+    }
+  }
+  return CallNextHookEx(nullptr, code, wparam, lparam);
 }
 
 class MenuBuilder {
@@ -261,9 +432,12 @@ const MenuItem* ShowPopupMenu(HWND owner, const std::vector<MenuItem>& items,
   const UINT alignment = GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0
                              ? TPM_RIGHTALIGN
                              : TPM_LEFTALIGN;
+  HHOOK hook = SetWindowsHookExW(WH_CBT, MenuCreationHook, nullptr,
+                                 GetCurrentThreadId());
   const UINT command = static_cast<UINT>(TrackPopupMenuEx(
       menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | alignment,
       anchor.x, anchor.y, owner, nullptr));
+  if (hook != nullptr) UnhookWindowsHookEx(hook);
   PostMessageW(owner, WM_NULL, 0, 0);
   DestroyMenu(menu);
   return builder.Chosen(command);

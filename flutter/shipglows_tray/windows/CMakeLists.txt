@@ -21,7 +21,7 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin
-  shell32.lib version.lib shcore.lib advapi32.lib)
+  shell32.lib version.lib shcore.lib advapi32.lib comctl32.lib oleacc.lib uiautomationcore.lib)
 
 set(shipglows_tray_bundled_libraries
   ""
