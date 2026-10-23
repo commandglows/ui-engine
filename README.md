@@ -903,8 +903,9 @@ Flutter.
   Commits still run once the screen is gone.
 - `showUndoSnackBar(context, message:, pending:)`: floating snack bar with
   « Undo » (persists for assistive-technology users); `attachUndoSnackBar`
-  ties a `PendingUndo` to the app's own toast instead. Closing commits;
-  undoing elsewhere hides it.
+  ties a `PendingUndo` to the app's own toast instead (closing commits),
+  with its content wrapped in `UndoSnackBarContent` so undoing elsewhere
+  closes that toast, never another message it was queued behind.
 - `TrashView<T>`: trash screen body inside the app's scaffold. `entryOf` maps
   an item to a `TrashEntry` (title, deletion and purge dates, `purging`);
   search with accents folded, `TrashFilter`s, restore, delete permanently and

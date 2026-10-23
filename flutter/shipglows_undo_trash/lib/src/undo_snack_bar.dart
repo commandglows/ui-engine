@@ -11,34 +11,59 @@ const Duration kUndoWindow = Duration(seconds: 5);
 /// calling [PendingUndo.undo]:
 ///
 /// - the snack bar closing any other way (timeout, swipe, replaced) commits;
-/// - the action settled elsewhere (Ctrl/⌘+Z, [UndoWindow.flush]) hides it;
 /// - no snack bar ([controller] null: no messenger) commits at once.
 ///
-/// For an app with its own toast look; [showUndoSnackBar] does both steps
-/// with a plain floating snack bar.
+/// Wrap the snack bar content in [UndoSnackBarContent] so it also closes when
+/// the action is settled elsewhere (Ctrl/⌘+Z, [UndoWindow.flush]). For an app
+/// with its own toast look; [showUndoSnackBar] does all of it with a plain
+/// floating snack bar.
 void attachUndoSnackBar(
   PendingUndo pending,
-  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller, {
-  ScaffoldMessengerState? messenger,
-}) {
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller,
+) {
   if (controller == null) {
     unawaited(pending.commit());
     return;
   }
-  var closed = false;
-  unawaited(
-    controller.closed.then((_) {
-      closed = true;
-      return pending.commit();
-    }),
-  );
-  unawaited(
-    pending.settled.then((_) {
-      if (!closed && messenger != null && messenger.mounted) {
-        messenger.hideCurrentSnackBar();
-      }
-    }),
-  );
+  unawaited(controller.closed.then((_) => pending.commit()));
+}
+
+/// Snack bar content that closes its snack bar once [pending] is settled
+/// elsewhere, even when it was still queued behind another one then: a
+/// snack bar content is only built while its snack bar is the current one,
+/// so it never closes another app message.
+class UndoSnackBarContent extends StatefulWidget {
+  const UndoSnackBarContent({
+    super.key,
+    required this.pending,
+    required this.child,
+  });
+
+  final PendingUndo pending;
+  final Widget child;
+
+  @override
+  State<UndoSnackBarContent> createState() => _UndoSnackBarContentState();
+}
+
+class _UndoSnackBarContentState extends State<UndoSnackBarContent> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.pending.isOpen) {
+      unawaited(widget.pending.settled.then((_) => _hide()));
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _hide());
+    }
+  }
+
+  void _hide() {
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Shows [message] with an « Undo » action for [duration] and settles
@@ -61,12 +86,12 @@ void showUndoSnackBar(
   messenger.hideCurrentSnackBar();
   final controller = messenger.showSnackBar(
     SnackBar(
-      content: Text(message),
+      content: UndoSnackBarContent(pending: pending, child: Text(message)),
       behavior: SnackBarBehavior.floating,
       duration: duration,
       persist: MediaQuery.accessibleNavigationOf(context),
       action: SnackBarAction(label: actionLabel, onPressed: pending.undo),
     ),
   );
-  attachUndoSnackBar(pending, controller, messenger: messenger);
+  attachUndoSnackBar(pending, controller);
 }

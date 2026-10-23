@@ -157,6 +157,52 @@ void main() {
     expect((undone, committed), (1, 1));
   });
 
+  testWidgets('undoing a queued toast never closes the message before it', (
+    tester,
+  ) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (c) {
+              context = c;
+              return const SizedBox();
+            },
+          ),
+        ),
+      ),
+    );
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Error'), duration: Duration(minutes: 1)),
+    );
+    var committed = 0;
+    final pending = PendingUndo(onCommit: () => committed++);
+    final controller = messenger.showSnackBar(
+      SnackBar(
+        content: UndoSnackBarContent(
+          pending: pending,
+          child: const Text('Moved'),
+        ),
+        duration: const Duration(minutes: 1),
+        action: SnackBarAction(label: 'Undo', onPressed: pending.undo),
+      ),
+    );
+    attachUndoSnackBar(pending, controller);
+    await tester.pumpAndSettle();
+
+    pending.undo();
+    await tester.pumpAndSettle();
+    expect(find.text('Error'), findsOneWidget);
+
+    messenger.hideCurrentSnackBar();
+    await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
+    expect(find.text('Moved'), findsNothing);
+    expect(committed, 0);
+  });
+
   testWidgets('UndoShortcuts: Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo, '
       'text fields keep their keys', (tester) async {
     var undos = 0;
