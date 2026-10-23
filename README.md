@@ -840,6 +840,16 @@ ContentGlows (offline queue, per-account cache, partial writes), BeatGlows
   (waiting, received, applied, ready), for `SyncProgressOverlay`.
 - Retry: 30 s doubling to 5 min, on app resume and on `sync()`;
   `SettingsRemoteAuthException` stops until the account changes.
+- Map settings (`SettingKey.map(id)`, `mergeFields` on by default): a change
+  marks only the nested fields that differ, `setField(key, path, value)`
+  edits one of them, the push sends a partial map (the remote deep-merges:
+  Firestore `merge: true`, an API merge), and a pull keeps the pending nested
+  fields while taking the others.
+- Records created offline: `isTemporaryId` (`(id) => id.startsWith(
+  'offline-')`) holds every pending field pointing at one; it is shown but
+  not sent until `rewriteIds({tempId: serverId})`, which rewrites the stored
+  values and sends them. The value helpers (`rewriteSyncIds`,
+  `holdsTemporaryId`) live in `shipglows_sync` for data stores too.
 - `status` (`SyncStatus`: also `unreachable` when the account was never read
   on this device), `listenable(key)` (notifies only for that key),
   `SettingBuilder`, `SettingSwitchTile`. The controller is a `SyncSource`,

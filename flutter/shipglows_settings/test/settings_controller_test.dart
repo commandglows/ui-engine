@@ -230,4 +230,113 @@ void main() {
     await controller.set(theme, ThemeMode.dark);
     expect(calls, 1);
   });
+
+  group('nested map fields', () {
+    final robot = SettingKey.map('robotSettings');
+    final mapSchema = SettingsSchema(keys: [robot]);
+    SettingsController mapController() => SettingsController(
+      schema: mapSchema,
+      storage: MemorySettingsStorage(),
+      observeAppLifecycle: false,
+    );
+
+    test('pushes only the nested field that changed', () async {
+      final remote = MemorySettingsRemote(
+        initial: {
+          'robotSettings': {
+            'ideaPoolEnabled': false,
+            'contentFrequency': {'linkedin': 2, 'x': 5},
+          },
+        },
+      );
+      final controller = mapController();
+      await controller.open();
+      await controller.setAccount(SettingsAccount(id: 'u1', remote: remote));
+      await controller.sync();
+
+      await controller.setField(robot, ['contentFrequency', 'linkedin'], 4);
+      await controller.sync();
+      expect(remote.pushes.last, {
+        'robotSettings': {
+          'contentFrequency': {'linkedin': 4},
+        },
+      });
+      expect(remote.values!['robotSettings'], {
+        'ideaPoolEnabled': false,
+        'contentFrequency': {'linkedin': 4, 'x': 5},
+      });
+      controller.dispose();
+    });
+
+    test('a pull keeps the pending nested field and takes the others', () async {
+      final remote = MemorySettingsRemote(
+        initial: {
+          'robotSettings': {'ideaPoolEnabled': false, 'aiRuntime': 'byok'},
+        },
+      );
+      final controller = mapController();
+      await controller.open();
+      await controller.setAccount(SettingsAccount(id: 'u1', remote: remote));
+      await controller.sync();
+      remote.failWith = StateError('offline');
+      await controller.setField(robot, ['ideaPoolEnabled'], true);
+      await controller.sync();
+
+      // Another device changes a sibling field.
+      remote.failWith = null;
+      await remote.push({
+        'robotSettings': {'aiRuntime': 'platform'},
+      });
+      await controller.sync();
+      expect(controller.get(robot), {
+        'ideaPoolEnabled': true,
+        'aiRuntime': 'platform',
+      });
+      expect(remote.values!['robotSettings'], {
+        'ideaPoolEnabled': true,
+        'aiRuntime': 'platform',
+      });
+      controller.dispose();
+    });
+  });
+
+  group('records created offline', () {
+    final project = SettingKey<String?>(
+      'defaultProjectId',
+      defaultValue: null,
+      codec: SettingCodec.string.nullable(),
+    );
+    final idSchema = SettingsSchema(keys: [project, sounds]);
+
+    test('a field holding a temporary id waits for the server id', () async {
+      final remote = MemorySettingsRemote();
+      final controller = SettingsController(
+        schema: idSchema,
+        storage: MemorySettingsStorage(),
+        observeAppLifecycle: false,
+        isTemporaryId: (id) => id.startsWith('offline-'),
+      );
+      await controller.open();
+      await controller.setAccount(SettingsAccount(id: 'u1', remote: remote));
+      await controller.sync();
+
+      await controller.edit(
+        (e) => e
+          ..set(project, 'offline-1')
+          ..set(sounds, false),
+      );
+      await controller.sync();
+      // The other field goes; the project waits, shown on the device.
+      expect(remote.values, {'sounds': false});
+      expect(controller.get(project), 'offline-1');
+      expect(controller.status.health, SyncHealth.pending);
+
+      await controller.rewriteIds({'offline-1': 'proj_42'});
+      await controller.sync();
+      expect(controller.get(project), 'proj_42');
+      expect(remote.values, {'sounds': false, 'defaultProjectId': 'proj_42'});
+      expect(controller.status.health, SyncHealth.synced);
+      controller.dispose();
+    });
+  });
 }

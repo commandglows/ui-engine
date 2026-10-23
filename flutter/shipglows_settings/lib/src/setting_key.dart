@@ -121,7 +121,23 @@ class SettingKey<T> {
     required this.codec,
     this.scope = SettingScope.account,
     this.normalize,
+    this.mergeFields = false,
   });
+
+  /// A JSON object setting (robot settings, dashboard layout). With
+  /// [mergeFields], each nested field is tracked and sent on its own.
+  static SettingKey<Map<String, Object?>> map(
+    String id, {
+    Map<String, Object?> defaultValue = const {},
+    SettingScope scope = SettingScope.account,
+    bool mergeFields = true,
+  }) => SettingKey(
+    id,
+    defaultValue: defaultValue,
+    codec: SettingCodec.jsonMap,
+    scope: scope,
+    mergeFields: mergeFields,
+  );
 
   static SettingKey<bool> boolean(
     String id, {
@@ -179,6 +195,13 @@ class SettingKey<T> {
 
   /// Clamps or repairs a decoded value (a negative step becomes 0).
   final T Function(T value)? normalize;
+
+  /// For a map value: a change marks only the nested fields that differ
+  /// (`robotSettings/contentFrequency/linkedin`), the push sends only them,
+  /// and a pull keeps those pending here while taking the others. The remote
+  /// must merge nested maps (Firestore `merge: true`, an API deep merge).
+  /// Nested field names must not contain `/`.
+  final bool mergeFields;
 
   bool get isSynced => scope == SettingScope.account;
 

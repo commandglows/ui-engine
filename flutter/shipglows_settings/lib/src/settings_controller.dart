@@ -68,6 +68,7 @@ class SettingsController extends ChangeNotifier
     this.remoteTimeout = const Duration(seconds: 10),
     this.observeAppLifecycle = true,
     this.reviewFirstSync = true,
+    this.isTemporaryId,
     SyncProgress? progress,
     DateTime Function()? clock,
     this.onError,
@@ -90,6 +91,11 @@ class SettingsController extends ChangeNotifier
   /// `false` keeps the former rule: on a first sign-in, an account that
   /// already has settings replaces the signed-out values without asking.
   final bool reviewFirstSync;
+
+  /// Recognizes the ids of records created offline (`offline-…`). A pending
+  /// field holding one stays on the device, shown but not sent, until
+  /// [rewriteIds] gives it the server id.
+  final TemporaryIdTest? isTemporaryId;
 
   /// Steps of an account's first sync on this device, for a progress screen.
   final SyncProgress progress;
@@ -232,6 +238,43 @@ class SettingsController extends ChangeNotifier
   Future<void> reset(SettingKey<Object?> key) =>
       edit((editor) => editor.reset(key));
 
+  /// Sets one nested field of a map setting (`['contentFrequency',
+  /// 'linkedin']`), keeping every other field; `null` removes it. With
+  /// [SettingKey.mergeFields], only that field is sent.
+  Future<void> setField(
+    SettingKey<Map<String, Object?>> key,
+    List<String> path,
+    Object? value,
+  ) {
+    assert(path.isNotEmpty, 'setField needs a nested field name.');
+    final next = _copyJson(get(key)) as Map<String, Object?>;
+    _writePath(next, path, value, present: value != null);
+    return set(key, next);
+  }
+
+  /// Gives the server ids to values that held temporary ones ([ids]:
+  /// temporary id to server id), on the device and in pending pushes, then
+  /// sends the fields that were waiting for them.
+  Future<void> rewriteIds(Map<String, String> ids) async {
+    if (ids.isEmpty) return;
+    var changed = false;
+    for (final bucket in [_device, _account]) {
+      var bucketChanged = false;
+      for (final entry in bucket.values.entries.toList()) {
+        final next = rewriteSyncIds(entry.value, ids);
+        if (_sameJson(entry.value, next)) continue;
+        bucket.values[entry.key] = next;
+        bucketChanged = true;
+      }
+      if (!bucketChanged) continue;
+      changed = true;
+      await _persist(bucket, rethrowError: false);
+    }
+    if (!changed) return;
+    _changed();
+    unawaited(sync());
+  }
+
   /// Applies several changes with one device write and one push.
   Future<void> edit(void Function(SettingsEditor editor) changes) async {
     final editor = SettingsEditor._();
@@ -250,10 +293,7 @@ class SettingsController extends ChangeNotifier
       }
       if (key.isSynced) {
         accountChanged = true;
-        if (_remote != null) {
-          bucket.pending.add(key.id);
-          _edits[key.id] = (_edits[key.id] ?? 0) + 1;
-        }
+        if (_remote != null) _markPending(bucket, key, before, encoded);
       } else {
         deviceChanged = true;
       }
@@ -542,13 +582,18 @@ class SettingsController extends ChangeNotifier
       changed = (document != null && _applyRemote(bucket, document)) || changed;
       unawaited(progress.advance(SyncStage.dataApplied));
 
-      if (bucket.pending.isNotEmpty) {
-        final sent = {for (final id in bucket.pending) id: _edits[id] ?? 0};
-        final changes = {for (final id in sent.keys) id: bucket.values[id]};
+      // A field pointing at a record not on the server yet waits for
+      // rewriteIds.
+      final ready = bucket.pending
+          .where((entry) => !_holdsTemporaryId(bucket, entry))
+          .toList();
+      if (ready.isNotEmpty) {
+        final sent = {for (final entry in ready) entry: _edits[entry] ?? 0};
+        final changes = _changesFor(bucket, sent.keys);
         final result = await remote.push(changes).timeout(remoteTimeout);
         if (generation != _generation) return;
-        sent.forEach((id, edit) {
-          if ((_edits[id] ?? 0) == edit) bucket.pending.remove(id);
+        sent.forEach((entry, edit) {
+          if ((_edits[entry] ?? 0) == edit) bucket.pending.remove(entry);
         });
         if (result != null) changed = _applyRemote(bucket, result) || changed;
       }
@@ -672,7 +717,12 @@ class SettingsController extends ChangeNotifier
     for (final key in schema.inScope(SettingScope.account)) {
       if (bucket.pending.contains(key.id)) continue;
       final raw = values[key.id];
-      final encoded = raw == null ? null : key.write(key.read(raw));
+      var encoded = raw == null ? null : key.write(key.read(raw));
+      final held = _pendingPaths(bucket, key.id);
+      if (held.isNotEmpty) {
+        // Nested fields changed here keep their device value.
+        encoded = _overlay(encoded, bucket.values[key.id], held);
+      }
       if (_sameJson(bucket.values[key.id], encoded)) continue;
       changed = true;
       if (encoded == null) {
@@ -684,6 +734,158 @@ class SettingsController extends ChangeNotifier
     bucket.revision = document.revision ?? bucket.revision;
     return changed;
   }
+
+  /// Marks [key] pending: only the nested fields that differ for a
+  /// [SettingKey.mergeFields] map, the whole field otherwise.
+  void _markPending(
+    _Bucket bucket,
+    SettingKey<Object?> key,
+    Object? before,
+    Object? after,
+  ) {
+    final List<String> entries;
+    if (key.mergeFields &&
+        before is Map &&
+        after is Map &&
+        !bucket.pending.contains(key.id)) {
+      entries = [
+        for (final path in _changedPaths(before, after))
+          [key.id, ...path].join('/'),
+      ];
+    } else {
+      bucket.pending.removeWhere((entry) => entry.startsWith('${key.id}/'));
+      entries = [key.id];
+    }
+    for (final entry in entries) {
+      bucket.pending.add(entry);
+      _edits[entry] = (_edits[entry] ?? 0) + 1;
+    }
+  }
+
+  /// Nested paths pending under [id] (`['contentFrequency', 'linkedin']`).
+  static List<List<String>> _pendingPaths(_Bucket bucket, String id) => [
+    for (final entry in bucket.pending)
+      if (entry.startsWith('$id/')) entry.substring(id.length + 1).split('/'),
+  ];
+
+  bool _holdsTemporaryId(_Bucket bucket, String entry) {
+    final test = isTemporaryId;
+    if (test == null) return false;
+    final (id, path) = _splitEntry(entry);
+    return holdsTemporaryId(_readPath(bucket.values[id], path).$2, test);
+  }
+
+  /// What [entries] send: whole fields, and partial maps for nested ones.
+  static Map<String, Object?> _changesFor(
+    _Bucket bucket,
+    Iterable<String> entries,
+  ) {
+    final changes = <String, Object?>{};
+    // A whole field sent already carries its nested ones.
+    final whole = {
+      for (final entry in entries)
+        if (!entry.contains('/')) entry,
+    };
+    final partials = <String, Map<String, Object?>>{};
+    for (final entry in entries) {
+      final (id, path) = _splitEntry(entry);
+      if (path.isEmpty) {
+        changes[id] = bucket.values[id];
+        continue;
+      }
+      if (whole.contains(id)) continue;
+      final partial = partials.putIfAbsent(id, () => <String, Object?>{});
+      changes[id] = partial;
+      // A removed nested field is sent as null.
+      _writePath(partial, path, _readPath(bucket.values[id], path).$2);
+    }
+    return changes;
+  }
+
+  static (String, List<String>) _splitEntry(String entry) {
+    final parts = entry.split('/');
+    return (parts.first, parts.sublist(1));
+  }
+
+  /// Leaf paths whose content differs between two maps.
+  static List<List<String>> _changedPaths(
+    Map<Object?, Object?> before,
+    Map<Object?, Object?> after,
+  ) {
+    final paths = <List<String>>[];
+    final names = {...before.keys, ...after.keys}.map((name) => '$name');
+    for (final name in names) {
+      final a = before[name];
+      final b = after[name];
+      if (a is Map && b is Map) {
+        for (final path in _changedPaths(a, b)) {
+          paths.add([name, ...path]);
+        }
+      } else if (!_sameJson(a, b) ||
+          before.containsKey(name) != after.containsKey(name)) {
+        paths.add([name]);
+      }
+    }
+    return paths;
+  }
+
+  /// [remote] with the device's value at each of [paths].
+  static Object? _overlay(
+    Object? remote,
+    Object? device,
+    List<List<String>> paths,
+  ) {
+    final result = remote is Map
+        ? _copyJson(remote) as Map<String, Object?>
+        : <String, Object?>{};
+    for (final path in paths) {
+      final (present, value) = _readPath(device, path);
+      _writePath(result, path, value, present: present);
+    }
+    return result;
+  }
+
+  /// Whether [path] exists in [value], and what it holds.
+  static (bool, Object?) _readPath(Object? value, List<String> path) {
+    var current = value;
+    for (final name in path) {
+      if (current is! Map || !current.containsKey(name)) return (false, null);
+      current = current[name];
+    }
+    return (true, current);
+  }
+
+  /// Sets (or, when not [present], removes) [path] in [target].
+  static void _writePath(
+    Map<String, Object?> target,
+    List<String> path,
+    Object? value, {
+    bool present = true,
+  }) {
+    var current = target;
+    for (final name in path.take(path.length - 1)) {
+      final next = current[name];
+      final child = next is Map
+          ? _copyJson(next) as Map<String, Object?>
+          : <String, Object?>{};
+      current[name] = child;
+      current = child;
+    }
+    if (present) {
+      current[path.last] = value;
+    } else {
+      current.remove(path.last);
+    }
+  }
+
+  /// Mutable deep copy of a JSON-safe value.
+  static Object? _copyJson(Object? value) => switch (value) {
+    final Map<Object?, Object?> map => <String, Object?>{
+      for (final entry in map.entries) '${entry.key}': _copyJson(entry.value),
+    },
+    final List<Object?> list => [for (final item in list) _copyJson(item)],
+    _ => value,
+  };
 
   void _restartWatch() {
     _watch?.cancel();

@@ -22,7 +22,8 @@ export 'package:shipglows_sync/shipglows_sync.dart'
         SyncSide,
         SyncSource,
         SyncStage,
-        SyncStatus;
+        SyncStatus,
+        TemporaryIdTest;
 
 export 'src/file_settings_storage_stub.dart'
     if (dart.library.io) 'src/file_settings_storage_io.dart';

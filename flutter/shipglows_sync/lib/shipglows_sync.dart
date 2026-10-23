@@ -9,12 +9,15 @@
 /// - [SyncReviewHost] / [SyncRecoveryHost]: a store that asks before its
 ///   first sync and keeps [SyncRecovery] copies of both sides.
 /// - [SyncProgress]: the steps of a first sync after sign-in.
+/// - [rewriteSyncIds] / [holdsTemporaryId]: values pointing at a record
+///   created offline wait for its server id, then are rewritten with it.
 /// - Widgets: [SyncStatusChip], [SyncIssueBanner], [SyncReviewPrompt] and
 ///   [showSyncReviewDialog], [SyncProgressOverlay], [SyncRecoveryPanel],
 ///   worded by [SyncStrings] (French and English).
 library;
 
 export 'src/reconciliation.dart';
+export 'src/sync_ids.dart';
 export 'src/sync_progress.dart';
 export 'src/sync_progress_view.dart';
 export 'src/sync_recovery_panel.dart';

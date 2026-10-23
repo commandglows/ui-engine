@@ -78,6 +78,7 @@ class CallbackSettingsRemote implements SettingsRemote {
 }
 
 /// In memory, shared by several controllers to stand for two devices in tests.
+/// Nested maps are merged like Firestore `merge: true` or an API deep merge.
 class MemorySettingsRemote implements SettingsRemote {
   MemorySettingsRemote({Map<String, Object?>? initial, DateTime Function()? clock})
     : _values = initial == null ? null : Map.of(initial),
@@ -115,8 +116,11 @@ class MemorySettingsRemote implements SettingsRemote {
     pushes.add(Map.of(changes));
     final values = _values ??= {};
     changes.forEach((id, value) {
+      final current = values[id];
       if (value == null) {
         values.remove(id);
+      } else if (value is Map && current is Map) {
+        values[id] = _merge(current, value);
       } else {
         values[id] = value;
       }
@@ -128,4 +132,12 @@ class MemorySettingsRemote implements SettingsRemote {
 
   @override
   Stream<RemoteSettings?>? watch() => null;
+
+  static Map<String, Object?> _merge(Map<Object?, Object?> into, Map<Object?, Object?> from) => {
+    for (final entry in into.entries) '${entry.key}': entry.value,
+    for (final entry in from.entries)
+      '${entry.key}': entry.value is Map && into[entry.key] is Map
+          ? _merge(into[entry.key]! as Map, entry.value! as Map)
+          : entry.value,
+  };
 }
