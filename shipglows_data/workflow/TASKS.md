@@ -8,7 +8,7 @@
 - [ ] `shipglows_hotkeys`: no consumer yet.
 - [ ] `shipglows_window` frame theme: in BeatGlows, CommandGlows, ContentGlows and the ShipGlows app, drop the template `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED` in `win32_window.cpp` (the frame already follows the app theme through `ShipglowsWindowFrame`).
 - [ ] `shipglows_diagnostics`: migrate DreamGlows (`path_flutter/lib/src/crash_log.dart`, engine labels main/capture), then ContentGlows, CommandGlows, ReplayGlows (Sentry through `onReport`) and the ShipGlows app; add a « Copier le diagnostic » entry where the app has none.
-- [ ] `shipglows_guide`: pin ReplayGlows `pubspec.lock` on the pushed ui-engine commit (local `pubspec_overrides.yaml` until then); widget tests (progress, first-visit trigger, target placement); more ReplayGlows screens (Notes, Play) once the Feed pilot is validated.
+- [ ] `shipglows_guide`: widget tests (progress, first-visit trigger, target placement); more ReplayGlows screens (Notes, Play) once the Feed pilot is validated.
 
 ## Done
 
