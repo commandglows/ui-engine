@@ -41,6 +41,7 @@ class ShipglowsTray {
   final _events = StreamController<ShipglowsTrayEvent>.broadcast();
   final _iconVisible = ValueNotifier(false);
   final _closeBehavior = ValueNotifier(ShipglowsTrayCloseBehavior.ask);
+  final _launchAtStartup = ValueNotifier(false);
   final _sessionStore = ShipglowsTrayMemoryStore();
 
   ShipglowsTrayConfig? _config;
@@ -49,6 +50,7 @@ class ShipglowsTray {
   List<ShipglowsMenuItem> _items = const [];
   bool _quitting = false;
   bool _askingToClose = false;
+  bool _launchedAtStartup = false;
 
   /// Whether the tray exists on this platform.
   static bool get isSupported =>
@@ -67,6 +69,14 @@ class ShipglowsTray {
   ValueListenable<ShipglowsTrayCloseBehavior> get closeBehavior =>
       _closeBehavior;
 
+  /// Whether Windows launches the app when the user signs in: its entry
+  /// exists for this executable and is not turned off in Task Manager.
+  /// Read by [start].
+  ValueListenable<bool> get launchAtStartup => _launchAtStartup;
+
+  /// Whether Windows launched this process at sign-in, known after [start].
+  bool get launchedAtStartup => _launchedAtStartup;
+
   /// Shows the icon with [config]; calling it again replaces the whole
   /// configuration. Returns whether the icon is visible.
   Future<bool> start(ShipglowsTrayConfig config) async {
@@ -79,12 +89,18 @@ class ShipglowsTray {
         (folder == null ? _sessionStore : ShipglowsTrayFileStore(folder));
     _closeBehavior.value = await _store!.load() ?? config.closeBehavior;
     _exeVersion ??= await _invoke<String>('version');
+    _readLaunchAtStartup(
+      await _invoke<Map<Object?, Object?>>('launchAtStartup', {
+        'name': config.appName,
+      }),
+    );
     final visible =
         await _invoke<bool>('start', {
           ..._payload(config),
           'closeBehavior': _closeBehavior.value.name,
           'secondInstanceShowsMainWindow': config.secondInstanceShowsMainWindow,
           'hasQuitHandler': config.onQuitRequested != null,
+          'hideWhenLaunchedAtStartup': config.hideWhenLaunchedAtStartup,
           ...config.primaryClick.toMap(),
         }) ??
         false;
@@ -114,6 +130,7 @@ class ShipglowsTray {
       closeDialogContext: current.closeDialogContext,
       primaryClick: current.primaryClick,
       secondInstanceShowsMainWindow: current.secondInstanceShowsMainWindow,
+      hideWhenLaunchedAtStartup: current.hideWhenLaunchedAtStartup,
       onQuitRequested: current.onQuitRequested,
     );
     _config = next;
@@ -132,6 +149,27 @@ class ShipglowsTray {
     await _invoke<void>('setCloseBehavior', {'closeBehavior': behavior.name});
     if (!save) return true;
     return await _store?.save(behavior) ?? false;
+  }
+
+  /// Turns the launch at Windows sign-in on or off for the current user,
+  /// under the app's name (one entry per app: the last copy that turned it
+  /// on wins). Returns false when it could not be written.
+  Future<bool> setLaunchAtStartup(bool enabled) async {
+    final config = _config;
+    if (!isSupported || config == null) return false;
+    final state = await _invoke<Map<Object?, Object?>>('setLaunchAtStartup', {
+      'name': config.appName,
+      'enabled': enabled,
+    });
+    _readLaunchAtStartup(state);
+    return state?['written'] == true;
+  }
+
+  void _readLaunchAtStartup(Map<Object?, Object?>? state) {
+    if (state == null) return;
+    _launchAtStartup.value =
+        state['registered'] == true && state['approved'] != false;
+    _launchedAtStartup = state['launched'] == true;
   }
 
   /// Hides the main window to the tray (minimizes it while the icon is

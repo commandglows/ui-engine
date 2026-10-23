@@ -197,10 +197,11 @@ Déjà couverts par un paquet existant, à migrer plutôt qu'à créer :
   que l'app implémente (backends différents).
 - Dépendances : `shipglows_diagnostics` (joindre le rapport), `record`.
 
-### 11. `shipglows_autostart` — Dart (FFI registre)
+### 11. Lancement au démarrage — fait dans `shipglows_tray`
 
-- Clé `HKCU\…\Run`, lancement réduit dans la zone de notification.
-- Dépendances : `shipglows_tray` (démarrer caché), `shipglows_settings`.
+- Clé `HKCU\…\Run`, lancement caché dans la zone de notification.
+- Pas de paquet à part : démarrer caché exige le tray, et le plugin natif
+  existait déjà (`setLaunchAtStartup`, `ShipglowsTrayStartupSetting`).
 
 ### 12. `shipglows_notifications` — natif Win32 (toasts)
 

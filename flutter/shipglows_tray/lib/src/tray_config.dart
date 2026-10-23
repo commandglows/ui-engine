@@ -135,6 +135,8 @@ class ShipglowsTrayStrings {
     required this.closeSetting,
     required this.closeAsk,
     required this.closeMinimize,
+    required this.launchAtStartup,
+    required this.launchAtStartupHint,
   });
 
   static const fr = ShipglowsTrayStrings(
@@ -152,6 +154,8 @@ class ShipglowsTrayStrings {
     closeSetting: 'Quand je ferme la fenêtre',
     closeAsk: 'Me demander',
     closeMinimize: 'Réduire dans la barre des tâches',
+    launchAtStartup: 'Lancer {app} au démarrage de Windows',
+    launchAtStartupHint: 'Il attend dans la zone de notification.',
   );
 
   static const en = ShipglowsTrayStrings(
@@ -169,6 +173,8 @@ class ShipglowsTrayStrings {
     closeSetting: 'When I close the window',
     closeAsk: 'Ask me',
     closeMinimize: 'Minimize to the taskbar',
+    launchAtStartup: 'Launch {app} when Windows starts',
+    launchAtStartupHint: 'It waits in the system tray.',
   );
 
   /// Labels of the shared standard entries.
@@ -195,6 +201,10 @@ class ShipglowsTrayStrings {
   final String closeAsk;
   final String closeMinimize;
 
+  /// Label and hint of `ShipglowsTrayStartupSetting`.
+  final String launchAtStartup;
+  final String launchAtStartupHint;
+
   ShipglowsTrayStrings copyWith({
     ShipglowsMenuStrings? menu,
     String? open,
@@ -212,6 +222,8 @@ class ShipglowsTrayStrings {
     String? closeSetting,
     String? closeAsk,
     String? closeMinimize,
+    String? launchAtStartup,
+    String? launchAtStartupHint,
   }) => ShipglowsTrayStrings(
     menu: (menu ?? this.menu).copyWith(
       settings: settings,
@@ -230,6 +242,8 @@ class ShipglowsTrayStrings {
     closeSetting: closeSetting ?? this.closeSetting,
     closeAsk: closeAsk ?? this.closeAsk,
     closeMinimize: closeMinimize ?? this.closeMinimize,
+    launchAtStartup: launchAtStartup ?? this.launchAtStartup,
+    launchAtStartupHint: launchAtStartupHint ?? this.launchAtStartupHint,
   );
 }
 
@@ -360,6 +374,7 @@ class ShipglowsTrayConfig {
     this.closeDialogContext,
     this.primaryClick = ShipglowsTrayClick.openMainWindow,
     this.secondInstanceShowsMainWindow = true,
+    this.hideWhenLaunchedAtStartup = true,
     this.onQuitRequested,
   });
 
@@ -397,6 +412,12 @@ class ShipglowsTrayConfig {
   /// Whether launching the app again brings the running one to the front
   /// (with the runner's `ShipglowsTrayForwardToPrimary`).
   final bool secondInstanceShowsMainWindow;
+
+  /// Whether a launch at Windows sign-in (`ShipglowsTray.setLaunchAtStartup`)
+  /// keeps the main window hidden in the tray until the user opens it. Show
+  /// it with `ShipglowsTray.showMainWindow`: other ways of showing it are
+  /// ignored until then.
+  final bool hideWhenLaunchedAtStartup;
 
   /// Called before quitting (menu, `ShipglowsTray.quit`, or closing with
   /// [ShipglowsTrayCloseBehavior.quit]) to save or tear down; false keeps

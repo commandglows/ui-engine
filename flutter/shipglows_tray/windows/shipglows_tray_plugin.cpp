@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "encodable_utils.h"
+#include "launch_at_startup.h"
 #include "single_instance_internal.h"
 #include "tray_host.h"
 #include "tray_menu.h"
@@ -138,6 +139,17 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     const auto* arguments = call.arguments();
     if (method == "version") {
       result->Success(flutter::EncodableValue(ProductVersion()));
+    } else if (method == "launchAtStartup") {
+      result->Success(LaunchAtStartupValue(
+          Wide(StringField(arguments, "name"))));
+    } else if (method == "setLaunchAtStartup") {
+      const std::wstring name = Wide(StringField(arguments, "name"));
+      const bool written = WriteLaunchAtStartup(
+          name, BoolField(arguments, "enabled", false));
+      flutter::EncodableValue state = LaunchAtStartupValue(name);
+      std::get<flutter::EncodableMap>(state)[flutter::EncodableValue(
+          "written")] = flutter::EncodableValue(written);
+      result->Success(state);
     } else if (method == "start") {
       close_behavior_ =
           CloseBehaviorFrom(StringField(arguments, "closeBehavior"));
@@ -157,6 +169,12 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
       quitting_ = false;
       started_ = true;
       const bool visible = host_->Show();
+      if (visible && !startup_handled_ &&
+          BoolField(arguments, "hideWhenLaunchedAtStartup", true) &&
+          LaunchedAtStartup()) {
+        StayHiddenAtLaunch();
+      }
+      startup_handled_ = true;
       result->Success(flutter::EncodableValue(visible));
       AttachSecondInstanceHandler(
           this, [this](const std::vector<std::wstring>& arguments) {
@@ -180,6 +198,7 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
       Quit();
     } else if (method == "dispose") {
       started_ = false;
+      suppress_show_ = false;
       if (host_) host_->Hide();
       DetachSecondInstanceHandler(this);
       items_.clear();
@@ -223,6 +242,7 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   }
 
   void ShowMainWindow() {
+    suppress_show_ = false;
     const HWND window = MainWindow();
     if (window == nullptr) return;
     ActivateWindowForUser(window, window);
@@ -238,15 +258,44 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     ShowWindow(window, host_ && host_->visible() ? SW_HIDE : SW_MINIMIZE);
   }
 
+  // Launched by Windows at sign-in: the window waits in the tray. The runner
+  // shows it on its first frame, often after this; that show is dropped
+  // until the window is opened through the tray (or ShipglowsTray.show).
+  void StayHiddenAtLaunch() {
+    const HWND window = MainWindow();
+    if (window != nullptr && IsWindowVisible(window)) {
+      ShowWindow(window, SW_HIDE);
+    } else {
+      suppress_show_ = true;
+    }
+  }
+
+  static flutter::EncodableValue LaunchAtStartupValue(
+      const std::wstring& name) {
+    const LaunchAtStartupState state = ReadLaunchAtStartup(name);
+    return flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue("registered"),
+         flutter::EncodableValue(state.registered)},
+        {flutter::EncodableValue("approved"),
+         flutter::EncodableValue(state.approved)},
+        {flutter::EncodableValue("launched"),
+         flutter::EncodableValue(LaunchedAtStartup())},
+    });
+  }
+
   void Quit() {
     const HWND window = MainWindow();
     quitting_ = true;
     if (window != nullptr) PostMessageW(window, WM_CLOSE, 0, 0);
   }
 
-  // Closing the main window while the tray runs.
+  // Closing the main window while the tray runs; dropping the launch show.
   std::optional<LRESULT> HandleTopLevelMessage(HWND window, UINT message,
-                                               WPARAM, LPARAM) {
+                                               WPARAM, LPARAM lparam) {
+    if (message == WM_WINDOWPOSCHANGING && suppress_show_) {
+      reinterpret_cast<WINDOWPOS*>(lparam)->flags &= ~SWP_SHOWWINDOW;
+      return std::nullopt;
+    }
     if (message != WM_CLOSE || !started_) return std::nullopt;
     if (quitting_) {
       quitting_ = false;
@@ -327,7 +376,11 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   }
 
   void OnSecondInstance(const std::vector<std::wstring>& arguments) {
-    if (second_instance_shows_main_window_) ShowMainWindow();
+    if (second_instance_shows_main_window_) {
+      ShowMainWindow();
+    } else {
+      suppress_show_ = false;
+    }
     flutter::EncodableList list;
     for (const auto& argument : arguments) {
       list.emplace_back(Utf8(argument));
@@ -363,6 +416,9 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
   bool has_quit_handler_ = false;
   bool started_ = false;
   bool quitting_ = false;
+  // Whether the first "start" already looked at a launch at sign-in.
+  bool startup_handled_ = false;
+  bool suppress_show_ = false;
 };
 
 }  // namespace

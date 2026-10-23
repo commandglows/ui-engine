@@ -1,5 +1,5 @@
 name: shipglows_tray
-description: Notification area (tray) icon, standard menu, close-to-tray and single instance for ShipGlows desktop Flutter apps.
+description: Notification area (tray) icon, standard menu, close-to-tray, launch at sign-in and single instance for ShipGlows desktop Flutter apps.
 version: 0.1.0
 publish_to: "none"
 

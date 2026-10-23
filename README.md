@@ -637,6 +637,13 @@ web, macOS and Linux). Native Win32, no third-party plugin.
   `ShipglowsTrayCloseSetting` is the settings row to change it back;
   `closeBehavior` / `setCloseBehavior` for a custom one. Quitting goes
   through `onQuitRequested` (false keeps the app running).
+- Launch at Windows sign-in (`setLaunchAtStartup`, `launchAtStartup`): an
+  entry `<appName>` under `HKCU\…\CurrentVersion\Run` starting this
+  executable with `--launched-at-startup`; turned off in Task Manager reads
+  as off, and turning it on again clears that. Such a launch keeps the main
+  window hidden in the tray until the user opens it
+  (`hideWhenLaunchedAtStartup`, default true; `launchedAtStartup` tells the
+  app). `ShipglowsTrayStartupSetting` is the settings switch.
 - Icon back after an Explorer restart, retried for a minute when the
   taskbar is not ready at sign-in.
 - Single instance: a later launch hands its command line to the running app
