@@ -546,15 +546,22 @@ class SettingsController extends ChangeNotifier
       return running;
     }
     _retryTimer?.cancel();
-    final run = _runSync().whenComplete(() {
-      _syncing = null;
-      if (_syncAgain && !_disposed) {
-        _syncAgain = false;
-        unawaited(sync());
-      }
-    });
+    final run = _syncUntilSettled();
     _syncing = run;
     return run;
+  }
+
+  /// Runs again while changes arrived during a run, so whoever awaits [sync]
+  /// sees the outcome of the last one.
+  Future<void> _syncUntilSettled() async {
+    try {
+      do {
+        _syncAgain = false;
+        await _runSync();
+      } while (_syncAgain && !_disposed && _remote != null);
+    } finally {
+      _syncing = null;
+    }
   }
 
   /// Raw stored values of the shown account and device, for diagnostics.
