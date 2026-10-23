@@ -96,7 +96,8 @@ void main() {
     await controller.set(theme, ThemeMode.dark);
     await controller.sync();
     expect(controller.get(theme), ThemeMode.dark);
-    expect(controller.status.health, SyncHealth.pending);
+    // Never read on this device: the account is unreachable, not just behind.
+    expect(controller.status.health, SyncHealth.unreachable);
 
     // Relaunch while still offline: the pending field survives.
     final relaunched = controllerFor(storage);
@@ -161,10 +162,20 @@ void main() {
     expect(controller.get(theme), ThemeMode.dark);
     expect(remote1.values, {'themeMode': 'dark'});
 
+    // Both sides set the theme differently: nothing moves until chosen.
     await controller.setAccount(SettingsAccount(id: 'u2', remote: remote2));
+    await controller.sync();
+    expect(controller.status.health, SyncHealth.needsReview);
+    expect(controller.get(theme), ThemeMode.dark);
+    expect(remote2.pushes, isEmpty);
+    expect(
+      await controller.resolveReview({'fields/themeMode': SyncSide.account}),
+      isTrue,
+    );
     await controller.sync();
     expect(controller.get(theme), ThemeMode.light);
     expect(remote2.pushes, isEmpty);
+    expect(controller.recovery?.device.fields['themeMode'], 'dark');
 
     await controller.set(sounds, false);
     await controller.setAccount(SettingsAccount(id: 'u1', remote: remote1));

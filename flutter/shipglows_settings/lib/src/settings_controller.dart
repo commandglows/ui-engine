@@ -4,12 +4,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shipglows_sync/shipglows_sync.dart';
 
 import 'setting_key.dart';
 import 'settings_remote.dart';
 import 'settings_schema.dart';
 import 'settings_storage.dart';
-import 'sync_status.dart';
 
 /// Reads settings saved by an older version of the app (one secure-storage
 /// key per field, a SharedPreferences prefix...), field id to raw value.
@@ -51,9 +51,15 @@ class SettingsEditor {
 /// - A pending field keeps its device value until the remote accepts it;
 ///   every other field follows the remote (last write to reach it wins).
 /// - Each account has its own device copy: switching account never shows or
-///   pushes another account's values. The first sign-in on a device adopts
-///   the signed-out values only when the account has no remote copy yet.
-class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
+///   pushes another account's values.
+/// - The first sign-in on a device unites the signed-out values with the
+///   account's: a value set on one side only is kept; when both sides set a
+///   value differently, sync waits for [resolveReview] ([SyncHealth.needsReview])
+///   and shows the device values meanwhile. Copies of both sides are kept as
+///   a [SyncRecovery] before the merged values are applied.
+class SettingsController extends ChangeNotifier
+    with WidgetsBindingObserver
+    implements SyncSource, SyncReviewHost, SyncRecoveryHost {
   SettingsController({
     required this.schema,
     required SettingsStorage storage,
@@ -61,9 +67,13 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
     this.maxRetryInterval = const Duration(minutes: 5),
     this.remoteTimeout = const Duration(seconds: 10),
     this.observeAppLifecycle = true,
+    this.reviewFirstSync = true,
+    SyncProgress? progress,
     DateTime Function()? clock,
     this.onError,
   }) : _storage = storage,
+       progress = progress ?? SyncProgress(),
+       _ownsProgress = progress == null,
        _clock = clock ?? DateTime.now;
 
   static const deviceBucket = 'device';
@@ -72,6 +82,18 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
   /// File-safe bucket name of [accountId].
   static String accountBucket(String accountId) =>
       'account.${accountId.replaceAllMapped(RegExp(r'[^A-Za-z0-9_-]'), (m) => '~${m[0]!.codeUnitAt(0).toRadixString(16)}')}';
+
+  /// Bucket of [accountId]'s [SyncRecovery].
+  static String recoveryBucket(String accountId) =>
+      'recovery.${accountBucket(accountId)}';
+
+  /// `false` keeps the former rule: on a first sign-in, an account that
+  /// already has settings replaces the signed-out values without asking.
+  final bool reviewFirstSync;
+
+  /// Steps of an account's first sync on this device, for a progress screen.
+  final SyncProgress progress;
+  final bool _ownsProgress;
 
   final SettingsSchema schema;
   final SettingsStorage _storage;
@@ -113,6 +135,10 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
   bool _open = false;
   bool _disposed = false;
   final Map<String, _SettingListenable<Object?>> _listenables = {};
+  SyncReview? _review;
+  bool _resolving = false;
+  SyncReviewError? _reviewError;
+  SyncRecovery? _recovery;
 
   /// Whether [open] finished: before, every setting reads as its default.
   bool get isOpen => _open;
@@ -120,7 +146,20 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
   /// The account shown, or `null` when signed out.
   String? get accountId => _accountId;
 
+  @override
   SyncStatus get status => _status;
+
+  @override
+  SyncReview? get review => _review;
+
+  @override
+  bool get isResolvingReview => _resolving;
+
+  @override
+  SyncReviewError? get reviewError => _reviewError;
+
+  @override
+  SyncRecovery? get recovery => _recovery;
 
   /// Loads the device copies (running [importLegacy] on a fresh device).
   ///
@@ -236,7 +275,11 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> setAccount(SettingsAccount? account) async {
     if (account?.id == _accountId) {
       if (account != null && !identical(account.remote, _remote)) {
+        final generation = _generation;
         _remote = account.remote;
+        _recovery ??= await _loadRecovery(account.id);
+        if (generation != _generation) return;
+        if (_remote != null && _account.syncedAt == null) progress.begin();
         _restartWatch();
         unawaited(sync());
       }
@@ -244,6 +287,9 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
     }
     final generation = ++_generation;
     _stopRemote();
+    _clearReview();
+    _recovery = null;
+    progress.reset();
     _device.lastAccount = account?.id;
     unawaited(_persist(_device, rethrowError: false));
     if (account == null) {
@@ -267,13 +313,17 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
       await _persist(bucket, rethrowError: false);
       if (generation != _generation) return;
     }
+    final recovery = await _loadRecovery(account.id);
+    if (generation != _generation) return;
     _account = bucket;
     _accountId = account.id;
     _remote = account.remote;
+    _recovery = recovery;
     _setStatus(
       _remote == null ? const SyncStatus.localOnly() : _pendingStatus(bucket),
       notify: false,
     );
+    if (_remote != null && bucket.syncedAt == null) progress.begin();
     _changed();
     _restartWatch();
     unawaited(sync());
@@ -283,6 +333,105 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> forgetAccount(String accountId) async {
     if (accountId == _accountId) await setAccount(null);
     await _storage.delete(accountBucket(accountId));
+    await _storage.delete(recoveryBucket(accountId));
+  }
+
+  @override
+  Future<bool> resolveReview(SyncChoices choices) async {
+    final review = _review;
+    final remote = _remote;
+    if (review == null || remote == null || _resolving) return false;
+    final plan = review.plan(choices);
+    if (!plan.isComplete) return false;
+    final generation = _generation;
+    final bucket = _account;
+    _resolving = true;
+    _reviewError = null;
+    _changed();
+    try {
+      final document = await remote.fetch().timeout(remoteTimeout);
+      if (generation != _generation) return false;
+      final deviceNow = _deviceSnapshot(bucket);
+      final accountNow = _remoteSnapshot(document);
+      if (deviceNow.fingerprint != review.device.fingerprint ||
+          accountNow.fingerprint != review.account.fingerprint) {
+        _review = SyncReview(
+          accountId: review.accountId,
+          device: deviceNow,
+          account: accountNow,
+        );
+        _reviewError = SyncReviewError.changed;
+        return false;
+      }
+      // The copies are saved first: if that fails, nothing has changed.
+      final recovery = SyncRecovery.of(review, _clock().toUtc());
+      await _storage.write(recoveryBucket(review.accountId), recovery.toJson());
+      if (generation != _generation) return false;
+      _recovery = recovery;
+      _adopt(bucket, plan.merged, review.account);
+      bucket.seed = false;
+      await _persist(bucket);
+      if (generation != _generation) return false;
+      _review = null;
+      _setStatus(_pendingStatus(bucket), notify: false);
+    } catch (error) {
+      if (generation != _generation) return false;
+      onError?.call('settings_review_error', error);
+      _reviewError = SyncReviewError.failed;
+      return false;
+    } finally {
+      _resolving = false;
+      _changed();
+    }
+    unawaited(sync());
+    return true;
+  }
+
+  @override
+  Future<bool> restoreRecovery(SyncSide side) async {
+    final recovery = _recovery;
+    if (recovery == null || recovery.accountId != _accountId || _resolving) {
+      return false;
+    }
+    final bucket = _account;
+    final copy = recovery.of(side).fields;
+    // Every field is sent, so the account takes the copy as a whole.
+    for (final key in schema.inScope(SettingScope.account)) {
+      final raw = copy[key.id];
+      final encoded = raw == null ? null : key.write(key.read(raw));
+      if (encoded == null) {
+        bucket.values.remove(key.id);
+      } else {
+        bucket.values[key.id] = encoded;
+      }
+      if (_remote != null) {
+        bucket.pending.add(key.id);
+        _edits[key.id] = (_edits[key.id] ?? 0) + 1;
+      }
+    }
+    bucket.seed = false;
+    _clearReview();
+    try {
+      await _persist(bucket);
+    } catch (_) {
+      return false;
+    }
+    _setStatus(
+      _remote == null ? const SyncStatus.localOnly() : _pendingStatus(bucket),
+      notify: false,
+    );
+    _changed();
+    unawaited(sync());
+    return true;
+  }
+
+  @override
+  Future<void> dropRecovery() async {
+    final recovery = _recovery;
+    if (recovery == null) return;
+    _recovery = null;
+    _changed();
+    await _storage.delete(recoveryBucket(recovery.accountId));
   }
 
   /// Pulls then pushes now. Never throws: the outcome is in [status].
@@ -326,6 +475,7 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
     for (final listenable in _listenables.values) {
       listenable.dispose();
     }
+    if (_ownsProgress) progress.dispose();
     super.dispose();
   }
 
@@ -344,21 +494,53 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
     try {
       final document = await remote.fetch().timeout(remoteTimeout);
       if (generation != _generation) return;
+      // The review being confirmed owns this first sync.
+      if (bucket.seed && _resolving) return;
+      unawaited(progress.advance(SyncStage.dataReceived));
+      var changed = false;
       if (bucket.seed) {
-        bucket.seed = false;
         if (document == null || document.isEmpty) {
           // New account: keep what the user chose while signed out.
+          bucket.seed = false;
           for (final key in schema.inScope(SettingScope.account)) {
             if (bucket.values.containsKey(key.id)) {
               bucket.pending.add(key.id);
               _edits[key.id] = (_edits[key.id] ?? 0) + 1;
             }
           }
-        } else {
+        } else if (!reviewFirstSync) {
+          bucket.seed = false;
           bucket.pending.clear();
+        } else {
+          final device = _deviceSnapshot(bucket);
+          final account = _remoteSnapshot(document);
+          final plan = reconcileSnapshots(device, account);
+          if (plan.hasConflicts) {
+            // Nothing is applied nor sent until the user chooses.
+            _review = SyncReview(
+              accountId: _accountId!,
+              device: device,
+              account: account,
+            );
+            _reviewError = null;
+            progress.reset();
+            _setStatus(
+              SyncStatus(
+                health: SyncHealth.needsReview,
+                pendingCount: bucket.pending.length,
+                lastSyncedAt: bucket.syncedAt,
+              ),
+            );
+            return;
+          }
+          // Nothing to choose: both sides are united at once.
+          bucket.seed = false;
+          _clearReview();
+          changed = _adopt(bucket, plan.merged, account);
         }
       }
-      var changed = document != null && _applyRemote(bucket, document);
+      changed = (document != null && _applyRemote(bucket, document)) || changed;
+      unawaited(progress.advance(SyncStage.dataApplied));
 
       if (bucket.pending.isNotEmpty) {
         final sent = {for (final id in bucket.pending) id: _edits[id] ?? 0};
@@ -381,20 +563,101 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
             ? SyncStatus(health: SyncHealth.synced, lastSyncedAt: bucket.syncedAt)
             : _pendingStatus(bucket),
       );
+      unawaited(progress.finish());
+      final recovery = _recovery;
+      if (recovery != null && !recovery.confirmed && bucket.pending.isEmpty) {
+        // The reviewed copy reached the account.
+        _recovery = recovery.confirm();
+        unawaited(_saveRecovery(_recovery!));
+      }
     } on SettingsRemoteAuthException catch (error) {
       if (generation != _generation) return;
       onError?.call('settings_cloud_auth_error', error);
+      progress.reset();
       _setStatus(_failed(bucket, 'auth', error.message, retryable: false));
     } on TimeoutException catch (error) {
       if (generation != _generation) return;
       onError?.call('settings_cloud_timeout', error);
+      progress.reset();
       _setStatus(_failed(bucket, 'timeout', 'The remote did not answer.'));
       _scheduleRetry();
     } catch (error) {
       if (generation != _generation) return;
       onError?.call('settings_cloud_sync_error', error);
+      progress.reset();
       _setStatus(_failed(bucket, 'remote_error', '$error'));
       _scheduleRetry();
+    }
+  }
+
+  /// The account values of [bucket], as compared in a review.
+  SyncSnapshot _deviceSnapshot(_Bucket bucket) => SyncSnapshot(
+    fields: _accountFields(bucket.values),
+  );
+
+  /// [document]'s values, migrated and normalized like stored ones.
+  SyncSnapshot _remoteSnapshot(RemoteSettings? document) {
+    if (document == null) return const SyncSnapshot();
+    final from = document.schemaVersion;
+    return SyncSnapshot(
+      fields: _accountFields(
+        from != null && from < schema.version
+            ? schema.migrate(document.values, from)
+            : document.values,
+      ),
+    );
+  }
+
+  Map<String, Object?> _accountFields(Map<String, Object?> values) => {
+    for (final key in schema.inScope(SettingScope.account))
+      if (values[key.id] case final raw?)
+        if (key.write(key.read(raw)) case final encoded?) key.id: encoded,
+  };
+
+  /// Shows [merged] and marks pending every field the account lacks or holds
+  /// differently; returns whether a shown value changed.
+  bool _adopt(_Bucket bucket, SyncSnapshot merged, SyncSnapshot account) {
+    var changed = false;
+    bucket.pending.clear();
+    for (final key in schema.inScope(SettingScope.account)) {
+      final value = merged.fields[key.id];
+      if (!_sameJson(bucket.values[key.id], value)) changed = true;
+      if (value == null) {
+        bucket.values.remove(key.id);
+      } else {
+        bucket.values[key.id] = value;
+      }
+      if (!_sameJson(account.fields[key.id], value)) {
+        bucket.pending.add(key.id);
+        _edits[key.id] = (_edits[key.id] ?? 0) + 1;
+      }
+    }
+    return changed;
+  }
+
+  void _clearReview() {
+    _review = null;
+    _reviewError = null;
+  }
+
+  Future<SyncRecovery?> _loadRecovery(String accountId) async {
+    try {
+      final data = await _storage.read(recoveryBucket(accountId));
+      return data == null ? null : SyncRecovery.fromJson(data);
+    } catch (error) {
+      onError?.call('settings_recovery_read_error', error);
+      return null;
+    }
+  }
+
+  Future<void> _saveRecovery(SyncRecovery recovery) async {
+    try {
+      await _storage.write(
+        recoveryBucket(recovery.accountId),
+        recovery.toJson(),
+      );
+    } catch (error) {
+      onError?.call('settings_recovery_write_error', error);
     }
   }
 
@@ -483,7 +746,12 @@ class SettingsController extends ChangeNotifier with WidgetsBindingObserver {
     String message, {
     bool retryable = true,
   }) => SyncStatus(
-    health: retryable && bucket.pending.isNotEmpty
+    health: !retryable
+        ? SyncHealth.failed
+        // Never read on this device: the shown values are not verified.
+        : bucket.syncedAt == null
+        ? SyncHealth.unreachable
+        : bucket.pending.isNotEmpty
         ? SyncHealth.pending
         : SyncHealth.failed,
     pendingCount: bucket.pending.length,

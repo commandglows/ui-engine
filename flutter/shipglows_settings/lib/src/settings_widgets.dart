@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'setting_key.dart';
 import 'settings_controller.dart';
-import 'sync_status.dart';
 
 /// Rebuilds only when [setting] changes value.
 class SettingBuilder<T> extends StatelessWidget {
@@ -58,84 +57,5 @@ class SettingSwitchTile extends StatelessWidget {
             })
           : null,
     ),
-  );
-}
-
-/// Labels of [SettingsSyncChip], French by default like the ShipGlows apps.
-class SettingsSyncLabels {
-  const SettingsSyncLabels({
-    this.localOnly = 'Sur cet appareil',
-    this.synced = 'Synchronisé',
-    this.pending = 'En attente de synchro',
-    this.syncing = 'Synchronisation…',
-    this.failed = 'Synchro impossible',
-    this.signInAgain = 'Reconnectez-vous pour synchroniser',
-  });
-
-  static const en = SettingsSyncLabels(
-    localOnly: 'On this device',
-    synced: 'Synced',
-    pending: 'Waiting to sync',
-    syncing: 'Syncing…',
-    failed: 'Sync failed',
-    signInAgain: 'Sign in again to sync',
-  );
-
-  final String localOnly;
-  final String synced;
-  final String pending;
-  final String syncing;
-  final String failed;
-  final String signInAgain;
-
-  String of(SyncStatus status) => switch (status.health) {
-    SyncHealth.localOnly => localOnly,
-    SyncHealth.synced => synced,
-    SyncHealth.pending => pending,
-    SyncHealth.syncing => syncing,
-    SyncHealth.failed =>
-      status.issue?.retryable == false ? signInAgain : failed,
-  };
-}
-
-/// Small chip with the sync state of the account settings; tapping it syncs
-/// now. Icon and text both carry the state, never the color alone.
-class SettingsSyncChip extends StatelessWidget {
-  const SettingsSyncChip({
-    super.key,
-    required this.controller,
-    this.labels = const SettingsSyncLabels(),
-  });
-
-  final SettingsController controller;
-  final SettingsSyncLabels labels;
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: controller,
-    builder: (context, _) {
-      final status = controller.status;
-      final scheme = Theme.of(context).colorScheme;
-      final (icon, color) = switch (status.health) {
-        SyncHealth.localOnly => (Icons.phone_android_outlined, scheme.outline),
-        SyncHealth.synced => (Icons.cloud_done_outlined, scheme.primary),
-        SyncHealth.pending => (Icons.cloud_upload_outlined, scheme.tertiary),
-        SyncHealth.syncing => (Icons.cloud_sync_outlined, scheme.primary),
-        SyncHealth.failed => (Icons.cloud_off_outlined, scheme.error),
-      };
-      final label = labels.of(status);
-      return Semantics(
-        button: status.health != SyncHealth.localOnly,
-        label: label,
-        excludeSemantics: true,
-        child: ActionChip(
-          avatar: Icon(icon, size: 18, color: color),
-          label: Text(label),
-          onPressed: status.health == SyncHealth.localOnly
-              ? null
-              : controller.sync,
-        ),
-      );
-    },
   );
 }

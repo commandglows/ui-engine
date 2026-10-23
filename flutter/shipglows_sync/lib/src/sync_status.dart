@@ -1,6 +1,8 @@
-/// Where the account settings stand against their remote copy.
+import 'package:flutter/foundation.dart';
+
+/// Where the account data stands against its remote copy.
 enum SyncHealth {
-  /// Signed out or no remote: settings stay on this device.
+  /// Signed out or no remote: data stays on this device.
   localOnly,
 
   /// Every change is on the remote.
@@ -11,6 +13,15 @@ enum SyncHealth {
 
   /// A pull or push is running.
   syncing,
+
+  /// The device and the account both hold data that differ: sync waits for
+  /// the user to pick a side per difference ([SyncReview]). Until then the
+  /// device copy is shown and nothing is sent.
+  needsReview,
+
+  /// The account was never read on this device and the last attempt failed:
+  /// the values shown are the device's, not verified against the account.
+  unreachable,
 
   /// The remote refused the last attempt; [SyncIssue.retryable] says whether
   /// the next retry can succeed on its own.
@@ -50,12 +61,19 @@ class SyncStatus {
 
   final SyncHealth health;
 
-  /// Settings changed on this device and not on the remote yet.
+  /// Changes made on this device and not on the remote yet.
   final int pendingCount;
   final DateTime? lastSyncedAt;
   final SyncIssue? issue;
 
   bool get hasPendingChanges => pendingCount > 0;
+
+  /// Whether the user has something to do or to know (review, error).
+  bool get needsAttention =>
+      health == SyncHealth.needsReview ||
+      health == SyncHealth.unreachable ||
+      health == SyncHealth.failed ||
+      (health == SyncHealth.pending && issue != null);
 
   @override
   bool operator ==(Object other) =>
@@ -77,4 +95,13 @@ class SyncStatus {
 
   @override
   String toString() => 'SyncStatus(${health.name}, pending: $pendingCount)';
+}
+
+/// Anything synced to an account that the shared widgets can show: the
+/// settings controller, a data repository...
+abstract interface class SyncSource implements Listenable {
+  SyncStatus get status;
+
+  /// Pulls then pushes now. Never throws: the outcome is in [status].
+  Future<void> sync();
 }
