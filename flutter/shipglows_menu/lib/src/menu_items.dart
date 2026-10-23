@@ -49,6 +49,10 @@ sealed class ShipglowsMenuItem {
           ],
           showsMainWindow: flag('showsMainWindow', false),
           isDefault: flag('isDefault', false),
+          destructive: flag('destructive', false),
+          confirmLabel: json['confirmLabel'] is String
+              ? json['confirmLabel']! as String
+              : null,
         );
       case 'header':
         return ShipglowsMenuHeader(text('label'), icon: icon);
@@ -83,6 +87,8 @@ final class ShipglowsMenuAction extends ShipglowsMenuItem {
     this.keywords = const [],
     this.showsMainWindow = false,
     this.isDefault = false,
+    this.destructive = false,
+    this.confirmLabel,
     this.onSelected,
   }) : icon = icon ?? glyph;
 
@@ -113,6 +119,15 @@ final class ShipglowsMenuAction extends ShipglowsMenuItem {
   /// Bold; the entry the primary click would pick. One per menu.
   final bool isDefault;
 
+  /// Flutter menus: drawn in the error color, for an action that deletes
+  /// or discards something. The tray ignores it.
+  final bool destructive;
+
+  /// Flutter menus: the first choice only swaps the label for this one
+  /// (« Supprimer ? Entrée pour confirmer »); a second choice selects it.
+  /// Moving away cancels. Null selects at once.
+  final String? confirmLabel;
+
   /// Called after the menu closed on this entry. Not serialised.
   final void Function()? onSelected;
 
@@ -129,6 +144,8 @@ final class ShipglowsMenuAction extends ShipglowsMenuItem {
     List<String>? keywords,
     bool? showsMainWindow,
     bool? isDefault,
+    bool? destructive,
+    String? confirmLabel,
     void Function()? onSelected,
   }) => ShipglowsMenuAction(
     id,
@@ -140,6 +157,8 @@ final class ShipglowsMenuAction extends ShipglowsMenuItem {
     keywords: keywords ?? this.keywords,
     showsMainWindow: showsMainWindow ?? this.showsMainWindow,
     isDefault: isDefault ?? this.isDefault,
+    destructive: destructive ?? this.destructive,
+    confirmLabel: confirmLabel ?? this.confirmLabel,
     onSelected: onSelected ?? this.onSelected,
   );
 
@@ -155,6 +174,8 @@ final class ShipglowsMenuAction extends ShipglowsMenuItem {
     if (keywords.isNotEmpty) 'keywords': keywords,
     'showsMainWindow': showsMainWindow,
     'isDefault': isDefault,
+    if (destructive) 'destructive': true,
+    if (confirmLabel != null) 'confirmLabel': confirmLabel,
   };
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:shipglows_menu/shipglows_menu.dart';
 
 import 'actions_panel.dart';
 import 'behavior.dart';
@@ -25,10 +26,16 @@ class CommandBarChoice {
     this.secondary = false,
     this.query,
     this.action,
+    this.appMenu = false,
   });
 
-  /// Id of the chosen entry, as in [CommandBarEntry.id].
+  /// Id of the chosen entry, as in [CommandBarEntry.id]; with [appMenu], the
+  /// id of the [ShipglowsMenuAction] chosen in [CommandBarView.appMenu].
   final String id;
+
+  /// Whether [id] is an action of the app menu (the ≡ button), not an
+  /// entry. Its `onSelected`, when it has one, already ran.
+  final bool appMenu;
 
   /// Whether the secondary action was chosen instead of the primary one.
   final bool secondary;
@@ -78,6 +85,7 @@ class CommandBarView extends StatefulWidget {
     this.queryHistory = const <String>[],
     this.onQueryUsed,
     this.hotkey = CommandBarHotkey.standard,
+    this.appMenu,
   });
 
   /// Where the entries come from.
@@ -141,6 +149,12 @@ class CommandBarView extends StatefulWidget {
   /// shell handles it system-wide (a floating window).
   final CommandBarHotkey? hotkey;
 
+  /// The app's own menu (settings, feedback, manual, about…), opened by the
+  /// ≡ button at the start of the footer, as in the tray: usually
+  /// `ShipglowsAppMenu.menu()`. A choice closes the bar through [onChoose]
+  /// with [CommandBarChoice.appMenu]. No button when null.
+  final ShipglowsMenu? appMenu;
+
   @override
   State<CommandBarView> createState() => _CommandBarViewState();
 }
@@ -195,6 +209,10 @@ class _BarLayout {
 
 class _CommandBarViewState extends State<CommandBarView> {
   final TextEditingController _controller = TextEditingController();
+
+  /// The search field, which gets the keyboard back when the actions panel
+  /// closes.
+  final FocusNode _searchFocus = FocusNode(debugLabel: 'CommandBarSearch');
   final ScrollController _scroll = ScrollController();
   // One key per list row, so the highlighted row can be brought into view
   // without a fixed row height.
@@ -227,12 +245,6 @@ class _CommandBarViewState extends State<CommandBarView> {
 
   /// Whether the actions panel of the highlighted entry is open.
   bool _actionsOpen = false;
-
-  /// Highlighted line of the actions panel.
-  int _actionHighlight = 0;
-
-  /// Action of the panel line waiting for its second press.
-  String? _actionConfirming;
 
   /// The row the actions panel belongs to, in the coordinates of [_listKey];
   /// null when it could not be measured.
@@ -316,6 +328,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     // Closed without a choice: the search is kept all the same.
     _reportQuery();
     _controller.dispose();
+    _searchFocus.dispose();
     _scroll.dispose();
     _hoveredItem.dispose();
     super.dispose();
@@ -550,10 +563,12 @@ class _CommandBarViewState extends State<CommandBarView> {
         CommandBarPanelLine(
           label: entry.primaryLabel ?? strings.open,
           icon: entry.icon,
+          shortcut: '↵',
         ),
       if (entry.hasSecondary)
         CommandBarPanelLine(
           label: entry.secondaryLabel ?? strings.secondary,
+          shortcut: '${strings.shiftKey}+↵',
           secondary: true,
         ),
       for (final action in actions)
@@ -561,6 +576,7 @@ class _CommandBarViewState extends State<CommandBarView> {
           label: action.label,
           icon: action.icon,
           group: action.group,
+          shortcut: action.shortcut,
           action: action.id,
           destructive: action.destructive,
           confirm: action.confirm,
@@ -578,8 +594,6 @@ class _CommandBarViewState extends State<CommandBarView> {
     setState(() {
       _highlight = itemIndex;
       _actionsOpen = true;
-      _actionHighlight = 0;
-      _actionConfirming = null;
       _panelAnchor = _anchorOf(itemIndex);
     });
   }
@@ -604,13 +618,14 @@ class _CommandBarViewState extends State<CommandBarView> {
     return rowBox.localToGlobal(Offset.zero, ancestor: listBox) & rowBox.size;
   }
 
-  void _closeActions() => setState(() => _actionsOpen = false);
+  /// Closes the actions panel; the search field takes the keyboard back.
+  void _closeActions() {
+    setState(() => _actionsOpen = false);
+    _searchFocus.requestFocus();
+  }
 
+  /// A line chosen in the panel, its confirmation (if any) already given.
   void _choosePanelAction(CommandBarPanelLine line) {
-    if (line.confirm && _actionConfirming != line.action) {
-      setState(() => _actionConfirming = line.action);
-      return;
-    }
     setState(() => _actionsOpen = false);
     _chooseItem(
       _effectiveHighlight,
@@ -634,55 +649,27 @@ class _CommandBarViewState extends State<CommandBarView> {
     return false;
   }
 
-  /// Keys while the actions panel is open: it keeps them all, so typing
-  /// never changes the search behind it.
+  /// Keys the actions panel lets through (it handles ↑/↓, Enter, Escape and
+  /// typing in its search): the bar's hotkey, an action's shortcut, and
+  /// Alt+Enter or ← (empty search) to close it. Others go on, so typed
+  /// characters reach the panel's field.
   KeyEventResult _onPanelKeyEvent(KeyEvent event) {
-    final entry = _highlightedEntry;
-    final lines = entry == null
-        ? const <CommandBarPanelLine>[]
-        : _panelActions(entry);
     final key = event.logicalKey;
-    final enter =
-        key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.numpadEnter;
     if (widget.hotkey?.matches(event) ?? false) {
       widget.onClose();
       return KeyEventResult.handled;
     }
-    if (lines.isEmpty ||
-        key == LogicalKeyboardKey.escape ||
-        key == LogicalKeyboardKey.arrowLeft ||
+    final enter =
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter;
+    if (key == LogicalKeyboardKey.arrowLeft ||
         (enter && HardwareKeyboard.instance.isAltPressed)) {
       if (event is! KeyRepeatEvent) _closeActions();
       return KeyEventResult.handled;
     }
-    final highlight = _actionHighlight.clamp(0, lines.length - 1).toInt();
-    if (key == LogicalKeyboardKey.arrowDown ||
-        key == LogicalKeyboardKey.arrowUp) {
-      final delta = key == LogicalKeyboardKey.arrowDown ? 1 : -1;
-      setState(() {
-        _actionHighlight =
-            ((highlight + delta) % lines.length + lines.length) % lines.length;
-        _actionConfirming = null;
-      });
-      return KeyEventResult.handled;
-    }
-    // A digit chooses its line, as Enter would on it.
-    final digit = commandBarDigit(key);
-    if (digit != null && digit <= lines.length) {
-      if (event is! KeyRepeatEvent) {
-        if (_actionHighlight != digit - 1) _actionConfirming = null;
-        setState(() => _actionHighlight = digit - 1);
-        _choosePanelAction(lines[digit - 1]);
-      }
-      return KeyEventResult.handled;
-    }
-    if (enter) {
-      if (event is! KeyRepeatEvent) _choosePanelAction(lines[highlight]);
-      return KeyEventResult.handled;
-    }
-    _runActionShortcut(entry, event);
-    return KeyEventResult.handled;
+    return _runActionShortcut(_highlightedEntry, event)
+        ? KeyEventResult.handled
+        : KeyEventResult.ignored;
   }
 
   KeyEventResult _onKeyEvent(KeyEvent event, double rowHeight) {
@@ -896,6 +883,24 @@ class _CommandBarViewState extends State<CommandBarView> {
   Widget _wrapFooter(BuildContext context, Widget footer) =>
       widget.footerBuilder?.call(context, footer) ?? footer;
 
+  /// Opens [CommandBarView.appMenu] above the ≡ button at [anchor].
+  Future<void> _openAppMenu(BuildContext anchor) async {
+    final menu = widget.appMenu;
+    if (menu == null) return;
+    final id = await showShipglowsMenu(
+      anchor,
+      menu: menu,
+      preferAbove: true,
+      strings: widget.strings.menu,
+    );
+    if (!mounted) return;
+    if (id == null) {
+      _searchFocus.requestFocus();
+      return;
+    }
+    widget.onChoose(CommandBarChoice(id: id, appMenu: true));
+  }
+
   Widget _list(_BarLayout layout, int highlight, bool showNumbers) {
     final strings = widget.strings;
     final behavior = widget.behavior;
@@ -1005,9 +1010,6 @@ class _CommandBarViewState extends State<CommandBarView> {
     final panelSubtitle = highlighted == null
         ? null
         : _panelSubtitle(highlighted);
-    final confirming = _actionConfirming == null
-        ? -1
-        : panelActions.indexWhere((line) => line.action == _actionConfirming);
 
     return Focus(
       onKeyEvent: (node, event) => _onKeyEvent(event, style.rowMinHeight),
@@ -1042,6 +1044,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                   onPointerCancel: _onSearchPointerEnd,
                   child: TextField(
                     controller: _controller,
+                    focusNode: _searchFocus,
                     autofocus: widget.autofocus,
                     onChanged: _onChanged,
                     style: textTheme.bodyLarge?.copyWith(
@@ -1100,7 +1103,6 @@ class _CommandBarViewState extends State<CommandBarView> {
                               ? 0
                               : CommandBarActionsPanel.heightFor(
                                   panelActions,
-                                  subtitle: panelSubtitle != null,
                                 ),
                         ),
                         child: _list(layout, highlight, showNumbers),
@@ -1112,17 +1114,11 @@ class _CommandBarViewState extends State<CommandBarView> {
                             CommandBarActionsPanel(
                               title: highlighted!.label,
                               subtitle: panelSubtitle,
-                              semanticLabel: strings.actionsPanel.replaceAll(
-                                '{label}',
-                                highlighted.label,
-                              ),
                               lines: panelActions,
-                              highlight: _actionHighlight
-                                  .clamp(0, panelActions.length - 1)
-                                  .toInt(),
-                              confirming: confirming < 0 ? null : confirming,
                               confirmLabel: strings.confirmAction,
+                              strings: strings.menu,
                               onChoose: _choosePanelAction,
+                              onDismiss: _closeActions,
                             ),
                           ),
                         ),
@@ -1133,39 +1129,68 @@ class _CommandBarViewState extends State<CommandBarView> {
           _wrapFooter(
             context,
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ExcludeSemantics(
-                child: Wrap(
-                  spacing: 16,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _FooterHint(
-                      keys: const ['↑', '↓'],
-                      label: strings.navigate,
+              padding: EdgeInsetsDirectional.fromSTEB(
+                widget.appMenu == null ? 16 : 6,
+                widget.appMenu == null ? 8 : 2,
+                16,
+                widget.appMenu == null ? 8 : 2,
+              ),
+              child: Row(
+                children: [
+                  if (widget.appMenu != null) ...[
+                    Builder(
+                      builder: (anchor) => IconButton(
+                        onPressed: () => unawaited(_openAppMenu(anchor)),
+                        tooltip: strings.menu.button,
+                        iconSize: 18,
+                        visualDensity: VisualDensity.compact,
+                        color: style.mutedColor,
+                        icon: const Icon(Icons.menu_rounded),
+                      ),
                     ),
-                    if (widget.filters.isNotEmpty)
-                      _FooterHint(
-                        keys: const ['←', '→'],
-                        label: strings.switchFilter,
-                      ),
-                    _FooterHint(
-                      keys: const ['Enter'],
-                      label: highlighted?.primaryLabel ?? strings.open,
-                    ),
-                    if (highlighted != null && highlighted.hasSecondary)
-                      _FooterHint(
-                        keys: const ['Shift', 'Enter'],
-                        label: highlighted.secondaryLabel ?? strings.secondary,
-                      ),
-                    if (highlighted != null && highlighted.hasActions)
-                      _FooterHint(
-                        keys: const ['Alt', 'Enter'],
-                        label: strings.actions,
-                      ),
-                    _FooterHint(keys: const ['Esc'], label: strings.close),
+                    const SizedBox(width: 6),
                   ],
-                ),
+                  Expanded(
+                    child: ExcludeSemantics(
+                      child: Wrap(
+                        spacing: 16,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _FooterHint(
+                            keys: const ['↑', '↓'],
+                            label: strings.navigate,
+                          ),
+                          if (widget.filters.isNotEmpty)
+                            _FooterHint(
+                              keys: const ['←', '→'],
+                              label: strings.switchFilter,
+                            ),
+                          _FooterHint(
+                            keys: const ['Enter'],
+                            label: highlighted?.primaryLabel ?? strings.open,
+                          ),
+                          if (highlighted != null && highlighted.hasSecondary)
+                            _FooterHint(
+                              keys: const ['Shift', 'Enter'],
+                              label:
+                                  highlighted.secondaryLabel ??
+                                  strings.secondary,
+                            ),
+                          if (highlighted != null && highlighted.hasActions)
+                            _FooterHint(
+                              keys: const ['Alt', 'Enter'],
+                              label: strings.actions,
+                            ),
+                          _FooterHint(
+                            keys: const ['Esc'],
+                            label: strings.close,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

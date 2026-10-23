@@ -196,6 +196,17 @@ class ShipglowsCommandBarOverlayController extends ChangeNotifier
   /// A disabled entry never runs; its secondary action and its actions run
   /// if it has them.
   Future<void> choose(CommandBarChoice choice) async {
+    if (choice.appMenu) {
+      // The app menu's actions (settings, about…) show the app's window.
+      final previous = host.previousForeground;
+      await host.hide(focus: OverlayHideFocus.app);
+      await host.send(selectMessage, <String, Object?>{
+        'id': choice.id,
+        'appMenu': true,
+        'previousForeground': previous,
+      });
+      return;
+    }
     CommandBarEntry? entry;
     for (final candidate in entries) {
       if (candidate.id == choice.id) {
@@ -446,6 +457,7 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
           strings: widget.strings,
           behavior: controller.snapshot?.behavior ?? widget.behavior,
           queryHistory: controller.queryHistory,
+          appMenu: controller.snapshot?.appMenu,
           onQueryUsed: controller.useQuery,
           // The app registers the hotkey system-wide: it closes the window
           // from there, never from here.

@@ -27,6 +27,7 @@ class ShipglowsMenuPanel extends StatefulWidget {
     this.strings = ShipglowsMenuStrings.fr,
     this.showSearch = true,
     this.autofocus = true,
+    this.icons,
   });
 
   final ShipglowsMenu menu;
@@ -44,6 +45,11 @@ class ShipglowsMenuPanel extends StatefulWidget {
 
   /// Takes the keyboard when shown.
   final bool autofocus;
+
+  /// Flutter icons by `ShipglowsMenuIcon.name`, over the theme's
+  /// [ShipglowsMenuTheme.icons]: for actions built at run time from
+  /// `IconData` (`ShipglowsMenuIcon.named('row.copy')`).
+  final Map<String, IconData>? icons;
 
   @override
   State<ShipglowsMenuPanel> createState() => _ShipglowsMenuPanelState();
@@ -94,11 +100,22 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
   List<_Row> _rows = const [];
   int _highlighted = -1;
 
+  /// Row showing its [ShipglowsMenuAction.confirmLabel], waiting for a
+  /// second choice.
+  int? _confirming;
+
   @override
   void initState() {
     super.initState();
     _query.addListener(_onQueryChanged);
     _rebuildRows();
+    // Embedded next to a field that has the focus, autofocus alone would
+    // leave it there.
+    if (widget.autofocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focus.requestFocus();
+      });
+    }
   }
 
   @override
@@ -146,6 +163,7 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
     _rows = rows;
     _rowKeys.clear();
     _highlighted = rows.indexWhere((row) => row.selectable);
+    _confirming = null;
   }
 
   void _move(int step) {
@@ -155,7 +173,10 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
       index = (index + step) % _rows.length;
       if (index < 0) index += _rows.length;
       if (_rows[index].selectable) {
-        setState(() => _highlighted = index);
+        setState(() {
+          _highlighted = index;
+          _confirming = null;
+        });
         WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(index));
         return;
       }
@@ -180,6 +201,14 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
   void _activate(int index) {
     if (index < 0 || index >= _rows.length) return;
     switch (_rows[index]) {
+      case _ActionRow(:final action)
+          when action.enabled &&
+              action.confirmLabel != null &&
+              _confirming != index:
+        setState(() {
+          _highlighted = index;
+          _confirming = index;
+        });
       case _ActionRow(:final action) when action.enabled:
         widget.onSelected(action);
       case _SubmenuRow(:final submenu) when submenu.enabled:
@@ -317,6 +346,9 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
   }
 
   Widget _row(int index, _Row row, ResolvedShipglowsMenuTheme style) {
+    final icons = widget.icons == null
+        ? style.icons
+        : {...?style.icons, ...widget.icons!};
     switch (row) {
       case _SeparatorRow():
         return Padding(
@@ -339,9 +371,15 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
           ),
         );
       case _ActionRow(:final action):
+        final danger = action.destructive
+            ? Theme.of(context).colorScheme.error
+            : null;
         return _Tile(
           key: _rowKeys.putIfAbsent(index, GlobalKey.new),
-          label: action.label,
+          label: index == _confirming
+              ? action.confirmLabel ?? action.label
+              : action.label,
+          color: danger,
           icon: action.checked
               ? Icon(
                   Icons.check_rounded,
@@ -353,9 +391,9 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
               : ShipglowsMenuIconView(
                   action.icon!,
                   color: action.enabled
-                      ? style.foregroundColor
+                      ? danger ?? style.foregroundColor
                       : style.mutedColor,
-                  overrides: style.icons,
+                  overrides: icons,
                 ),
           shortcut: action.shortcut,
           bold: action.isDefault,
@@ -363,7 +401,10 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
           checked: action.checked ? true : null,
           highlighted: index == _highlighted,
           style: style,
-          onHover: () => setState(() => _highlighted = index),
+          onHover: () => setState(() {
+            if (_highlighted != index) _confirming = null;
+            _highlighted = index;
+          }),
           onTap: () => _activate(index),
         );
       case _SubmenuRow(:final submenu):
@@ -375,7 +416,7 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
               : ShipglowsMenuIconView(
                   submenu.icon!,
                   color: style.foregroundColor,
-                  overrides: style.icons,
+                  overrides: icons,
                 ),
           trailing: Icon(
             Directionality.of(context) == TextDirection.rtl
@@ -506,10 +547,14 @@ class _Tile extends StatelessWidget {
     this.trailing,
     this.bold = false,
     this.checked,
+    this.color,
   });
 
   final String label;
   final Widget? icon;
+
+  /// Label color of an enabled row; the theme's foreground when null.
+  final Color? color;
   final String? shortcut;
   final Widget? trailing;
   final bool bold;
@@ -523,7 +568,9 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final keys = shortcut == null ? const <String>[] : _keys(shortcut!);
-    final color = enabled ? style.foregroundColor : style.mutedColor;
+    final color = enabled
+        ? this.color ?? style.foregroundColor
+        : style.mutedColor;
     return Semantics(
       container: true,
       button: true,

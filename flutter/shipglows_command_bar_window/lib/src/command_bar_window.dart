@@ -17,6 +17,7 @@ class ShipglowsCommandBarSelection {
     this.previousForeground,
     this.query,
     this.action,
+    this.appMenu = false,
   });
 
   /// Id of the chosen entry, as in `CommandBarEntry.id`.
@@ -37,6 +38,10 @@ class ShipglowsCommandBarSelection {
   /// Id of the `CommandBarEntryAction` chosen in the actions panel (or with
   /// its shortcut); null for Enter and Shift+Enter.
   final String? action;
+
+  /// Whether [id] is an action of [ShipglowsCommandBarSnapshot.appMenu]
+  /// (the ≡ button), not an entry: the app runs that action itself.
+  final bool appMenu;
 }
 
 /// The floating command bar, seen from the app's engine.
@@ -206,6 +211,7 @@ class ShipglowsCommandBarWindow {
         previousForeground: previous is int ? previous : null,
         query: query is String ? query : null,
         action: action is String ? action : null,
+        appMenu: arguments['appMenu'] == true,
       ),
     );
   }

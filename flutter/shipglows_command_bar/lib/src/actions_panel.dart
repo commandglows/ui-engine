@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:shipglows_menu/shipglows_menu.dart';
 
 import 'command.dart';
-import 'theme.dart';
 
 /// One line of the actions panel: Enter, Shift+Enter or one of the
 /// [CommandBarEntry.actions].
-///
-/// The panel only knows these lines, so it can later give way to a shared
-/// floating menu without touching the bar.
 @immutable
 class CommandBarPanelLine {
   const CommandBarPanelLine({
     required this.label,
     this.icon,
     this.group,
+    this.shortcut,
     this.secondary = false,
     this.action,
     this.destructive = false,
@@ -26,6 +24,9 @@ class CommandBarPanelLine {
   /// Title of the group the line opens or continues
   /// ([CommandBarEntryAction.group]); lines without one come first.
   final String? group;
+
+  /// Keys shown on the right (`Shift+↵`, `Ctrl+Shift+C`).
+  final String? shortcut;
 
   /// Whether the line is Shift+Enter.
   final bool secondary;
@@ -79,278 +80,119 @@ class CommandBarActionsPanelLayout extends SingleChildLayoutDelegate {
       oldDelegate.textDirection != textDirection;
 }
 
-/// The actions of the highlighted row, next to it: its title and what it
-/// is, then its lines numbered 1 to 9, the destructive ones last after a
-/// separator. Keyboard handling stays with the bar.
+/// The actions of the highlighted row, next to it: the shared action menu
+/// (`shipglows_menu`), titled with the entry, its search field taking the
+/// keyboard. Destructive lines come last after a separator, in the error
+/// color; a line that [CommandBarPanelLine.confirm]s asks for a second
+/// press.
 class CommandBarActionsPanel extends StatelessWidget {
   const CommandBarActionsPanel({
     super.key,
     required this.title,
     required this.lines,
-    required this.highlight,
     required this.onChoose,
+    required this.onDismiss,
+    required this.strings,
     this.subtitle,
-    this.semanticLabel,
-    this.confirming,
-    this.confirmLabel = '',
+    this.confirmLabel,
   });
-
-  static const double _rowHeight = 36;
-  static const double _headerHeight = 26;
-  static const double _titleHeight = 36;
-  static const double _subtitleHeight = 16;
-  static const double _separatorHeight = 9;
-  static const double _maxListHeight = 8 * _rowHeight;
 
   /// Space around the card.
   static const double margin = 8;
 
-  /// Room the panel takes with [lines], margin included.
-  static double heightFor(
-    List<CommandBarPanelLine> lines, {
-    bool subtitle = false,
-  }) {
-    var list = lines.length * _rowHeight + _groups(lines) * _headerHeight;
-    if (lines.any((line) => line.destructive) &&
-        lines.any((line) => !line.destructive)) {
-      list += _separatorHeight;
-    }
-    return _titleHeight +
-        (subtitle ? _subtitleHeight : 0) +
-        (list > _maxListHeight ? _maxListHeight : list) +
-        8 +
-        2 * margin;
-  }
+  static const double _width = 300;
 
-  /// Number of group titles [lines] show.
-  static int _groups(List<CommandBarPanelLine> lines) {
-    var count = 0;
+  /// Room the panel takes with [lines], margin included, as the shared
+  /// menu lays them out (44 px rows, title and search lines).
+  static double heightFor(List<CommandBarPanelLine> lines) {
+    const row = 44.0;
+    var groups = 0;
     String? previous;
     for (final line in lines) {
       final group = line.destructive ? null : line.group;
-      if (group != null && group != previous) count++;
+      if (group != null && group != previous) groups++;
       previous = group;
     }
-    return count;
+    final separated =
+        lines.any((line) => line.destructive) &&
+        lines.any((line) => !line.destructive);
+    final list =
+        lines.length * row + groups * (row + 9) + (separated ? 9 : 0) + 12;
+    final body = row + (list > 6 * row ? 6 * row : list) + row + 2;
+    return body + 2 * margin;
   }
 
   /// The entry's label.
   final String title;
 
-  /// What the entry is, muted under [title] (« Snippet · Pinned »).
+  /// What the entry is, dimmed after [title] (« Snippet · Pinned »).
   final String? subtitle;
-
-  /// Accessible name of the panel; [title] when null.
-  final String? semanticLabel;
 
   /// Lines in display order: the destructive ones last.
   final List<CommandBarPanelLine> lines;
 
-  /// Index in [lines] of the line Enter chooses.
-  final int highlight;
+  /// Label of a confirming line while it waits for its second press.
+  final String? confirmLabel;
 
-  /// Index in [lines] of the line waiting for its second press, shown with
-  /// [confirmLabel].
-  final int? confirming;
-  final String confirmLabel;
+  final ShipglowsMenuStrings strings;
   final ValueChanged<CommandBarPanelLine> onChoose;
 
-  @override
-  Widget build(BuildContext context) {
-    final style = CommandBarThemeData.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    final danger = Theme.of(context).colorScheme.error;
-    final headerStyle = textTheme.labelSmall?.copyWith(
-      color: style.mutedColor,
-      fontWeight: FontWeight.w600,
-    );
-    final subtitle = this.subtitle;
-    final children = <Widget>[];
+  /// Escape: the panel closes, the bar stays.
+  final VoidCallback onDismiss;
+
+  static const String _iconPrefix = 'commandBar.line.';
+
+  ShipglowsMenu _menu() {
+    final items = <ShipglowsMenuItem>[];
     String? previous;
     var separated = false;
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      if (line.destructive && !separated && i > 0) {
+    for (final (index, line) in lines.indexed) {
+      if (line.destructive && !separated) {
         separated = true;
-        children.add(
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Divider(height: 1, color: style.borderColor),
-          ),
-        );
+        items.add(const ShipglowsMenuSeparator());
       }
       final group = line.destructive ? null : line.group;
       if (group != null && group != previous) {
-        children.add(
-          SizedBox(
-            height: _headerHeight,
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(start: 12, top: 8),
-              child: Semantics(
-                header: true,
-                child: Text(group, maxLines: 1, style: headerStyle),
-              ),
-            ),
-          ),
-        );
+        items
+          ..add(const ShipglowsMenuSeparator())
+          ..add(ShipglowsMenuHeader(group));
       }
       previous = group;
-      children.add(
-        _PanelLineTile(
-          line: line,
-          label: i == confirming ? confirmLabel : line.label,
-          number: i < 9 ? i + 1 : null,
-          color: line.destructive ? danger : style.textColor,
-          highlighted: i == highlight,
-          onTap: () => onChoose(line),
+      items.add(
+        ShipglowsMenuAction(
+          '$index',
+          line.label,
+          icon: line.icon == null
+              ? null
+              : ShipglowsMenuIcon.named('$_iconPrefix$index'),
+          shortcut: line.shortcut,
+          isDefault: index == 0 && !line.secondary && line.action == null,
+          destructive: line.destructive,
+          confirmLabel: line.confirm ? confirmLabel : null,
         ),
       );
     }
-    return Padding(
-      padding: const EdgeInsets.all(margin),
-      child: SizedBox(
-        width: 280,
-        child: Material(
-          color: style.backgroundColor,
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(style.rowRadius + 4),
-            side: BorderSide(color: style.borderColor),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Semantics(
-            label: semanticLabel ?? title,
-            explicitChildNodes: true,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ExcludeSemantics(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: style.textColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (subtitle != null)
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.labelSmall?.copyWith(
-                              color: style.mutedColor,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                Divider(height: 1, color: style.borderColor),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    children: children,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    return ShipglowsMenu(title: title, subtitle: subtitle, items: items);
   }
-}
-
-class _PanelLineTile extends StatelessWidget {
-  const _PanelLineTile({
-    required this.line,
-    required this.label,
-    required this.number,
-    required this.color,
-    required this.highlighted,
-    required this.onTap,
-  });
-
-  final CommandBarPanelLine line;
-  final String label;
-
-  /// Digit that chooses the line, or null past the ninth.
-  final int? number;
-  final Color color;
-  final bool highlighted;
-  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final style = CommandBarThemeData.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    final icon = line.icon;
-    final number = this.number;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Material(
-        color: highlighted ? style.highlightColor : Colors.transparent,
-        borderRadius: BorderRadius.circular(style.rowRadius),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(style.rowRadius),
-          onTap: onTap,
-          child: Semantics(
-            button: true,
-            selected: highlighted,
-            label: label,
-            excludeSemantics: true,
-            child: SizedBox(
-              height: CommandBarActionsPanel._rowHeight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    if (icon != null) ...[
-                      Icon(
-                        icon,
-                        size: 16,
-                        color: line.destructive
-                            ? color
-                            : highlighted
-                            ? style.highlightedIconColor
-                            : style.iconColor,
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    Expanded(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: color,
-                          fontWeight: highlighted
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    if (number != null) ...[
-                      const SizedBox(width: 12),
-                      CommandBarKeys(keys: ['$number']),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(margin),
+    child: SizedBox(
+      width: _width,
+      child: ShipglowsMenuPanel(
+        menu: _menu(),
+        strings: strings,
+        icons: {
+          for (final (index, line) in lines.indexed)
+            if (line.icon case final icon?) '$_iconPrefix$index': icon,
+        },
+        onSelected: (action) {
+          final index = int.tryParse(action.id);
+          if (index != null && index < lines.length) onChoose(lines[index]);
+        },
+        onDismiss: onDismiss,
       ),
-    );
-  }
+    ),
+  );
 }

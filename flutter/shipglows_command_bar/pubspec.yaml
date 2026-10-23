@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   shipglows_theme:
     path: ../shipglows_theme
+  shipglows_menu:
+    path: ../shipglows_menu
   web: ^1.1.0
 
 dev_dependencies:

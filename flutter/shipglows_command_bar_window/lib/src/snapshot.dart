@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shipglows_command_bar/shipglows_command_bar.dart';
+import 'package:shipglows_menu/shipglows_menu_model.dart';
 
 /// What the floating bar lists, as the app's engine sees it now: the
 /// entries, the recent ids, the past searches, the theme brightness and the
@@ -21,6 +22,7 @@ class ShipglowsCommandBarSnapshot {
     this.appWindowIds = const <String>{},
     this.appWindowActions = const <String>{},
     this.data = const <String, Object?>{},
+    this.appMenu,
   });
 
   /// Restores a snapshot from [json], as produced by [toJson]. Invalid
@@ -49,6 +51,10 @@ class ShipglowsCommandBarSnapshot {
       locale: _localeFrom(json['locale']),
       appWindowIds: _strings(json['appWindowIds']).toSet(),
       appWindowActions: _strings(json['appWindowActions']).toSet(),
+      appMenu: switch (json['appMenu']) {
+        final Map menu => ShipglowsMenu.fromJson(menu),
+        _ => null,
+      },
       data: switch (json['data']) {
         final Map data => data.cast<String, Object?>(),
         _ => const <String, Object?>{},
@@ -91,6 +97,11 @@ class ShipglowsCommandBarSnapshot {
   /// draws with (`ShipglowsCommandBarOverlayController.snapshot`).
   final Map<String, Object?> data;
 
+  /// The app's menu behind the bar's ≡ button (`CommandBarView.appMenu`),
+  /// callbacks left out: a choice comes back as a selection with
+  /// `appMenu` set, and the app runs the action. No button when null.
+  final ShipglowsMenu? appMenu;
+
   /// JSON-safe map with the keys [fromJson] reads.
   Map<String, Object?> toJson() => <String, Object?>{
     'entries': [for (final entry in entries) entry.toJson()],
@@ -102,6 +113,7 @@ class ShipglowsCommandBarSnapshot {
     'appWindowIds': appWindowIds.toList(),
     'appWindowActions': appWindowActions.toList(),
     'data': data,
+    'appMenu': appMenu?.toJson(),
   };
 }
 

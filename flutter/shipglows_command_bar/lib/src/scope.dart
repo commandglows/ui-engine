@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shipglows_menu/shipglows_menu.dart';
 
 import 'behavior.dart';
 import 'browser_guard.dart'
@@ -51,6 +52,7 @@ Future<CommandBarChoice?> showCommandBar(
   List<String> queryHistory = const <String>[],
   ValueChanged<String>? onQueryUsed,
   CommandBarHotkey? hotkey = CommandBarHotkey.standard,
+  ShipglowsMenu? appMenu,
   ValueChanged<Route<CommandBarChoice>>? onRoute,
 }) {
   final style = CommandBarThemeData.of(context);
@@ -85,6 +87,7 @@ Future<CommandBarChoice?> showCommandBar(
       queryHistory: queryHistory,
       onQueryUsed: onQueryUsed,
       hotkey: hotkey,
+      appMenu: appMenu,
       onChoose: finish,
       onClose: finish,
     ),
@@ -254,6 +257,7 @@ class CommandBarScope extends StatefulWidget {
     this.shortcutsOnF1 = false,
     this.shortcutsOnQuestionMark = false,
     this.shortcutsCommandSection,
+    this.appMenu,
   });
 
   /// App-wide commands, built with the scope's context.
@@ -329,6 +333,12 @@ class CommandBarScope extends StatefulWidget {
   /// Section of the « Keyboard shortcuts » entry
   /// ([commandBarShortcutsCommandId]) in the bar; no entry when null.
   final String? shortcutsCommandSection;
+
+  /// The app's menu behind the ≡ button of the bar (see
+  /// [CommandBarView.appMenu]), built when the bar opens: usually
+  /// `ShipglowsAppMenu.menu()`, the same entries as the tray. Its actions run
+  /// their `onSelected`.
+  final ShipglowsMenu Function(BuildContext context)? appMenu;
 
   /// The controller of the nearest scope, or null when there is none.
   static CommandBarController? maybeOf(BuildContext context) => context
@@ -617,6 +627,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
       queryHistory: _readQueryHistory(),
       onQueryUsed: (query) => unawaited(_rememberQuery(query)),
       hotkey: widget.hotkey,
+      appMenu: widget.appMenu?.call(context),
       onRoute: (route) => _route = route,
     );
     _route = null;
@@ -644,6 +655,8 @@ class _CommandBarScopeState extends State<CommandBarScope>
   }
 
   Future<void> _run(CommandBarChoice choice) async {
+    // An app menu action already ran its own `onSelected`.
+    if (choice.appMenu) return;
     CommandBarCommand? command;
     for (final candidate in _commands()) {
       if (candidate.id == choice.id) command = candidate;
@@ -835,6 +848,7 @@ class _CommandBarDialog extends StatefulWidget {
     required this.queryHistory,
     required this.onQueryUsed,
     required this.hotkey,
+    required this.appMenu,
     required this.onChoose,
     required this.onClose,
   });
@@ -851,6 +865,7 @@ class _CommandBarDialog extends StatefulWidget {
   final List<String> queryHistory;
   final ValueChanged<String>? onQueryUsed;
   final CommandBarHotkey? hotkey;
+  final ShipglowsMenu? appMenu;
   final ValueChanged<CommandBarChoice> onChoose;
   final VoidCallback onClose;
 
@@ -1007,6 +1022,7 @@ class _CommandBarDialogState extends State<_CommandBarDialog> {
           queryHistory: widget.queryHistory,
           onQueryUsed: widget.onQueryUsed,
           hotkey: widget.hotkey,
+          appMenu: widget.appMenu,
           onChoose: widget.onChoose,
           onClose: widget.onClose,
           onSearchDoubleTap: widget.expandable ? _toggleExpanded : null,

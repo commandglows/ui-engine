@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shipglows_menu/shipglows_menu_model.dart';
 
 /// Texts of the command bar. The app picks the language: use [en], [fr], or
 /// its own values.
@@ -73,6 +74,7 @@ class CommandBarStrings {
     this.actions = 'actions',
     this.actionsPanel = 'Actions of « {label} »',
     this.confirmAction = 'Press again to confirm',
+    this.menu = ShipglowsMenuStrings.en,
   });
 
   /// English texts.
@@ -161,6 +163,7 @@ class CommandBarStrings {
     actions: 'actions',
     actionsPanel: 'Actions de « {label} »',
     confirmAction: 'Appuie encore pour confirmer',
+    menu: ShipglowsMenuStrings.fr,
   );
 
   /// Accessible name of the dialog.
@@ -331,6 +334,10 @@ class CommandBarStrings {
   /// was chosen once in the actions panel: choosing it again runs it.
   final String confirmAction;
 
+  /// Texts of the action menus (an entry's actions, the app menu): search
+  /// field, empty result, standard entries.
+  final ShipglowsMenuStrings menu;
+
   /// Copy of these texts with the given values replaced.
   CommandBarStrings copyWith({
     String? dialogLabel,
@@ -387,6 +394,7 @@ class CommandBarStrings {
     String? actions,
     String? actionsPanel,
     String? confirmAction,
+    ShipglowsMenuStrings? menu,
   }) => CommandBarStrings(
     dialogLabel: dialogLabel ?? this.dialogLabel,
     searchHint: searchHint ?? this.searchHint,
@@ -441,6 +449,7 @@ class CommandBarStrings {
     entryKindLabels: entryKindLabels ?? this.entryKindLabels,
     actions: actions ?? this.actions,
     actionsPanel: actionsPanel ?? this.actionsPanel,
+    menu: menu ?? this.menu,
     confirmAction: confirmAction ?? this.confirmAction,
   );
 }
