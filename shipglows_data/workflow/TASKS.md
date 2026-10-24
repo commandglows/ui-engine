@@ -10,6 +10,7 @@
 - [ ] `shipglows_onboarding`: migrate the CommunityGlows Flutter introduction (`communityglows/flutter/lib/features/onboarding/`, language → welcome → account → access; keep its `communityglows.ios.onboarding.v1` state or map it to the gate); widget tests (gate scope/replay, skip to last page, narrow layout).
 - [ ] `shipglows_sync` in CommandGlows: check on screen the review dialog (first sign-in on a device whose settings differ from the account), the progress overlay and a recovery restore. The account page panel was checked on 2026-10-23 (signed-in account, « Synchronisé », French tooltip date, manual sync from the chip). On 2026-10-24 a first sign-in on an Android phone (Galaxy S21, managed debug session) also ends on « Synchronisé »; the progress overlay itself was not observed.
 - [ ] `shipglows_sync`: adopt it in the other apps using account settings (CommunityGlows Flutter `features/sync/cloud_sync.dart`, DreamGlows), then for business data through `SyncSnapshot.collections`.
+- [ ] `shipglows_feedback`: replace each app's own messages (ContentGlows toasts, CommandGlows SnackBars and `app_components`, DreamGlows `user_facing_error`, BeatGlows `feedback.dart`, `safe_error_view`), give each brand its `success`/`warning` in `ShipglowsTheme`, check the look on screen; run `test/feedback_test.dart` and the `shipglows_undo_trash` tests (written, not run).
 - [ ] `shipglows_sync`: unit tests of `reconcileSnapshots`, `SyncProgress` and the controller review/recovery (on operator request).
 
 ## Done

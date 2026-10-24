@@ -24,6 +24,8 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     required this.accent,
     required this.onAccent,
     required this.danger,
+    this.success = const Color(0xFF2E8B57),
+    this.warning = const Color(0xFFB87A00),
     required this.focus,
     required this.scrim,
     required this.keyBackground,
@@ -63,6 +65,12 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     accent: scheme.primary,
     onAccent: scheme.onPrimary,
     danger: scheme.error,
+    success: scheme.brightness == Brightness.dark
+        ? const Color(0xFF6FCF97)
+        : const Color(0xFF1E7B45),
+    warning: scheme.brightness == Brightness.dark
+        ? const Color(0xFFF2C14E)
+        : const Color(0xFF9A6200),
     focus: scheme.primary,
     scrim: scheme.scrim.withValues(alpha: 0.32),
     keyBackground: scheme.surface,
@@ -116,6 +124,14 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
 
   /// Destructive actions and errors.
   final Color danger;
+
+  /// Done, saved, synced. Used for marks and icons beside [text], never as
+  /// a text color: at least 3:1 against [surfaceRaised]. The default is a
+  /// mid tone readable on light and dark surfaces; set the brand's own.
+  final Color success;
+
+  /// Needs attention but nothing failed. Same contrast rule as [success].
+  final Color warning;
 
   /// Focus ring.
   final Color focus;
@@ -193,6 +209,8 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     Color? accent,
     Color? onAccent,
     Color? danger,
+    Color? success,
+    Color? warning,
     Color? focus,
     Color? scrim,
     Color? keyBackground,
@@ -229,6 +247,8 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     accent: accent ?? this.accent,
     onAccent: onAccent ?? this.onAccent,
     danger: danger ?? this.danger,
+    success: success ?? this.success,
+    warning: warning ?? this.warning,
     focus: focus ?? this.focus,
     scrim: scrim ?? this.scrim,
     keyBackground: keyBackground ?? this.keyBackground,
@@ -272,6 +292,8 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
       accent: c(accent, other.accent),
       onAccent: c(onAccent, other.onAccent),
       danger: c(danger, other.danger),
+      success: c(success, other.success),
+      warning: c(warning, other.warning),
       focus: c(focus, other.focus),
       scrim: c(scrim, other.scrim),
       keyBackground: c(keyBackground, other.keyBackground),

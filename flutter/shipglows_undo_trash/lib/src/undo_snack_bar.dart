@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shipglows_feedback/shipglows_feedback.dart';
 
 import 'pending_undo.dart';
 
@@ -15,8 +16,8 @@ const Duration kUndoWindow = Duration(seconds: 5);
 ///
 /// Wrap the snack bar content in [UndoSnackBarContent] so it also closes when
 /// the action is settled elsewhere (Ctrl/⌘+Z, [UndoWindow.flush]). For an app
-/// with its own toast look; [showUndoSnackBar] does all of it with a plain
-/// floating snack bar.
+/// with its own toast look; [showUndoSnackBar] does all of it with the shared
+/// message snack bar.
 void attachUndoSnackBar(
   PendingUndo pending,
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller,
@@ -69,14 +70,17 @@ class _UndoSnackBarContentState extends State<UndoSnackBarContent> {
 /// Shows [message] with an « Undo » action for [duration] and settles
 /// [pending] with it (see [attachUndoSnackBar]).
 ///
-/// The snack bar stays until dismissed for assistive-technology users, who
-/// need time to reach the action.
+/// The snack bar is the shared message one (`feedbackSnackBar` of
+/// `shipglows_feedback`, [kind] info by default), so it looks like the app's
+/// other messages and queues with them. It stays until dismissed for
+/// assistive-technology users, who need time to reach the action.
 void showUndoSnackBar(
   BuildContext context, {
   required String message,
   required PendingUndo pending,
   String actionLabel = 'Undo',
   Duration duration = kUndoWindow,
+  FeedbackKind kind = FeedbackKind.info,
 }) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) {
@@ -85,12 +89,16 @@ void showUndoSnackBar(
   }
   messenger.hideCurrentSnackBar();
   final controller = messenger.showSnackBar(
-    SnackBar(
-      content: UndoSnackBarContent(pending: pending, child: Text(message)),
-      behavior: SnackBarBehavior.floating,
+    feedbackSnackBar(
+      context,
+      message: message,
+      kind: kind,
+      actionLabel: actionLabel,
+      onAction: pending.undo,
       duration: duration,
-      persist: MediaQuery.accessibleNavigationOf(context),
-      action: SnackBarAction(label: actionLabel, onPressed: pending.undo),
+      showCloseIcon: false,
+      wrapContent: (content) =>
+          UndoSnackBarContent(pending: pending, child: content),
     ),
   );
   attachUndoSnackBar(pending, controller);

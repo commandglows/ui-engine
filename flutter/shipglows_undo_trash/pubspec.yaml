@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shipglows_feedback:
+    path: ../shipglows_feedback
 
 dev_dependencies:
   flutter_lints: ^6.0.0

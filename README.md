@@ -16,7 +16,7 @@ never pulls `window_manager`.
 
 One theme for every app and package. `ShipglowsTheme` (a `ThemeExtension`)
 holds the semantic roles: surfaces, text, icons, border/line, highlight,
-accent, danger, focus, scrim, keycap face, shape, spacing, control height and
+accent, danger, success, warning, focus, scrim, keycap face, shape, spacing, control height and
 motion. Each app fills it once from its own brand tokens (generated from its
 design-token source, as its Astro site does) and adds it to
 `ThemeData.extensions`, light and dark:
@@ -902,10 +902,39 @@ echoes, Timestamps read as ISO text, `permission-denied` mapped to
 `SettingsRemoteAuthException`. `decorate` adds derived fields for security
 rules.
 
+## `flutter/shipglows_feedback`
+
+In-app messages: info, success, warning, error. One look and one queue in
+every app instead of each app's own SnackBars and toasts. Depends on
+`shipglows_theme`. Not the Windows system toasts (see the desktop shell
+audit, item 12).
+
+- `showFeedback(context, message, kind:)`, or `context.showInfo` /
+  `showSuccess` / `showWarning` / `showError`: a floating snack bar on
+  `surfaceRaised` with a `border` outline, 480 wide on large windows. The
+  icon in the kind's color (`accent`, `success`, `warning`, `danger`), the
+  text in `text`, so the kind never rests on color alone.
+- Defaults by kind: 4 s for info and success, 6 s for warning, 8 s with a
+  close button for errors. Optional action (`actionLabel`, `onAction`): the
+  message then stays until dismissed for assistive-technology users.
+- Messages queue one after the other; `replaceCurrent: true` closes the one
+  on screen first. The same text of the same kind, still queued or shown, is
+  not queued again (a failing sync reporting each retry).
+- Read as « Error: … » by a screen reader: `FeedbackStrings.en`, `.fr`
+  (picked from the app locale) or the app's own (`copyWith`).
+- `feedbackSnackBar(context, …, wrapContent:)` builds the same snack bar for
+  code that shows it itself; `FeedbackContent` is the icon and text alone,
+  for an app's own surface.
+
+```dart
+context.showSuccess('Saved');
+context.showError('Could not publish', actionLabel: 'Retry', onAction: publish);
+```
+
 ## `flutter/shipglows_undo_trash`
 
-Undo, redo and trash, extracted from ContentGlows. No dependency beyond
-Flutter.
+Undo, redo and trash, extracted from ContentGlows. Depends on
+`shipglows_feedback` for its snack bar.
 
 - `UndoRedoHistory<T>`: undo/redo stacks of snapshots for an editor. `record(before)`
   before each change (clears redo), `undo(current)` / `redo(current)` return
@@ -925,8 +954,9 @@ Flutter.
   `flush()` commits everything (app backgrounded). `keepHiddenAfterCommit`
   avoids a flicker while the list reloads; a failed commit shows it again.
   Commits still run once the screen is gone.
-- `showUndoSnackBar(context, message:, pending:)`: floating snack bar with
-  « Undo » (persists for assistive-technology users); `attachUndoSnackBar`
+- `showUndoSnackBar(context, message:, pending:)`: the shared message snack
+  bar (`feedbackSnackBar`, info by default, `kind:` to change) with « Undo »
+  (persists for assistive-technology users); `attachUndoSnackBar`
   ties a `PendingUndo` to the app's own toast instead (closing commits),
   with its content wrapped in `UndoSnackBarContent` so undoing elsewhere
   closes that toast, never another message it was queued behind.
