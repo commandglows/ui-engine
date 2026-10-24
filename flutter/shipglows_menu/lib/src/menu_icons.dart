@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'menu_icon.dart';
 
 /// Draws a [ShipglowsMenuIcon] in Flutter: by name from [overrides], then
-/// from [ShipglowsMenuIcons.material]; else its Segoe glyph on Windows
-/// (Segoe Fluent Icons, Segoe MDL2 Assets on Windows 10); else nothing.
+/// from the shared base icons ([ShipglowsIcons.of], which honors the app's
+/// [ShipglowsIconSet]); else its Segoe glyph on Windows (Segoe Fluent Icons,
+/// Segoe MDL2 Assets on Windows 10); else nothing.
 /// Decorative: screen readers read the entry's label.
 class ShipglowsMenuIconView extends StatelessWidget {
   const ShipglowsMenuIconView(
@@ -26,7 +28,7 @@ class ShipglowsMenuIconView extends StatelessWidget {
     final name = icon.name;
     final data = name == null
         ? null
-        : overrides[name] ?? ShipglowsMenuIcons.material[name];
+        : overrides[name] ?? ShipglowsIcons.of(context, name);
     if (data != null) {
       return ExcludeSemantics(
         child: Icon(data, size: size, color: color),
@@ -57,36 +59,9 @@ class ShipglowsMenuIconView extends StatelessWidget {
   }
 }
 
-/// Flutter icons standing for the named [ShipglowsMenuIcon]s.
+/// Platform facts for drawing [ShipglowsMenuIcon]s.
 abstract final class ShipglowsMenuIcons {
   /// Whether the Segoe icon fonts can be used (Windows desktop).
   static bool get hasSegoeFont =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-
-  static const material = <String, IconData>{
-    'open': Icons.open_in_new_rounded,
-    'settings': Icons.settings_outlined,
-    'info': Icons.info_outline_rounded,
-    'update': Icons.sync_rounded,
-    'quit': Icons.power_settings_new_rounded,
-    'feedback': Icons.feedback_outlined,
-    'manual': Icons.menu_book_outlined,
-    'whatsNew': Icons.auto_awesome_outlined,
-    'troubleshoot': Icons.build_outlined,
-    'help': Icons.help_outline_rounded,
-    'community': Icons.people_outline_rounded,
-    'screenshot': Icons.screenshot_monitor_outlined,
-    'video': Icons.videocam_outlined,
-    'audio': Icons.mic_none_rounded,
-    'search': Icons.search_rounded,
-    'commandBar': Icons.keyboard_command_key_rounded,
-    'keyboard': Icons.keyboard_outlined,
-    'add': Icons.add_rounded,
-    'edit': Icons.edit_outlined,
-    'note': Icons.sticky_note_2_outlined,
-    'calendar': Icons.calendar_today_outlined,
-    'folder': Icons.folder_outlined,
-    'copy': Icons.content_copy_rounded,
-    'star': Icons.star_outline_rounded,
-  };
 }

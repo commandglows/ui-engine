@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shipglows_menu/shipglows_menu.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'behavior.dart';
 import 'browser_guard.dart'
@@ -487,7 +488,7 @@ class _CommandBarScopeState extends State<CommandBarScope>
       id: commandBarShortcutsCommandId,
       label: widget.strings.shortcutsTitle,
       section: section,
-      icon: Icons.keyboard_rounded,
+      icon: ShipglowsIcons.keyboard,
       shortcuts: _shortcutsKeys,
       run: (_) => showShortcuts(),
     );

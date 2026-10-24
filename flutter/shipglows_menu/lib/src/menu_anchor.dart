@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'app_menu.dart';
 import 'menu_items.dart';
@@ -110,14 +111,14 @@ class ShipglowsMenuAnchor extends StatelessWidget {
   );
 }
 
-/// An icon button (≡ by default; `Icons.more_horiz` for « ⋯ ») opening
+/// An icon button (≡ by default; `ShipglowsIcons.more` for « ⋯ ») opening
 /// [menu].
 class ShipglowsMenuButton extends StatelessWidget {
   const ShipglowsMenuButton({
     super.key,
     required this.menu,
     this.onSelected,
-    this.icon = const Icon(Icons.menu_rounded),
+    this.icon = const Icon(ShipglowsIcons.menu),
     this.tooltip,
     this.preferAbove = false,
     this.showSearch = true,

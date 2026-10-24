@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'sync_progress.dart';
 import 'sync_strings.dart';
@@ -171,7 +172,7 @@ class _Step extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final Widget icon = switch (state) {
       _StepState.done => Icon(
-        Icons.check_circle,
+        ShipglowsIcons.success,
         size: 20,
         color: scheme.primary,
       ),
@@ -180,12 +181,12 @@ class _Step extends StatelessWidget {
         child: CircularProgressIndicator(strokeWidth: 2),
       ),
       _StepState.current => Icon(
-        Icons.radio_button_checked,
+        ShipglowsIcons.stepCurrent,
         size: 20,
         color: scheme.primary,
       ),
       _StepState.todo => Icon(
-        Icons.radio_button_unchecked,
+        ShipglowsIcons.stepPending,
         size: 20,
         color: scheme.outline,
       ),

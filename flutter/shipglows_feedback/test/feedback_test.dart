@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shipglows_feedback/shipglows_feedback.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 Future<BuildContext> _pumpApp(WidgetTester tester) async {
   late BuildContext context;
@@ -27,7 +28,7 @@ void main() {
     context.showError('Could not save');
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.error_outline), findsOneWidget);
+    expect(find.byIcon(ShipglowsIcons.error), findsOneWidget);
     expect(find.bySemanticsLabel('Error: Could not save'), findsOneWidget);
     expect(find.byIcon(Icons.close), findsOneWidget, reason: 'errors close');
   });

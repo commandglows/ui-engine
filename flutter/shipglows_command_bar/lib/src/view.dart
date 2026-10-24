@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:shipglows_menu/shipglows_menu.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'actions_panel.dart';
 import 'behavior.dart';
@@ -791,7 +792,7 @@ class _CommandBarViewState extends State<CommandBarView> {
             id: '$_queryRowPrefix$raw',
             label: parsed.text,
             section: _queryRowPrefix,
-            icon: Icons.history_rounded,
+            icon: ShipglowsIcons.history,
             subtitle: parsed.filter?.label,
             primaryLabel: widget.strings.fillQuery,
           ),
@@ -1063,7 +1064,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                     ),
                     decoration: InputDecoration(
                       hintText: strings.searchHint,
-                      prefixIcon: const Icon(Icons.search_rounded),
+                      prefixIcon: const Icon(ShipglowsIcons.search),
                       filled: false,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -1156,7 +1157,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                         iconSize: 18,
                         visualDensity: VisualDensity.compact,
                         color: style.mutedColor,
-                        icon: const Icon(Icons.menu_rounded),
+                        icon: const Icon(ShipglowsIcons.menu),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1383,7 +1384,7 @@ class CommandBarTile extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    entry.icon ?? Icons.arrow_forward_rounded,
+                    entry.icon ?? ShipglowsIcons.forward,
                     size: 20,
                     color: iconColor,
                   ),
@@ -1689,7 +1690,7 @@ class _ActionsButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(style.rowRadius),
             ),
           ),
-          icon: Icon(Icons.more_horiz_rounded, color: style.iconColor),
+          icon: Icon(ShipglowsIcons.more, color: style.iconColor),
         ),
       ),
     );

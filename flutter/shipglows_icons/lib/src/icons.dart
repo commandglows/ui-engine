@@ -233,6 +233,36 @@ abstract final class ShipglowsIcons {
   /// Restore size, exit full screen.
   static const IconData minimize = LucideIcons.minimize2;
 
+  /// Go to a place inside the app.
+  static const IconData jump = LucideIcons.arrowUpRight;
+
+  /// Clear a list: logs, emptied trash.
+  static const IconData clear = LucideIcons.brushCleaning;
+
+  /// Delete for good, no way back.
+  static const IconData deleteForever = LucideIcons.circleX;
+
+  /// Waiting its turn.
+  static const IconData pending = LucideIcons.hourglass;
+
+  /// Guided tour.
+  static const IconData guide = LucideIcons.signpost;
+
+  /// Current step.
+  static const IconData stepCurrent = LucideIcons.circleDot;
+
+  /// Step still to come.
+  static const IconData stepPending = LucideIcons.circle;
+
+  /// Syncing.
+  static const IconData syncing = LucideIcons.cloudSync;
+
+  /// Two versions to compare.
+  static const IconData conflict = LucideIcons.gitCompareArrows;
+
+  /// Send to the tray, keep running.
+  static const IconData toTray = LucideIcons.arrowDownRight;
+
   /// Every base icon by name, the names shared with the menu model and the
   /// Astro sites.
   static const Map<String, IconData> byName = {
@@ -311,6 +341,16 @@ abstract final class ShipglowsIcons {
     'bug': bug,
     'maximize': maximize,
     'minimize': minimize,
+    'jump': jump,
+    'clear': clear,
+    'deleteForever': deleteForever,
+    'pending': pending,
+    'guide': guide,
+    'stepCurrent': stepCurrent,
+    'stepPending': stepPending,
+    'syncing': syncing,
+    'conflict': conflict,
+    'toTray': toTray,
   };
 
   /// The icon named [name] for [context]: the app's [ShipglowsIconSet]

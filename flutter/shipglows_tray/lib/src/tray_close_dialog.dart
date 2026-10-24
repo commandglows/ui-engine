@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'tray.dart';
 import 'tray_config.dart';
@@ -61,7 +62,7 @@ class _CloseDialogState extends State<_CloseDialog> {
             Text(strings.closeMessage),
             const SizedBox(height: 16),
             _Choice(
-              icon: Icons.south_east_rounded,
+              icon: ShipglowsIcons.toTray,
               title: strings.closeToTray,
               hint: _fill(strings.closeToTrayHint),
               autofocus: true,
@@ -69,7 +70,7 @@ class _CloseDialogState extends State<_CloseDialog> {
             ),
             const SizedBox(height: 8),
             _Choice(
-              icon: Icons.power_settings_new_rounded,
+              icon: ShipglowsIcons.quit,
               title: _fill(strings.quit),
               hint: strings.closeQuitHint,
               onPressed: () => _choose(ShipglowsTrayCloseBehavior.quit),

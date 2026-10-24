@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'onboarding_page.dart';
 import 'onboarding_strings.dart';
@@ -375,7 +376,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           Text(label),
           if (arrow) ...[
             const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward, size: 18),
+            const Icon(ShipglowsIcons.forward, size: 18),
           ],
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'hotkey.dart';
 import 'strings.dart';
@@ -140,7 +141,7 @@ class _CommandBarHotkeyFieldState extends State<CommandBarHotkeyField> {
                   onPressed: widget.enabled
                       ? () => widget.onChanged(widget.defaultValue)
                       : null,
-                  icon: const Icon(Icons.restart_alt_rounded),
+                  icon: const Icon(ShipglowsIcons.restore),
                 ),
             ],
           ),

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'command.dart';
 import 'practice.dart';
@@ -358,7 +359,7 @@ class _ShortcutsSheetState extends State<_ShortcutsSheet> {
                             color: style.mutedColor,
                           ),
                           prefixIcon: Icon(
-                            Icons.search_rounded,
+                            ShipglowsIcons.search,
                             color: style.iconColor,
                           ),
                           filled: false,
@@ -444,7 +445,7 @@ class _ShortcutsSheetState extends State<_ShortcutsSheet> {
                             0)
                           TextButton.icon(
                             onPressed: () => setState(() => _practicing = true),
-                            icon: const Icon(Icons.school_outlined, size: 18),
+                            icon: const Icon(ShipglowsIcons.learn, size: 18),
                             label: Text(strings.practice),
                           ),
                         TextButton(

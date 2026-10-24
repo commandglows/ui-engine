@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'strings.dart';
 
@@ -285,7 +286,7 @@ class _TrashViewState<T> extends State<TrashView<T>> {
               constraints: const BoxConstraints(maxWidth: 320),
               child: TextField(
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  prefixIcon: const Icon(ShipglowsIcons.search),
                   hintText: strings.searchHint,
                 ),
                 onChanged: (value) => setState(() => _query = value),
@@ -315,7 +316,7 @@ class _TrashViewState<T> extends State<TrashView<T>> {
                     )
                   : TextButton.icon(
                       onPressed: _emptyTrash,
-                      icon: const Icon(Icons.delete_sweep_outlined),
+                      icon: const Icon(ShipglowsIcons.clear),
                       label: Text(strings.emptyTrash),
                     ),
           ],
@@ -409,7 +410,7 @@ class _TrashTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final Widget trailing;
     if (entry.purging) {
-      trailing = const Icon(Icons.hourglass_top_rounded);
+      trailing = const Icon(ShipglowsIcons.pending);
     } else if (busy) {
       trailing = const SizedBox.square(
         dimension: 24,
@@ -421,14 +422,14 @@ class _TrashTile extends StatelessWidget {
         children: [
           TextButton.icon(
             onPressed: onRestore,
-            icon: const Icon(Icons.restore_rounded),
+            icon: const Icon(ShipglowsIcons.restore),
             label: Text(strings.restore),
           ),
           if (onDelete != null)
             IconButton(
               tooltip: strings.deletePermanently,
               onPressed: onDelete,
-              icon: const Icon(Icons.delete_forever_outlined),
+              icon: const Icon(ShipglowsIcons.deleteForever),
             ),
         ],
       );
@@ -437,7 +438,7 @@ class _TrashTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(entry.icon ?? Icons.description_outlined),
+        leading: Icon(entry.icon ?? ShipglowsIcons.document),
         title: Text(entry.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: subtitle == null
             ? null
@@ -466,7 +467,7 @@ class _DefaultEmpty extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.delete_sweep_outlined,
+              ShipglowsIcons.clear,
               size: 48,
               color: theme.colorScheme.onSurfaceVariant,
             ),

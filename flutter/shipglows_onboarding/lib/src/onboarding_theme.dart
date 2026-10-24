@@ -79,8 +79,9 @@ class OnboardingThemeData extends ThemeExtension<OnboardingThemeData> {
     final roles = ShipglowsTheme.from(theme);
 
     final title = TextStyle(
+      fontFamily: roles.fontDisplay,
       fontSize: 44,
-      fontWeight: FontWeight.w400,
+      fontWeight: FontWeight.w600,
       height: 1.05,
       letterSpacing: -0.4,
       color: roles.text,

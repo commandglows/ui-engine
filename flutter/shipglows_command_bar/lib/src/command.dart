@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 /// Runs a command. [context] is the context of the [CommandBarScope] that
 /// opened the bar, below the app navigator, so routing works from it.
@@ -32,14 +33,17 @@ class CommandBarEntryKind {
   /// Goes to a screen of the app.
   static const open = CommandBarEntryKind(
     'open',
-    icon: Icons.north_east_rounded,
+    icon: ShipglowsIcons.jump,
   );
 
   /// Does the work right from the bar: save, copy, toggle, paste.
-  static const action = CommandBarEntryKind('action', icon: Icons.bolt_rounded);
+  static const action = CommandBarEntryKind(
+    'action',
+    icon: ShipglowsIcons.quick,
+  );
 
   /// Opens another application, such as the browser.
-  static const app = CommandBarEntryKind('app', icon: Icons.launch_rounded);
+  static const app = CommandBarEntryKind('app', icon: ShipglowsIcons.open);
 
   /// The built-in kinds, which JSON restores by [id] alone.
   static const builtIn = <CommandBarEntryKind>[open, action, app];

@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:shipglows_theme/shipglows_theme.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 /// What a message reports. Each kind has its own icon as well as its color,
 /// so the kind never rests on color alone.
 enum FeedbackKind {
   /// Neutral news: an action done, a hint.
-  info(Icons.info_outline, Duration(seconds: 4)),
+  info(ShipglowsIcons.info, Duration(seconds: 4)),
 
   /// Saved, sent, synced.
-  success(Icons.check_circle_outline, Duration(seconds: 4)),
+  success(ShipglowsIcons.success, Duration(seconds: 4)),
 
   /// Needs attention but nothing failed: offline, partial result.
-  warning(Icons.warning_amber_rounded, Duration(seconds: 6)),
+  warning(ShipglowsIcons.warning, Duration(seconds: 6)),
 
   /// Something failed; says what and, when there is one, what to do.
-  error(Icons.error_outline, Duration(seconds: 8));
+  error(ShipglowsIcons.error, Duration(seconds: 8));
 
   const FeedbackKind(this.icon, this.duration);
 

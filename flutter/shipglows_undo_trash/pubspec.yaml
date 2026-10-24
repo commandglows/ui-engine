@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shipglows_icons:
+    path: ../shipglows_icons
   shipglows_feedback:
     path: ../shipglows_feedback
 

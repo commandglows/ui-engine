@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shipglows_theme/shipglows_theme.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'app_menu.dart';
 import 'menu_icons.dart';
@@ -382,7 +383,7 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
           color: danger,
           icon: action.checked
               ? Icon(
-                  Icons.check_rounded,
+                  ShipglowsIcons.check,
                   size: 18,
                   color: style.foregroundColor,
                 )
@@ -420,8 +421,8 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
                 ),
           trailing: Icon(
             Directionality.of(context) == TextDirection.rtl
-                ? Icons.chevron_left_rounded
-                : Icons.chevron_right_rounded,
+                ? ShipglowsIcons.chevronLeft
+                : ShipglowsIcons.chevronRight,
             size: 18,
             color: style.mutedColor,
           ),
@@ -442,7 +443,7 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
         children: [
           ExcludeSemantics(
             child: Icon(
-              Icons.search_rounded,
+              ShipglowsIcons.search,
               size: 18,
               color: style.mutedColor,
             ),

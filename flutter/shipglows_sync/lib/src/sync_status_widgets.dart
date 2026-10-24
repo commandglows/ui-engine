@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'sync_status.dart';
 import 'sync_strings.dart';
@@ -71,13 +72,13 @@ class SyncStatusChip extends StatelessWidget {
 (IconData, Color) syncStatusLook(BuildContext context, SyncHealth health) {
   final scheme = Theme.of(context).colorScheme;
   return switch (health) {
-    SyncHealth.localOnly => (Icons.phone_android_outlined, scheme.outline),
-    SyncHealth.synced => (Icons.cloud_done_outlined, scheme.primary),
-    SyncHealth.pending => (Icons.cloud_upload_outlined, scheme.tertiary),
-    SyncHealth.syncing => (Icons.cloud_sync_outlined, scheme.primary),
-    SyncHealth.needsReview => (Icons.compare_arrows, scheme.tertiary),
-    SyncHealth.unreachable => (Icons.cloud_off_outlined, scheme.error),
-    SyncHealth.failed => (Icons.cloud_off_outlined, scheme.error),
+    SyncHealth.localOnly => (ShipglowsIcons.phone, scheme.outline),
+    SyncHealth.synced => (ShipglowsIcons.synced, scheme.primary),
+    SyncHealth.pending => (ShipglowsIcons.syncUpload, scheme.tertiary),
+    SyncHealth.syncing => (ShipglowsIcons.syncing, scheme.primary),
+    SyncHealth.needsReview => (ShipglowsIcons.conflict, scheme.tertiary),
+    SyncHealth.unreachable => (ShipglowsIcons.offline, scheme.error),
+    SyncHealth.failed => (ShipglowsIcons.offline, scheme.error),
   };
 }
 

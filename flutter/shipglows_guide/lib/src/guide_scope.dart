@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'guide_controller.dart';
 import 'guide_step.dart';
@@ -726,8 +727,8 @@ class _GuideCard extends StatelessWidget {
                   ExcludeSemantics(
                     child: Icon(
                       tour.isTip
-                          ? Icons.lightbulb_outline_rounded
-                          : Icons.tour_rounded,
+                          ? ShipglowsIcons.idea
+                          : ShipglowsIcons.guide,
                       size: 20,
                       color: accent,
                     ),
@@ -738,7 +739,7 @@ class _GuideCard extends StatelessWidget {
                         ? () => unawaited(controller.skip())
                         : controller.pause,
                     icon: Icon(
-                      Icons.close_rounded,
+                      ShipglowsIcons.close,
                       size: 20,
                       color: scheme.onSurfaceVariant,
                     ),
@@ -784,7 +785,7 @@ class _GuideCard extends StatelessWidget {
                   child: _hintBox(
                     accent,
                     showTryIt ? strings.tryIt : text(hint!),
-                    showTryIt ? Icons.touch_app_outlined : null,
+                    showTryIt ? ShipglowsIcons.tap : null,
                   ),
                 ),
               ],
@@ -862,7 +863,7 @@ class _GuideCard extends StatelessWidget {
         children: [
           ExcludeSemantics(
             child: Icon(
-              icon ?? Icons.lightbulb_outline,
+              icon ?? ShipglowsIcons.idea,
               size: 18,
               color: accent,
             ),
@@ -904,7 +905,7 @@ class _GuideCard extends StatelessWidget {
           if (!tour.isTip && !controller.isFirst)
             TextButton.icon(
               onPressed: () => unawaited(controller.previous()),
-              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              icon: const Icon(ShipglowsIcons.back, size: 18),
               label: Text(strings.previous),
               style: TextButton.styleFrom(
                 foregroundColor: scheme.onSurface,
@@ -939,8 +940,8 @@ class _GuideCard extends StatelessWidget {
             onPressed: () => unawaited(controller.next()),
             icon: Icon(
               tour.isTip || controller.isLast
-                  ? Icons.check_rounded
-                  : Icons.arrow_forward_rounded,
+                  ? ShipglowsIcons.check
+                  : ShipglowsIcons.forward,
               size: 18,
             ),
             label: Text(primaryLabel),

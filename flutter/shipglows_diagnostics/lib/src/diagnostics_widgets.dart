@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
+import 'package:shipglows_theme/shipglows_theme.dart';
 
 import 'diagnostic_event.dart';
 import 'shipglows_diagnostics.dart';
@@ -200,7 +202,7 @@ class _ShipglowsDiagnosticsButtonState
         iconSize: widget.iconSize,
         constraints: widget.constraints,
         icon: Icon(
-          _copied ? Icons.check_rounded : Icons.bug_report_outlined,
+          _copied ? ShipglowsIcons.check : ShipglowsIcons.bug,
           semanticLabel: label,
         ),
       ),
@@ -302,23 +304,23 @@ class _ShipglowsDiagnosticsPanelState extends State<ShipglowsDiagnosticsPanel> {
           children: [
             FilledButton.tonalIcon(
               onPressed: () => unawaited(_copy()),
-              icon: const Icon(Icons.content_copy_rounded),
+              icon: const Icon(ShipglowsIcons.copy),
               label: Text(labels.copy),
             ),
             OutlinedButton.icon(
               onPressed: () => unawaited(_view()),
-              icon: const Icon(Icons.article_outlined),
+              icon: const Icon(ShipglowsIcons.document),
               label: Text(labels.view),
             ),
             if (canReveal)
               OutlinedButton.icon(
                 onPressed: () => unawaited(_reveal()),
-                icon: const Icon(Icons.folder_open_outlined),
+                icon: const Icon(ShipglowsIcons.folderOpen),
                 label: Text(labels.revealLog),
               ),
             TextButton.icon(
               onPressed: diagnostics.buffer.length == 0 ? null : _clear,
-              icon: const Icon(Icons.delete_sweep_outlined),
+              icon: const Icon(ShipglowsIcons.clear),
               label: Text(labels.clear),
             ),
           ],
@@ -425,10 +427,8 @@ class _DiagnosticsDialogState extends State<_DiagnosticsDialog> {
                   padding: const EdgeInsets.all(12),
                   child: SelectableText(
                     report,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: 'Consolas',
-                      fontFamilyFallback: const ['Menlo', 'monospace'],
-                    ),
+                    style: ShipglowsTheme.from(theme)
+                        .monoStyle(context, theme.textTheme.bodySmall),
                   ),
                 ),
               ),
@@ -447,7 +447,7 @@ class _DiagnosticsDialogState extends State<_DiagnosticsDialog> {
         ),
         FilledButton.icon(
           onPressed: () => unawaited(_copy()),
-          icon: const Icon(Icons.content_copy_rounded),
+          icon: const Icon(ShipglowsIcons.copy),
           label: Text(labels.copy),
         ),
       ],
