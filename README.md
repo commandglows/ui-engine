@@ -934,6 +934,9 @@ audit, item 12).
   appears. `FeedbackContent(liveRegion: true)` for the bare icon and text.
 - `FeedbackErrorState(message:, title:, onRetry:, details:)`: what a screen
   shows when loading it failed, with « Retry » and « Copy details ».
+  `compact: true` aligns it to the start with a smaller icon (a panel, a
+  card); `helperText:` says what to do; `selectable: true` lets the message
+  be copied by hand; `showIcon:`, `copyLabel:`.
 - `FeedbackStringsScope(strings: FeedbackStrings.fr, child:)` in
   `MaterialApp.builder` sets the texts for the whole app (French apps
   without `flutter_localizations` read as English otherwise).
