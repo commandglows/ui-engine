@@ -2,6 +2,8 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 
+import 'typography.dart';
+
 /// The semantic roles every ShipGlows surface draws with, set once in the
 /// app theme: `ThemeData(extensions: [ShipglowsTheme(...)])`.
 ///
@@ -49,6 +51,9 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     this.controlMinHeight = 44,
     this.motionFast = const Duration(milliseconds: 120),
     this.motionNormal = const Duration(milliseconds: 200),
+    this.fontSans = ShipglowsFonts.sans,
+    this.fontDisplay = ShipglowsFonts.display,
+    this.fontMono = ShipglowsFonts.mono,
   });
 
   /// Roles taken from [scheme], for an app that declares no brand values.
@@ -88,6 +93,33 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
   static ShipglowsTheme from(ThemeData theme) =>
       theme.extension<ShipglowsTheme>() ??
       ShipglowsTheme.fallback(theme.colorScheme);
+
+  /// [theme] dressed with these roles: the font roles on its text themes,
+  /// the shared scrollbars, and this extension added (or replaced). One call
+  /// in the app theme gives every ShipGlows app the same type and scrollbars.
+  ThemeData applyTo(ThemeData theme) => theme.copyWith(
+    textTheme: textTheme(theme.textTheme),
+    primaryTextTheme: textTheme(theme.primaryTextTheme),
+    scrollbarTheme: shipglowsScrollbarTheme(this),
+    extensions: [
+      ...theme.extensions.values.where((e) => e is! ShipglowsTheme),
+      this,
+    ],
+  );
+
+  /// [base] with [fontSans] and, on display and headline styles,
+  /// [fontDisplay].
+  TextTheme textTheme(TextTheme base) =>
+      ShipglowsFonts.textTheme(base, sans: fontSans, display: fontDisplay);
+
+  /// [base] (or the text theme's `bodyMedium`) in [fontMono], for code,
+  /// paths and logs.
+  TextStyle monoStyle(BuildContext context, [TextStyle? base]) =>
+      (base ?? Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+          .copyWith(
+            fontFamily: fontMono,
+            fontFamilyFallback: ShipglowsFonts.monoFallback,
+          );
 
   /// Page background.
   final Color surface;
@@ -195,6 +227,17 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
   /// Regular transitions: open, close, move.
   final Duration motionNormal;
 
+  /// Interface text. Defaults to the bundled Inter ([ShipglowsFonts.sans]).
+  final String fontSans;
+
+  /// Titles and big numbers. Defaults to the bundled Cal Sans
+  /// ([ShipglowsFonts.display]).
+  final String fontDisplay;
+
+  /// Code, paths, logs. Defaults to JetBrains Mono ([ShipglowsFonts.mono]),
+  /// with system monospace faces behind it.
+  final String fontMono;
+
   @override
   ShipglowsTheme copyWith({
     Color? surface,
@@ -234,6 +277,9 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     double? controlMinHeight,
     Duration? motionFast,
     Duration? motionNormal,
+    String? fontSans,
+    String? fontDisplay,
+    String? fontMono,
   }) => ShipglowsTheme(
     surface: surface ?? this.surface,
     surfaceRaised: surfaceRaised ?? this.surfaceRaised,
@@ -272,6 +318,9 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     controlMinHeight: controlMinHeight ?? this.controlMinHeight,
     motionFast: motionFast ?? this.motionFast,
     motionNormal: motionNormal ?? this.motionNormal,
+    fontSans: fontSans ?? this.fontSans,
+    fontDisplay: fontDisplay ?? this.fontDisplay,
+    fontMono: fontMono ?? this.fontMono,
   );
 
   @override
@@ -317,6 +366,9 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
       controlMinHeight: d(controlMinHeight, other.controlMinHeight),
       motionFast: t < 0.5 ? motionFast : other.motionFast,
       motionNormal: t < 0.5 ? motionNormal : other.motionNormal,
+      fontSans: t < 0.5 ? fontSans : other.fontSans,
+      fontDisplay: t < 0.5 ? fontDisplay : other.fontDisplay,
+      fontMono: t < 0.5 ? fontMono : other.fontMono,
     );
   }
 }

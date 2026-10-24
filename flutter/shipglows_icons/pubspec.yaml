@@ -1,0 +1,16 @@
+name: shipglows_icons
+description: Base icons for ShipGlows Flutter apps and packages, one name per meaning, drawn from Lucide and replaceable per app.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  lucide_icons_flutter: ^4.0.1
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
