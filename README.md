@@ -922,13 +922,38 @@ audit, item 12).
   not queued again (a failing sync reporting each retry).
 - Read as « Error: … » by a screen reader: `FeedbackStrings.en`, `.fr`
   (picked from the app locale) or the app's own (`copyWith`).
+- After an await, read `FeedbackMessenger.of(context)` before it and show
+  through it after (same queue, theme and texts, the widget may be gone).
+  Never pass the `ScaffoldMessenger`'s own context to `feedbackSnackBar`:
+  `MaterialApp` puts it above the theme, so the brand roles are lost.
+- `showError(…, details: () => error.toString())` offers « Copy details »
+  when there is no other action, then confirms « Details copied ».
+- `replaceCurrent: true` also skips the repeat check.
+- `FeedbackInline(message:, kind:, title:, dense:, trailing:)`: a message in
+  place (under a form, in a panel), tinted with its kind, announced when it
+  appears. `FeedbackContent(liveRegion: true)` for the bare icon and text.
+- `FeedbackErrorState(message:, title:, onRetry:, details:)`: what a screen
+  shows when loading it failed, with « Retry » and « Copy details ».
+- `FeedbackStringsScope(strings: FeedbackStrings.fr, child:)` in
+  `MaterialApp.builder` sets the texts for the whole app (French apps
+  without `flutter_localizations` read as English otherwise).
 - `feedbackSnackBar(context, …, wrapContent:)` builds the same snack bar for
   code that shows it itself; `FeedbackContent` is the icon and text alone,
   for an app's own surface.
+- Errors take `danger`, which the `ColorScheme` fallback sets to
+  `scheme.error`: an app keeping red for emergencies sets its own.
 
 ```dart
 context.showSuccess('Saved');
 context.showError('Could not publish', actionLabel: 'Retry', onAction: publish);
+
+final feedback = FeedbackMessenger.of(context);
+try {
+  await api.save();
+  feedback.showSuccess('Saved');
+} catch (error) {
+  feedback.showError('Could not save', details: () => '$error');
+}
 ```
 
 ## `flutter/shipglows_undo_trash`

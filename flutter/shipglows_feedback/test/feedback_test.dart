@@ -80,6 +80,72 @@ void main() {
     expect(find.text('Synced'), findsNothing);
   });
 
+  testWidgets('a messenger read before an await shows after the widget is gone', (
+    tester,
+  ) async {
+    final context = await _pumpApp(tester);
+    final feedback = FeedbackMessenger.of(context);
+    await tester.pumpWidget(const SizedBox.shrink());
+    feedback.showSuccess('Saved');
+    await tester.pumpAndSettle();
+    expect(find.text('Saved'), findsNothing, reason: 'its messenger is gone');
+  });
+
+  testWidgets('an error with details offers to copy them', (tester) async {
+    final context = await _pumpApp(tester);
+    context.showError('Could not publish', details: () => 'HTTP 500');
+    await tester.pumpAndSettle();
+    expect(find.text('Copy details'), findsOneWidget);
+  });
+
+  testWidgets('the app scope sets the texts', (tester) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (_, child) =>
+            FeedbackStringsScope(strings: FeedbackStrings.fr, child: child!),
+        home: Scaffold(
+          body: Builder(
+            builder: (c) {
+              context = c;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    context.showError('Échec');
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Erreur: Échec'), findsOneWidget);
+  });
+
+  testWidgets('inline message and error state', (tester) async {
+    var retried = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              const FeedbackInline(
+                message: 'Check the address',
+                kind: FeedbackKind.warning,
+              ),
+              Expanded(
+                child: FeedbackErrorState(
+                  message: 'Could not load',
+                  onRetry: () => retried++,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(find.bySemanticsLabel('Warning: Check the address'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    expect(retried, 1);
+  });
+
   test('French texts', () {
     expect(FeedbackStrings.fr.labelOf(FeedbackKind.warning), 'Avertissement');
   });
