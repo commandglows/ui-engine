@@ -27,6 +27,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     this.highlightIndicatorColor,
     this.highlightIndicatorWidth,
     this.highlightIndicatorBleed,
+    this.highlightIndicatorBothSides,
     this.radius,
     this.rowRadius,
     this.rowMinHeight,
@@ -74,6 +75,10 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
   /// through, its clip included.
   final double? highlightIndicatorBleed;
 
+  /// Draws the highlight bar on both sides of the row, not only at its start
+  /// (false by default).
+  final bool? highlightIndicatorBothSides;
+
   /// Corner radius of the dialog.
   final double? radius;
 
@@ -115,6 +120,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     Color? highlightIndicatorColor,
     double? highlightIndicatorWidth,
     double? highlightIndicatorBleed,
+    bool? highlightIndicatorBothSides,
     double? radius,
     double? rowRadius,
     double? rowMinHeight,
@@ -138,6 +144,8 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
         highlightIndicatorWidth ?? this.highlightIndicatorWidth,
     highlightIndicatorBleed:
         highlightIndicatorBleed ?? this.highlightIndicatorBleed,
+    highlightIndicatorBothSides:
+        highlightIndicatorBothSides ?? this.highlightIndicatorBothSides,
     radius: radius ?? this.radius,
     rowRadius: rowRadius ?? this.rowRadius,
     rowMinHeight: rowMinHeight ?? this.rowMinHeight,
@@ -180,6 +188,9 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
         other.highlightIndicatorBleed,
         t,
       ),
+      highlightIndicatorBothSides: t < 0.5
+          ? highlightIndicatorBothSides
+          : other.highlightIndicatorBothSides,
       radius: lerpDouble(radius, other.radius, t),
       rowRadius: lerpDouble(rowRadius, other.rowRadius, t),
       rowMinHeight: lerpDouble(rowMinHeight, other.rowMinHeight, t),
@@ -214,6 +225,7 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       highlightIndicatorColor: data.highlightIndicatorColor,
       highlightIndicatorWidth: data.highlightIndicatorWidth ?? 3,
       highlightIndicatorBleed: data.highlightIndicatorBleed ?? 0,
+      highlightIndicatorBothSides: data.highlightIndicatorBothSides ?? false,
       radius: data.radius ?? roles.radiusLg,
       rowRadius: data.rowRadius ?? roles.radiusMd,
       rowMinHeight: data.rowMinHeight ?? roles.controlMinHeight,
@@ -243,6 +255,7 @@ class ResolvedCommandBarTheme {
     required this.highlightIndicatorColor,
     required this.highlightIndicatorWidth,
     required this.highlightIndicatorBleed,
+    required this.highlightIndicatorBothSides,
     required this.radius,
     required this.rowRadius,
     required this.rowMinHeight,
@@ -264,6 +277,7 @@ class ResolvedCommandBarTheme {
   final Color? highlightIndicatorColor;
   final double highlightIndicatorWidth;
   final double highlightIndicatorBleed;
+  final bool highlightIndicatorBothSides;
   final double radius;
   final double rowRadius;
   final double rowMinHeight;

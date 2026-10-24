@@ -1372,6 +1372,12 @@ class CommandBarTile extends StatelessWidget {
                           color: inset,
                           width: style.highlightIndicatorWidth,
                         ),
+                        end: style.highlightIndicatorBothSides
+                            ? BorderSide(
+                                color: inset,
+                                width: style.highlightIndicatorWidth,
+                              )
+                            : BorderSide.none,
                       ),
                     ),
               child: Row(
@@ -1473,6 +1479,16 @@ class CommandBarTile extends StatelessWidget {
       ),
     );
     if (indicator == null || inset != null) return tile;
+    final bar = IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: indicator,
+          borderRadius: BorderRadius.circular(
+            style.highlightIndicatorWidth / 4,
+          ),
+        ),
+      ),
+    );
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -1482,17 +1498,16 @@ class CommandBarTile extends StatelessWidget {
           top: 1,
           bottom: 1,
           width: style.highlightIndicatorWidth,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: indicator,
-                borderRadius: BorderRadius.circular(
-                  style.highlightIndicatorWidth / 4,
-                ),
-              ),
-            ),
-          ),
+          child: bar,
         ),
+        if (style.highlightIndicatorBothSides)
+          PositionedDirectional(
+            end: -bleed,
+            top: 1,
+            bottom: 1,
+            width: style.highlightIndicatorWidth,
+            child: bar,
+          ),
       ],
     );
   }
