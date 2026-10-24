@@ -141,6 +141,7 @@ class SettingsController extends ChangeNotifier
   bool _open = false;
   bool _disposed = false;
   final Map<String, _SettingListenable<Object?>> _listenables = {};
+  final Map<String, Future<void>> _writeChains = {};
   StreamSubscription<String>? _storageWatch;
 
   /// Own writes in flight: a change seen meanwhile is reloaded after them.
@@ -1074,8 +1075,15 @@ class SettingsController extends ChangeNotifier
 
   Future<void> _persist(_Bucket bucket, {bool rethrowError = true}) async {
     _writes++;
+    // Saves of one bucket run in call order: two quick account switches must
+    // not let the older copy (lastAccount null) land last.
+    final data = bucket.toJson(schema.version);
+    final write = (_writeChains[bucket.name] ?? Future<void>.value()).then(
+      (_) => _storage.write(bucket.name, data),
+    );
+    _writeChains[bucket.name] = write.then<void>((_) {}, onError: (_) {});
     try {
-      await _storage.write(bucket.name, bucket.toJson(schema.version));
+      await write;
     } catch (error) {
       final failure = SettingsStorageException('write', bucket.name, error);
       onError?.call('settings_local_write_error', failure);
