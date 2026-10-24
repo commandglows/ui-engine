@@ -2,19 +2,19 @@
 
 ## Open
 
-- [ ] `shipglows_tray`: wire CommandGlows after its command bar migration; operator to decide whether closing hides to the tray (it quits today).
-- [ ] `shipglows_tray`: wire ContentGlows after its command bar migration; remove the tray part of `resident_shell` and `resident_shell_menu_test.cpp`, keep the hotkeys and the Auth0/shell-task gate.
-- [ ] `shipglows_hotkeys`: no consumer yet.
+- [ ] Flutter apps with no shared package yet: CommunityGlows (`communityglows/flutter`), Claiire (`claiire/app_flutter`), DreamGlows Android (`dreamglows/android_app`); BestFriedChicken and GoCharbon not assessed.
 - [ ] `shipglows_window` frame theme: in BeatGlows, CommandGlows, ContentGlows and the ShipGlows app, drop the template `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED` in `win32_window.cpp` (the frame already follows the app theme through `ShipglowsWindowFrame`).
 - [ ] `shipglows_diagnostics`: migrate DreamGlows (`path_flutter/lib/src/crash_log.dart`, engine labels main/capture), then ContentGlows, CommandGlows, ReplayGlows (Sentry through `onReport`, their Sentry/auth/backend lines through `addSection`) and the ShipGlows app; put `ShipglowsDiagnosticsPanel` in each settings page and `ShipglowsDiagnosticsButton` in error views.
 - [ ] `shipglows_guide`: widget tests (progress, first-visit trigger, target placement); more ReplayGlows screens (Notes, Play) once the Feed pilot is validated.
 - [ ] `shipglows_onboarding`: push ui-engine (operator approval), then pin ReplayGlows `app/pubspec.lock` on that commit and drop its local `pubspec_overrides.yaml`.
 - [ ] `shipglows_onboarding`: migrate the CommunityGlows Flutter introduction (`communityglows/flutter/lib/features/onboarding/`, language → welcome → account → access; keep its `communityglows.ios.onboarding.v1` state or map it to the gate); widget tests (gate scope/replay, skip to last page, narrow layout).
 - [ ] `shipglows_sync` in CommandGlows: check on screen the review dialog (first sign-in on a device whose settings differ from the account), the progress overlay and a recovery restore. The account page panel was checked on 2026-10-23 (signed-in account, « Synchronisé », French tooltip date, manual sync from the chip). On 2026-10-24 a first sign-in on an Android phone (Galaxy S21, managed debug session) also ends on « Synchronisé »; the progress overlay itself was not observed.
-- [ ] `shipglows_sync`: adopt it in the other apps using account settings (CommunityGlows Flutter `features/sync/cloud_sync.dart`, ContentGlows, DreamGlows), then for business data through `SyncSnapshot.collections`.
+- [ ] `shipglows_sync`: adopt it in the other apps using account settings (CommunityGlows Flutter `features/sync/cloud_sync.dart`, DreamGlows), then for business data through `SyncSnapshot.collections`.
 - [ ] `shipglows_sync`: unit tests of `reconcileSnapshots`, `SyncProgress` and the controller review/recovery (on operator request).
 
 ## Done
+
+- [x] 2026-10-24: migration audit from the code (imports under each app's `lib/`, not checked on screen). Shared packages in use: ContentGlows (command_bar(+window), zoom, guide, overlay_window, settings, sync, tray, undo_trash, window, audio), CommandGlows (command_bar(+window), zoom, menu, settings(+firestore), sync, theme, tray, window), BeatGlows (command_bar(+window), diagnostics, zoom, settings, tray, window, audio, visualization), DreamGlows `path_flutter` + `windows_app` (command_bar(+window), settings, tray, zoom, window), ShipGlows app (command_bar(+window), zoom, hotkeys, window), ReplayGlows (command_bar, guide, onboarding). Closed by this audit: `shipglows_tray` in CommandGlows (commandglows 074879a6; close-or-hide is a user choice through `ShipglowsTrayCloseSetting` in settings) and in ContentGlows (contentglows b44b9a4b; `resident_shell` no longer has a notification icon and `resident_shell_menu_test.cpp` is gone); `shipglows_hotkeys` used by the ShipGlows app floating command bar (shipglows_app aec34168); `shipglows_sync` used by ContentGlows settings (`settings_sync_ui.dart`).
 
 - [x] 2026-10-23: `shipglows_tray` launch at Windows sign-in (a99d300); DreamGlows settings get a « Fenêtre » section with the close choice and the startup switch (dreamglows b4bef16). Run through `s`: the switch writes `HKCU\…\Run\DreamGlows` = `"…\dreamglows_windows.exe" --launched-at-startup` and removes it when turned off. The Debug exe launched with `--launched-at-startup` keeps the main window hidden (capture tab and tray icon only); a second launch brings it back. Then the startup window became a user choice (hidden / minimized / open, saved in `tray.json`): each mode checked by launching the Debug exe with the flag; `tray.json` was never written before (bad path escaping), fixed.
 
