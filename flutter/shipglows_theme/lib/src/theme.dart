@@ -234,8 +234,8 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
   /// ([ShipglowsFonts.display]).
   final String fontDisplay;
 
-  /// Code, paths, logs. Defaults to JetBrains Mono ([ShipglowsFonts.mono]),
-  /// with system monospace faces behind it.
+  /// Code, paths, logs. Defaults to the bundled JetBrains Mono
+  /// ([ShipglowsFonts.mono]), with system monospace faces behind it.
   final String fontMono;
 
   @override

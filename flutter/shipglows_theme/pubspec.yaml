@@ -1,5 +1,5 @@
 name: shipglows_theme
-description: Shared semantic theme roles, bundled fonts (Inter, Cal Sans), scrollbars and base components (keycaps, key buttons, key hints) for ShipGlows Flutter apps and packages.
+description: Shared semantic theme roles, bundled fonts (Inter, Cal Sans, JetBrains Mono), scrollbars and base components (keycaps, key buttons, key hints) for ShipGlows Flutter apps and packages.
 version: 0.1.0
 publish_to: "none"
 
@@ -31,3 +31,8 @@ flutter:
       fonts:
         - asset: fonts/CalSans-Regular.ttf
           weight: 600
+    - family: JetBrains Mono
+      fonts:
+        - asset: fonts/JetBrainsMono-Regular.ttf
+        - asset: fonts/JetBrainsMono-Bold.ttf
+          weight: 700

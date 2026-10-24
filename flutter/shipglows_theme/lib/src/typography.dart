@@ -12,10 +12,10 @@ abstract final class ShipglowsFonts {
   /// Titles and big numbers: Cal Sans, one weight (600).
   static const display = 'packages/shipglows_theme/Cal Sans';
 
-  /// Code, paths, logs: JetBrains Mono.
+  /// Code, paths, logs: JetBrains Mono, 400 and 700.
   static const mono = 'packages/shipglows_theme/JetBrains Mono';
 
-  /// System monospace faces drawn while [mono] is missing a glyph or a file.
+  /// System monospace faces drawn where [mono] lacks a glyph.
   static const monoFallback = ['Cascadia Mono', 'Consolas', 'Menlo', 'monospace'];
 
   /// [base] with [sans] on every style and [display] on the display and
