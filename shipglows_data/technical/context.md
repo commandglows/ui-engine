@@ -40,6 +40,8 @@ do nothing or fall back to plain Flutter.
 
 | Package | Role | Native | Consumers (2026-10-22) |
 | --- | --- | --- | --- |
+| `shipglows_theme` | Semantic roles (`ShipglowsTheme`), bundled fonts (Inter, Cal Sans; JetBrains Mono falls back to system monospace until its files are added) as `fontSans`/`fontDisplay`/`fontMono`, shared `TextTheme` and scrollbars, `applyTo(themeData)` to set them in one call; keycap components | no | every shared package; apps with `ShipglowsTheme` in their theme (fonts and scrollbars not adopted yet, 2026-10-24) |
+| `shipglows_icons` | Base icons by meaning (`ShipglowsIcons.settings`, `byName`), drawn from Lucide (`lucide_icons_flutter`); apps swap any with a `ShipglowsIconSet` theme extension (`ShipglowsIcons.of`, `ShipglowsIcon`); same names as the menu model and the Astro engine `icons` | no | command bar, diagnostics, feedback, guide, menu, onboarding, sync, tray, undo_trash (2026-10-24); no app yet |
 | `shipglows_command_bar` | Command palette widget (`CommandBarView`, sections, filters, recents) | no | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ReplayGlows |
 | `shipglows_flutter_zoom` | App-wide zoom (`FlutterZoomViewport`): Ctrl+wheel, pinch, Ctrl+= / Ctrl+- / Ctrl+0; moved from `shipglows-email-engine` | no | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ShipGlows app, email-engine `source_sidebar_flutter` |
 | `shipglows_window` | Custom title bar and window chrome (`window_manager`); the Windows frame (dark mode, caption and text colors) follows the app theme through DWM FFI | via plugin dep, DWM FFI | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ShipGlows app |

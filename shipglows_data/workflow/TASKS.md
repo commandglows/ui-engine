@@ -2,6 +2,7 @@
 
 ## Open
 
+- [ ] Fonts, icons, scrollbars (ui-engine f906ca2, b18a584, not pushed): in each Flutter app, call `ShipglowsTheme(...).applyTo(theme)` (or `ShipglowsFonts.textTheme` + `shipglowsScrollbarTheme`), drop its own Inter/Cal Sans assets and `fontFamily` strings, and replace Material icons with `ShipglowsIcons`; check on screen. Add JetBrains Mono files to `shipglows_theme` (download approval pending).
 - [ ] Flutter apps with no shared package yet: CommunityGlows (`communityglows/flutter`), Claiire (`claiire/app_flutter`), DreamGlows Android (`dreamglows/android_app`); BestFriedChicken and GoCharbon not assessed.
 - [ ] `shipglows_window` frame theme: in BeatGlows, CommandGlows, ContentGlows and the ShipGlows app, drop the template `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED` in `win32_window.cpp` (the frame already follows the app theme through `ShipglowsWindowFrame`).
 - [ ] `shipglows_diagnostics`: migrate DreamGlows (`path_flutter/lib/src/crash_log.dart`, engine labels main/capture), then ContentGlows, CommandGlows, ReplayGlows (Sentry through `onReport`, their Sentry/auth/backend lines through `addSection`) and the ShipGlows app; put `ShipglowsDiagnosticsPanel` in each settings page and `ShipglowsDiagnosticsButton` in error views.
