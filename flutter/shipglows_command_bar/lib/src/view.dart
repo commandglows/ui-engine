@@ -904,9 +904,13 @@ class _CommandBarViewState extends State<CommandBarView> {
   Widget _list(_BarLayout layout, int highlight, bool showNumbers) {
     final strings = widget.strings;
     final behavior = widget.behavior;
+    final bleed = CommandBarThemeData.of(context).highlightIndicatorBleed;
     final list = ListView.builder(
       controller: _scroll,
       shrinkWrap: true,
+      // A bleeding highlight bar reaches past the list's sides: only the top
+      // and bottom stay clipped (by [_BleedClipper] below).
+      clipBehavior: bleed > 0 ? Clip.none : Clip.hardEdge,
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: layout.rows.length,
       itemBuilder: (context, row) => KeyedSubtree(
@@ -965,7 +969,9 @@ class _CommandBarViewState extends State<CommandBarView> {
         if (_actionsOpen) _closeActions();
         return false;
       },
-      child: list,
+      child: bleed > 0
+          ? ClipRect(clipper: _BleedClipper(bleed), child: list)
+          : list,
     );
   }
 
@@ -1333,14 +1339,17 @@ class CommandBarTile extends StatelessWidget {
         : style.iconColor;
     final number = this.number;
     final indicator = highlighted ? style.highlightIndicatorColor : null;
+    final bleed = style.highlightIndicatorBleed;
+    // Drawn along the row's edge, or over the dialog outline with a bleed.
+    final inset = bleed > 0 ? null : indicator;
 
-    return Padding(
+    final tile = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       child: Material(
         color: highlighted ? style.highlightColor : Colors.transparent,
         borderRadius: BorderRadius.circular(style.rowRadius),
         // Keeps the indicator inside the rounded corners.
-        clipBehavior: indicator == null ? Clip.none : Clip.antiAlias,
+        clipBehavior: inset == null ? Clip.none : Clip.antiAlias,
         child: InkWell(
           borderRadius: BorderRadius.circular(style.rowRadius),
           onTap: disabled ? null : onTap,
@@ -1355,11 +1364,14 @@ class CommandBarTile extends StatelessWidget {
             child: Container(
               constraints: BoxConstraints(minHeight: style.rowMinHeight),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: indicator == null
+              decoration: inset == null
                   ? null
                   : BoxDecoration(
                       border: BorderDirectional(
-                        start: BorderSide(color: indicator, width: 3),
+                        start: BorderSide(
+                          color: inset,
+                          width: style.highlightIndicatorWidth,
+                        ),
                       ),
                     ),
               child: Row(
@@ -1460,7 +1472,45 @@ class CommandBarTile extends StatelessWidget {
         ),
       ),
     );
+    if (indicator == null || inset != null) return tile;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        tile,
+        PositionedDirectional(
+          start: -bleed,
+          top: 1,
+          bottom: 1,
+          width: style.highlightIndicatorWidth,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: indicator,
+                borderRadius: BorderRadius.circular(
+                  style.highlightIndicatorWidth / 4,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
+}
+
+/// Clips the top and bottom of the list only, so a bleeding highlight bar
+/// can reach [bleed] past its sides.
+class _BleedClipper extends CustomClipper<Rect> {
+  const _BleedClipper(this.bleed);
+
+  final double bleed;
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(-bleed, 0, size.width + bleed, size.height);
+
+  @override
+  bool shouldReclip(_BleedClipper oldClipper) => oldClipper.bleed != bleed;
 }
 
 /// The filter row: « All », then one button per filter, the active one

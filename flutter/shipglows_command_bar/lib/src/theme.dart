@@ -25,6 +25,8 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     this.iconColor,
     this.highlightedIconColor,
     this.highlightIndicatorColor,
+    this.highlightIndicatorWidth,
+    this.highlightIndicatorBleed,
     this.radius,
     this.rowRadius,
     this.rowMinHeight,
@@ -62,6 +64,15 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
   /// Bar drawn along the leading edge of the highlighted row, so the
   /// highlight does not rest on its fill alone. No bar when null.
   final Color? highlightIndicatorColor;
+
+  /// Width of the highlight bar (3 by default).
+  final double? highlightIndicatorWidth;
+
+  /// How far the highlight bar reaches past the edge of the list, over the
+  /// dialog outline, so the chosen row is caught at a glance (0 by default:
+  /// the bar stays inside the row). The surface around the bar must let it
+  /// through, its clip included.
+  final double? highlightIndicatorBleed;
 
   /// Corner radius of the dialog.
   final double? radius;
@@ -102,6 +113,8 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     Color? iconColor,
     Color? highlightedIconColor,
     Color? highlightIndicatorColor,
+    double? highlightIndicatorWidth,
+    double? highlightIndicatorBleed,
     double? radius,
     double? rowRadius,
     double? rowMinHeight,
@@ -121,6 +134,10 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
     highlightedIconColor: highlightedIconColor ?? this.highlightedIconColor,
     highlightIndicatorColor:
         highlightIndicatorColor ?? this.highlightIndicatorColor,
+    highlightIndicatorWidth:
+        highlightIndicatorWidth ?? this.highlightIndicatorWidth,
+    highlightIndicatorBleed:
+        highlightIndicatorBleed ?? this.highlightIndicatorBleed,
     radius: radius ?? this.radius,
     rowRadius: rowRadius ?? this.rowRadius,
     rowMinHeight: rowMinHeight ?? this.rowMinHeight,
@@ -151,6 +168,16 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       highlightIndicatorColor: Color.lerp(
         highlightIndicatorColor,
         other.highlightIndicatorColor,
+        t,
+      ),
+      highlightIndicatorWidth: lerpDouble(
+        highlightIndicatorWidth,
+        other.highlightIndicatorWidth,
+        t,
+      ),
+      highlightIndicatorBleed: lerpDouble(
+        highlightIndicatorBleed,
+        other.highlightIndicatorBleed,
         t,
       ),
       radius: lerpDouble(radius, other.radius, t),
@@ -185,6 +212,8 @@ class CommandBarThemeData extends ThemeExtension<CommandBarThemeData> {
       iconColor: data.iconColor ?? roles.icon,
       highlightedIconColor: data.highlightedIconColor ?? roles.onHighlight,
       highlightIndicatorColor: data.highlightIndicatorColor,
+      highlightIndicatorWidth: data.highlightIndicatorWidth ?? 3,
+      highlightIndicatorBleed: data.highlightIndicatorBleed ?? 0,
       radius: data.radius ?? roles.radiusLg,
       rowRadius: data.rowRadius ?? roles.radiusMd,
       rowMinHeight: data.rowMinHeight ?? roles.controlMinHeight,
@@ -212,6 +241,8 @@ class ResolvedCommandBarTheme {
     required this.iconColor,
     required this.highlightedIconColor,
     required this.highlightIndicatorColor,
+    required this.highlightIndicatorWidth,
+    required this.highlightIndicatorBleed,
     required this.radius,
     required this.rowRadius,
     required this.rowMinHeight,
@@ -231,6 +262,8 @@ class ResolvedCommandBarTheme {
   final Color iconColor;
   final Color highlightedIconColor;
   final Color? highlightIndicatorColor;
+  final double highlightIndicatorWidth;
+  final double highlightIndicatorBleed;
   final double radius;
   final double rowRadius;
   final double rowMinHeight;
