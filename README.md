@@ -751,9 +751,11 @@ take a release APK); web does nothing.
   the state becomes `needsPermission` and the system page opens; `install()`
   again once back. Background checks stay silent on failure.
 - The experience, the same on every app: nothing interrupts a session. A
-  new version is announced once, at launch only (`ShipglowsUpdateAnnouncer`
-  in `MaterialApp.builder`, given the navigator key; `announcedVersion` /
-  `onAnnounced` keep it once per version). Afterwards a quiet
+  waiting version is announced at every launch (`ShipglowsUpdateAnnouncer`
+  in `MaterialApp.builder`, given the navigator key) until it is installed
+  or the person picks « Ne plus me rappeler pour cette version »
+  (`skippedVersion` / `onSkipVersion` keep that choice; a newer version is
+  announced again). « Plus tard » only closes the dialog. Afterwards a quiet
   `ShipglowsUpdatePill(appName:, compact:)` in the app's chrome (sidebar,
   menu) and `ShipglowsUpdateBadge(child:)` (a dot on the settings icon)
   stay while the update waits.

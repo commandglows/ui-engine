@@ -43,6 +43,7 @@ final class ShipglowsUpdaterStrings {
     required this.install,
     required this.installNow,
     required this.later,
+    required this.skipVersion,
     required this.hide,
     required this.close,
     required this.seeUpdate,
@@ -82,6 +83,7 @@ final class ShipglowsUpdaterStrings {
     install: 'Installer',
     installNow: 'Installer maintenant',
     later: 'Plus tard',
+    skipVersion: 'Ne plus me rappeler pour cette version',
     hide: 'Masquer',
     close: 'Fermer',
     seeUpdate: 'Voir la mise à jour',
@@ -123,6 +125,7 @@ final class ShipglowsUpdaterStrings {
     install: 'Install',
     installNow: 'Install now',
     later: 'Later',
+    skipVersion: 'Don’t remind me about this version',
     hide: 'Hide',
     close: 'Close',
     seeUpdate: 'See the update',
@@ -161,6 +164,7 @@ final class ShipglowsUpdaterStrings {
   final String install;
   final String installNow;
   final String later;
+  final String skipVersion;
   final String hide;
   final String close;
   final String seeUpdate;

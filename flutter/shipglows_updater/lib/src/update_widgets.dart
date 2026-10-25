@@ -36,12 +36,14 @@ Future<void> showShipglowsUpdateDialog(
   required String appName,
   ShipglowsUpdaterStrings strings = ShipglowsUpdaterStrings.fr,
   ShipglowsUpdater? updater,
+  ValueChanged<String>? onSkipVersion,
 }) => showDialog<void>(
   context: context,
   builder: (_) => ShipglowsUpdateDialog(
     appName: appName,
     strings: strings,
     updater: updater ?? ShipglowsUpdater.instance,
+    onSkipVersion: onSkipVersion,
   ),
 );
 
@@ -51,11 +53,16 @@ class ShipglowsUpdateDialog extends StatelessWidget {
     required this.appName,
     required this.updater,
     this.strings = ShipglowsUpdaterStrings.fr,
+    this.onSkipVersion,
   });
 
   final String appName;
   final ShipglowsUpdater updater;
   final ShipglowsUpdaterStrings strings;
+
+  /// Shows « Ne plus me rappeler pour cette version »: the launch reminder
+  /// stops for this version only, a newer one is announced again.
+  final ValueChanged<String>? onSkipVersion;
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +196,12 @@ class ShipglowsUpdateDialog extends StatelessWidget {
       ],
       ShipglowsUpdateIdle() ||
       ShipglowsUpdateUpToDate() => [primary(strings.close, close)],
-      ShipglowsUpdateAvailable() => [
+      ShipglowsUpdateAvailable(:final release) => [
+        if (onSkipVersion != null && release != null)
+          secondary(strings.skipVersion, () {
+            onSkipVersion!(release.version.toString());
+            close();
+          }),
         secondary(strings.later, close),
         primary(strings.installNow, () => unawaited(updater.install())),
       ],
@@ -333,9 +345,11 @@ class ShipglowsUpdateBadge extends StatelessWidget {
   }
 }
 
-/// Announces a new version once, at launch only (a natural break, never in
-/// the middle of a session), with the update dialog. Android only: on
-/// Windows WinSparkle announces it itself. Put it in `MaterialApp.builder`.
+/// Reminds of a waiting version at every launch (a natural break, never in
+/// the middle of a session) with the update dialog, until it is installed
+/// or the person picks « Ne plus me rappeler pour cette version ». Android
+/// only: on Windows WinSparkle reminds itself and has its own « skip this
+/// version ». Put it in `MaterialApp.builder`.
 class ShipglowsUpdateAnnouncer extends StatefulWidget {
   const ShipglowsUpdateAnnouncer({
     super.key,
@@ -343,8 +357,8 @@ class ShipglowsUpdateAnnouncer extends StatefulWidget {
     required this.appName,
     required this.child,
     this.strings = ShipglowsUpdaterStrings.fr,
-    this.announcedVersion,
-    this.onAnnounced,
+    this.skippedVersion,
+    this.onSkipVersion,
     this.window = const Duration(minutes: 2),
     this.updater,
   });
@@ -354,13 +368,14 @@ class ShipglowsUpdateAnnouncer extends StatefulWidget {
   final Widget child;
   final ShipglowsUpdaterStrings strings;
 
-  /// The version announced last time, so a version is announced only once;
-  /// save it from [onAnnounced]. Null announces once per launch.
-  final String? announcedVersion;
-  final ValueChanged<String>? onAnnounced;
+  /// The version the person asked not to be reminded of; save it from
+  /// [onSkipVersion]. Without [onSkipVersion] the choice lasts until the app
+  /// quits.
+  final String? skippedVersion;
+  final ValueChanged<String>? onSkipVersion;
 
   /// After this long the first check counts as « in a session »: the
-  /// announcement is skipped and only the pill and badge remain.
+  /// reminder is left out and only the pill and badge remain.
   final Duration window;
 
   /// Defaults to [ShipglowsUpdater.instance].
@@ -375,6 +390,7 @@ class _ShipglowsUpdateAnnouncerState extends State<ShipglowsUpdateAnnouncer> {
   late final ShipglowsUpdater _updater =
       widget.updater ?? ShipglowsUpdater.instance;
   late final DateTime _launchedAt = DateTime.now();
+  late String? _skipped = widget.skippedVersion;
   bool _done = false;
 
   @override
@@ -403,16 +419,19 @@ class _ShipglowsUpdateAnnouncerState extends State<ShipglowsUpdateAnnouncer> {
     if (release == null) return;
     if (DateTime.now().difference(_launchedAt) > widget.window) return;
     final version = release.version.toString();
-    if (widget.announcedVersion == version) return;
+    if (_skipped == version) return;
     final context = widget.navigatorKey.currentContext;
     if (context == null || !context.mounted) return;
-    widget.onAnnounced?.call(version);
     unawaited(
       showShipglowsUpdateDialog(
         context,
         appName: widget.appName,
         strings: widget.strings,
         updater: _updater,
+        onSkipVersion: (skipped) {
+          _skipped = skipped;
+          widget.onSkipVersion?.call(skipped);
+        },
       ),
     );
   }
