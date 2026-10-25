@@ -4,7 +4,7 @@ metadata_schema_version: "1.0"
 artifact_version: "1.3.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
-updated: "2026-10-23"
+updated: "2026-10-25"
 status: active
 source_skill: sg-docs
 scope: package-map
@@ -24,6 +24,7 @@ evidence:
   - "2026-10-23: shipglows_sync added (2b6f624, 61a6d87); CommandGlows recorded as consumer of shipglows_sync, shipglows_settings and shipglows_settings_firestore (f0f6eeb9)."
   - "2026-10-23: ContentGlows (8f47c303, REST remote over /api/settings) and BeatGlows (15824f2, no account yet) consume shipglows_settings."
   - "2026-10-23: DreamGlows (6ba8566, PathTheme preset, mode and calendar zone) consumes shipglows_settings."
+  - "2026-10-25: shipglows_updater added (WinSparkle on Windows from ContentGlows, verified sideloaded APK on Android, releases in a public shipglows-releases repository); no consumer yet, not run on a device."
   - "2026-10-23: shipglows_flutter_zoom added after its move from shipglows-email-engine (ea6ec1a); Ctrl+= / Ctrl+- / Ctrl+0 checked by the operator in CommandGlows."
 next_review: "2027-01-22"
 next_step: "Update the consumer column when an app adopts or drops a package."
@@ -49,6 +50,7 @@ do nothing or fall back to plain Flutter.
 | `shipglows_command_bar_window` | The command bar in a floating overlay window | through overlay | BeatGlows, CommandGlows, ContentGlows, DreamGlows |
 | `shipglows_hotkeys` | System-wide hotkeys, saved choices, conflicts reported | Win32 | none yet |
 | `shipglows_tray` | Notification area icon, standard menu, close-or-hide dialog, launch at sign-in, single instance | Win32 | DreamGlows |
+| `shipglows_updater` | Release updates: `ShipglowsUpdater` (`start`, `checkNow`, `install`, `state`), WinSparkle appcast on Windows (from ContentGlows), on Android a JSON manifest then an APK checked (SHA-256, package, versionCode, signing certificate) before the system installer, Play Store installs left to the store; `ShipglowsUpdateSetting` row; `tool/publish-release.ps1` to the public `shipglows-releases` repository | Kotlin (Android), `auto_updater` (Windows) | none yet (ContentGlows has the Windows original) |
 | `shipglows_diagnostics` | Crash net: `FlutterError.onError` + `PlatformDispatcher.onError` chained, masked event buffer (repeats merged), report with app sections (`addSection`), optional `crash.log` (256 KB, `.1` rotation, engine label); widgets `ShipglowsDiagnosticsButton` (header/error view), `ShipglowsDiagnosticsPanel` (settings: copy, view, open log folder, clear), preview dialog; version from `appBuildName`/`appBuildNumber`; Sentry stays in the app via `onReport` | no | BeatGlows |
 | `shipglows_sync` | Device-to-account sync ported from CommunityGlows: `SyncStatus` (needsReview, unreachable…), `reconcileSnapshots` (union, conflicts chosen device/account), `SyncRecovery` copies, `SyncProgress`, widgets (chip, issue banner, review dialog/prompt, progress overlay, recovery panel), `SyncStrings` FR/EN; `rewriteSyncIds` / `holdsTemporaryId` for records created offline | no | CommandGlows, ContentGlows (settings) |
 | `shipglows_settings` | Typed user settings (`SettingKey`, `SettingsSchema` + migrations), device-first `SettingsController`, per-field push, per-account device copies, retry with backoff, first-sync review and recovery copies through `shipglows_sync`, nested map fields merged one by one (`SettingKey.map`, `setField`), fields waiting for an offline record's server id (`isTemporaryId`, `rewriteIds`), `SecretStore`, several windows on watched files (`WatchableSettingsStorage`, `reload`); remote and storage are ports | no | BeatGlows (local only), CommandGlows, ContentGlows, DreamGlows (local only, all windows) |

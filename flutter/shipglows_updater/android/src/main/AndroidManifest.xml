@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET" />
+  <!-- Sideloaded updates only. A Play Store build removes it in its own
+       manifest: tools:node="remove" (see the package README). -->
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+  <application>
+    <!-- Own provider class and authority: never clashes with the app's. -->
+    <provider
+      android:name="com.shipglows.updater.ShipglowsUpdaterFileProvider"
+      android:authorities="${applicationId}.shipglows_updater.files"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/shipglows_updater_paths" />
+    </provider>
+  </application>
+</manifest>

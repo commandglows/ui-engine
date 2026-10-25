@@ -1,0 +1,25 @@
+name: shipglows_updater
+description: Release updates for ShipGlows Flutter apps — WinSparkle appcast on Windows, verified sideloaded APK on Android — behind one check / install API and a settings row.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  auto_updater: ^1.0.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.shipglows.updater
+        pluginClass: ShipglowsUpdaterPlugin
