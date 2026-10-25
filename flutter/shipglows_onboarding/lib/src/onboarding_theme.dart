@@ -18,6 +18,9 @@ class OnboardingThemeData extends ThemeExtension<OnboardingThemeData> {
     this.progressGradient,
     this.progressTrackColor,
     this.previewColor,
+    this.cardColor,
+    this.cardBorder,
+    this.cardShadows,
     this.cardRadius,
     this.buttonRadius,
     this.maxCardWidth,
@@ -50,6 +53,15 @@ class OnboardingThemeData extends ThemeExtension<OnboardingThemeData> {
 
   /// Background of the preview column (default: `surfaceContainerLow`).
   final Color? previewColor;
+
+  /// Card fill (default: `surface`).
+  final Color? cardColor;
+
+  /// Card outline (default: hairline `outlineVariant`).
+  final BorderSide? cardBorder;
+
+  /// Card shadows (default: one soft, blurred drop shadow).
+  final List<BoxShadow>? cardShadows;
 
   /// Default: `radiusLg`.
   final double? cardRadius;
@@ -107,6 +119,17 @@ class OnboardingThemeData extends ThemeExtension<OnboardingThemeData> {
       progressGradient: own?.progressGradient,
       progressTrackColor: own?.progressTrackColor ?? roles.line,
       previewColor: own?.previewColor ?? scheme.surfaceContainerLow,
+      cardColor: own?.cardColor ?? scheme.surface,
+      cardBorder: own?.cardBorder ?? BorderSide(color: scheme.outlineVariant),
+      cardShadows:
+          own?.cardShadows ??
+          [
+            BoxShadow(
+              color: scheme.shadow.withValues(alpha: 0.10),
+              blurRadius: 40,
+              offset: const Offset(0, 16),
+            ),
+          ],
       cardRadius: own?.cardRadius ?? roles.radiusLg,
       buttonRadius: own?.buttonRadius ?? roles.radiusMd,
       maxCardWidth: own?.maxCardWidth ?? 1216,
@@ -129,6 +152,9 @@ class OnboardingThemeData extends ThemeExtension<OnboardingThemeData> {
     Gradient? progressGradient,
     Color? progressTrackColor,
     Color? previewColor,
+    Color? cardColor,
+    BorderSide? cardBorder,
+    List<BoxShadow>? cardShadows,
     double? cardRadius,
     double? buttonRadius,
     double? maxCardWidth,
@@ -146,6 +172,9 @@ class OnboardingThemeData extends ThemeExtension<OnboardingThemeData> {
       progressGradient: progressGradient ?? this.progressGradient,
       progressTrackColor: progressTrackColor ?? this.progressTrackColor,
       previewColor: previewColor ?? this.previewColor,
+      cardColor: cardColor ?? this.cardColor,
+      cardBorder: cardBorder ?? this.cardBorder,
+      cardShadows: cardShadows ?? this.cardShadows,
       cardRadius: cardRadius ?? this.cardRadius,
       buttonRadius: buttonRadius ?? this.buttonRadius,
       maxCardWidth: maxCardWidth ?? this.maxCardWidth,
@@ -181,6 +210,11 @@ class OnboardingThemeData extends ThemeExtension<OnboardingThemeData> {
         t,
       ),
       previewColor: Color.lerp(previewColor, other.previewColor, t),
+      cardColor: Color.lerp(cardColor, other.cardColor, t),
+      cardBorder: cardBorder == null || other.cardBorder == null
+          ? near.cardBorder
+          : BorderSide.lerp(cardBorder!, other.cardBorder!, t),
+      cardShadows: BoxShadow.lerpList(cardShadows, other.cardShadows, t),
       cardRadius: lerpDouble(cardRadius, other.cardRadius, t),
       buttonRadius: lerpDouble(buttonRadius, other.buttonRadius, t),
       maxCardWidth: lerpDouble(maxCardWidth, other.maxCardWidth, t),

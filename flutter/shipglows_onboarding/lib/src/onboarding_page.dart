@@ -6,7 +6,7 @@ import 'package:flutter/widgets.dart';
 class OnboardingPage {
   const OnboardingPage({
     required this.id,
-    required this.title,
+    this.title,
     this.eyebrow,
     this.leading,
     this.description,
@@ -18,13 +18,16 @@ class OnboardingPage {
     this.scrollable = false,
     this.showBack = true,
     this.showSkip = true,
+    this.showPrimary = true,
     this.primaryLabel,
     this.primaryArrow,
   });
 
   /// Stable id: keys the page transitions.
   final String id;
-  final String title;
+
+  /// Null when the [body] brings its own heading (an embedded sign-in form).
+  final String? title;
 
   /// Small uppercase line above the title (`What you can do · 2/6`).
   final String? eyebrow;
@@ -55,6 +58,10 @@ class OnboardingPage {
 
   /// Shows Skip, which jumps to the last page. Never shown on the last page.
   final bool showSkip;
+
+  /// Hides the primary action when the [body] owns the way forward (a sign-in
+  /// form, a start-trial panel).
+  final bool showPrimary;
 
   /// Primary label (default: Next, or Finish on the last page).
   final String? primaryLabel;
@@ -87,7 +94,7 @@ class OnboardingLanguageOption {
 class OnboardingLanguagePage extends OnboardingPage {
   const OnboardingLanguagePage({
     required super.id,
-    required super.title,
+    required String super.title,
     super.description,
     super.leading,
     required this.options,

@@ -13,12 +13,20 @@ import 'onboarding_theme.dart';
 ///
 /// The pages are rebuilt by the app (a new language after the language page,
 /// a status that loads); the current page is kept by index.
+///
+/// The flow moves between pages by itself, unless the app gives [index]: the
+/// app then owns the page, for example when signing in moves the flow on.
+/// Every move (Next, Back, Skip, a progress segment, a language) is then
+/// asked through [onIndexChanged], and the app answers with a new [index].
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
     required this.pages,
     required this.strings,
     required this.onFinish,
+    this.index,
+    this.onIndexChanged,
+    this.progressNavigation = true,
   });
 
   final List<OnboardingPage> pages;
@@ -26,6 +34,15 @@ class OnboardingFlow extends StatefulWidget {
 
   /// Primary action of the last page.
   final VoidCallback onFinish;
+
+  /// Page shown when the app owns the navigation.
+  final int? index;
+
+  /// A move asked by the user, with the page it leads to.
+  final ValueChanged<int>? onIndexChanged;
+
+  /// Lets done progress segments reopen their page.
+  final bool progressNavigation;
 
   @override
   State<OnboardingFlow> createState() => _OnboardingFlowState();
@@ -37,7 +54,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _titleFocus = FocusNode(debugLabel: 'onboarding-title');
 
   List<OnboardingPage> get _pages => widget.pages;
-  int get _current => math.min(_index, _pages.length - 1);
+  int get _current => (widget.index ?? _index).clamp(0, _pages.length - 1);
   OnboardingPage get _page => _pages[_current];
   bool get _isLast => _current == _pages.length - 1;
 
@@ -47,9 +64,27 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant OnboardingFlow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.index != null && widget.index != oldWidget.index) {
+      _focusTitle();
+    }
+  }
+
   void _go(int index) {
-    setState(() => _index = index.clamp(0, _pages.length - 1));
-    // Keyboard and screen-reader focus follow each page change.
+    final target = index.clamp(0, _pages.length - 1);
+    if (widget.index != null) {
+      widget.onIndexChanged?.call(target);
+      return;
+    }
+    setState(() => _index = target);
+    widget.onIndexChanged?.call(target);
+    _focusTitle();
+  }
+
+  // Keyboard and screen-reader focus follow each page change.
+  void _focusTitle() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _titleFocus.requestFocus();
     });
@@ -136,16 +171,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     : math.min(look.maxCardHeight!, size.height - 64),
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: scheme.surface,
+                  color: look.cardColor,
                   borderRadius: BorderRadius.circular(look.cardRadius!),
-                  border: Border.all(color: scheme.outlineVariant),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.shadow.withValues(alpha: 0.10),
-                      blurRadius: 40,
-                      offset: const Offset(0, 16),
-                    ),
-                  ],
+                  border: Border.fromBorderSide(look.cardBorder!),
+                  boxShadow: look.cardShadows,
                 ),
                 child: Stack(
                   children: [
@@ -164,7 +193,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                           label: widget.strings.progress,
                           stepLabel: (i) => widget.strings.goToStep
                               .replaceAll('{step}', '${i + 1}'),
-                          onTap: _go,
+                          onTap: widget.progressNavigation ? _go : null,
                           look: look,
                         ),
                       ),
@@ -192,17 +221,21 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final body = page is OnboardingLanguagePage
         ? _languageBody(context, page, look)
         : _textBody(context, page, look);
-    final actions = page is OnboardingLanguagePage
+    final back = page.showBack && _current > 0
+        ? TextButton(
+            key: const Key('onboarding-back'),
+            onPressed: () => _go(_current - 1),
+            child: Text(widget.strings.back),
+          )
+        : null;
+    final actions =
+        page is OnboardingLanguagePage || (back == null && !page.showPrimary)
         ? null
         : _Actions(
-            back: page.showBack && _current > 0
+            back: back,
+            skip: page.showSkip && page.showPrimary && !_isLast
                 ? TextButton(
-                    onPressed: () => _go(_current - 1),
-                    child: Text(widget.strings.back),
-                  )
-                : null,
-            skip: page.showSkip && !_isLast
-                ? TextButton(
+                    key: const Key('onboarding-skip'),
                     onPressed: () => _go(_pages.length - 1),
                     style: TextButton.styleFrom(
                       foregroundColor: look.skipStyle!.color,
@@ -215,11 +248,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     ),
                   )
                 : null,
-            primary: _primaryButton(
-              page.primaryLabel ??
-                  (_isLast ? widget.strings.finish : widget.strings.next),
-              arrow: page.primaryArrow ?? !_isLast,
-            ),
+            primary: page.showPrimary
+                ? _primaryButton(
+                    page.primaryLabel ??
+                        (_isLast ? widget.strings.finish : widget.strings.next),
+                    arrow: page.primaryArrow ?? !_isLast,
+                  )
+                : null,
           );
 
     final switcher = AnimatedSwitcher(
@@ -297,7 +332,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           page.leading!,
           const SizedBox(height: 16),
         ],
-        _title(page.title, look),
+        if (page.title != null) _title(page.title!, look),
         if (page.description != null) ...[
           const SizedBox(height: 16),
           _description(page.description!, look, lines: page.descriptionLines),
@@ -339,7 +374,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           page.leading!,
           const SizedBox(height: 24),
         ],
-        _title(page.title, look),
+        _title(page.title!, look),
         if (page.description != null) ...[
           const SizedBox(height: 16),
           _description(page.description!, look),
@@ -351,6 +386,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             onEnter: (_) => setState(() => _hoveredLanguage = i),
             onExit: (_) => setState(() => _hoveredLanguage = null),
             child: _LanguageButton(
+              key: Key('onboarding-language-${option.locale.languageCode}'),
               label: option.label,
               radius: look.buttonRadius!,
               style: look.descriptionStyle!,
@@ -366,6 +402,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   Widget _primaryButton(String label, {required bool arrow}) {
     return FilledButton(
+      key: Key(_isLast ? 'onboarding-finish' : 'onboarding-primary'),
       onPressed: _next,
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -389,11 +426,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 // -----------------------------------------------------------------------------
 
 class _Actions extends StatelessWidget {
-  const _Actions({this.back, this.skip, required this.primary});
+  const _Actions({this.back, this.skip, this.primary});
 
   final Widget? back;
   final Widget? skip;
-  final Widget primary;
+  final Widget? primary;
 
   @override
   Widget build(BuildContext context) {
@@ -406,7 +443,7 @@ class _Actions extends StatelessWidget {
               mainAxisAlignment: back == null
                   ? MainAxisAlignment.end
                   : MainAxisAlignment.spaceBetween,
-              children: [?back, Flexible(child: primary)],
+              children: [?back, if (primary != null) Flexible(child: primary!)],
             )
           : Row(
               children: [
@@ -419,7 +456,7 @@ class _Actions extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                primary,
+                ?primary,
               ],
             ),
     );
@@ -441,7 +478,9 @@ class _ProgressBar extends StatelessWidget {
   final int total;
   final String label;
   final String Function(int index) stepLabel;
-  final ValueChanged<int> onTap;
+
+  /// Null keeps the done segments still.
+  final ValueChanged<int>? onTap;
   final OnboardingThemeData look;
 
   @override
@@ -450,6 +489,7 @@ class _ProgressBar extends StatelessWidget {
     final curve = look.motionCurve!;
     final gradient = look.progressGradient;
     final accent = Theme.of(context).colorScheme.primary;
+    bool revisitable(int i) => onTap != null && i < current;
     // Each bar is drawn twice: a neutral track that owns taps and semantics,
     // and a fill layer, recolored by one gradient spanning the whole row when
     // the theme gives one. Fills are sized in pixels so they stay visible at
@@ -498,15 +538,15 @@ class _ProgressBar extends StatelessWidget {
             children: [
               for (var i = 0; i < total; i++)
                 Semantics(
-                  button: i < current,
+                  button: revisitable(i),
                   selected: i == current,
                   label: stepLabel(i),
                   excludeSemantics: true,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: i < current ? () => onTap(i) : null,
+                    onTap: revisitable(i) ? () => onTap!(i) : null,
                     child: MouseRegion(
-                      cursor: i < current
+                      cursor: revisitable(i)
                           ? SystemMouseCursors.click
                           : MouseCursor.defer,
                       child: segment(i, fill: false),
@@ -536,6 +576,7 @@ class _ProgressBar extends StatelessWidget {
 
 class _LanguageButton extends StatelessWidget {
   const _LanguageButton({
+    super.key,
     required this.label,
     required this.radius,
     required this.style,

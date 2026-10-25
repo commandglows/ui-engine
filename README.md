@@ -1330,11 +1330,14 @@ teaser of what the app does, not a walkthrough of its controls (that is
 `shipglows_guide`). No dependency besides Flutter and `shipglows_theme`:
 texts, previews, storage and the signed-in account are the app's.
 
-- `OnboardingPage`: `title`, optional `eyebrow`, `leading` (icon badge),
+- `OnboardingPage`: `title` (null when the `body` brings its own heading,
+  like an embedded sign-in form), optional `eyebrow`, `leading` (icon badge),
   `description` (`descriptionLines` keeps a series aligned), `note` (italic
   word from the maker), `body` (status, links), `preview` builder.
   `centered` for feature pages, `scrollable` for a page whose body grows,
-  `showBack` / `showSkip`, `primaryLabel` / `primaryArrow`.
+  `showBack` / `showSkip`, `showPrimary` (off when the body owns the way
+  forward: a sign-in form, a start-trial panel), `primaryLabel` /
+  `primaryArrow`.
 - `OnboardingLanguagePage`: first page, one button per
   `OnboardingLanguageOption` (label and greeting in its own language), a
   specimen of the greetings as preview; picking one moves on.
@@ -1344,7 +1347,12 @@ texts, previews, storage and the signed-in account are the app's.
   done segments of the progress bar go back, focus follows the title. Pages
   can be rebuilt (new language, a status that loads): the current one is kept
   by index. Below `narrowWidth` the card is one scrolling column without
-  preview.
+  preview. With `index:` the app owns the page (the introduction wraps
+  sign-in and access, CommandGlows): every move is asked through
+  `onIndexChanged` and the app answers with a new `index`;
+  `progressNavigation: false` keeps done segments still. Stable keys for
+  tests: `onboarding-primary`, `onboarding-finish` (last page),
+  `onboarding-back`, `onboarding-skip`, `onboarding-language-<code>`.
 - `OnboardingGate`: due once per `setScope(userId)` and `version`
   (`onboarding_completed:v1:<user>`), `complete()`, `replay()` for
   Preferences. Signed out (null scope) never shows it. Keys go through an
@@ -1355,7 +1363,7 @@ texts, previews, storage and the signed-in account are the app's.
 - Texts: `OnboardingStrings.en`, `.fr`, or the app's own.
 - Look: `OnboardingThemeData` theme extension (title, description, eyebrow,
   skip and specimen styles merged onto the defaults, `progressGradient`,
-  radii, card size, motion); fallbacks from `ShipglowsTheme`. Motion is off
+  card color, border and shadows, radii, card size, motion); fallbacks from `ShipglowsTheme`. Motion is off
   when the platform asks to reduce it.
 
 ```dart
