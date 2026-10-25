@@ -44,7 +44,9 @@ final class AutoUpdaterWinSparklePlatform implements WinSparklePlatform {
 /// installer, checks its DSA signature against the `DSAPub` resource of the
 /// runner and runs it; the app quits first so the installer can replace it.
 /// Taken from ContentGlows' `windows_app_updater.dart`.
-final class WindowsUpdaterBackend with UpdaterListener implements UpdaterBackend {
+final class WindowsUpdaterBackend
+    with UpdaterListener
+    implements UpdaterBackend {
   WindowsUpdaterBackend({
     required this.feedUrl,
     this.platform = const AutoUpdaterWinSparklePlatform(),
@@ -81,6 +83,9 @@ final class WindowsUpdaterBackend with UpdaterListener implements UpdaterBackend
   /// WinSparkle installs from its own window: show it.
   @override
   Future<void> install() => platform.checkForUpdates(inBackground: false);
+
+  @override
+  Future<void> openInstallPermission() async {}
 
   @override
   void dispose() => platform.removeListener(this);

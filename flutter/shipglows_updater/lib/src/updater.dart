@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'app_version.dart';
 import 'platform_backend_stub.dart'
     if (dart.library.io) 'platform_backend_io.dart';
+import 'update_release.dart';
 import 'update_state.dart';
 import 'updater_backend.dart';
 import 'updater_config.dart';
@@ -89,4 +90,43 @@ class ShipglowsUpdater {
     await _starting;
     await _backend?.install();
   }
+
+  /// Android: opens the system page where « install unknown apps » is turned
+  /// on; the install resumes when the app is back in front.
+  Future<void> openInstallPermission() async {
+    await _starting;
+    await _backend?.openInstallPermission();
+  }
+
+  /// After a failure: install again when installing failed, else check again.
+  Future<void> retry() async {
+    final state = this.state.value;
+    if (state is ShipglowsUpdateFailed && state.release != null) {
+      await install();
+    } else {
+      await checkNow();
+    }
+  }
+
+  /// A newer version is known and not installed yet: badges and the pill
+  /// show.
+  bool get hasPendingUpdate => switch (_state.value) {
+    ShipglowsUpdateAvailable() ||
+    ShipglowsUpdateDownloading() ||
+    ShipglowsUpdateNeedsPermission() ||
+    ShipglowsUpdateInstalling() => true,
+    ShipglowsUpdateFailed(:final release) => release != null,
+    _ => false,
+  };
+
+  /// The release behind the current state, when the platform knows it
+  /// (Android; WinSparkle keeps its own).
+  ShipglowsRelease? get release => switch (_state.value) {
+    ShipglowsUpdateAvailable(:final release) => release,
+    ShipglowsUpdateDownloading(:final release) => release,
+    ShipglowsUpdateNeedsPermission(:final release) => release,
+    ShipglowsUpdateInstalling(:final release) => release,
+    ShipglowsUpdateFailed(:final release) => release,
+    _ => null,
+  };
 }

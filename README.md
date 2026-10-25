@@ -750,11 +750,25 @@ take a release APK); web does nothing.
   installer through its own `FileProvider`. Without « install unknown apps »
   the state becomes `needsPermission` and the system page opens; `install()`
   again once back. Background checks stay silent on failure.
-- `ShipglowsUpdateSetting(strings:)`: the settings row: the state as an
-  announced subtitle (or the installed version), the fitting button
-  (Rechercher, Installer, Autoriser, Réessayer) and a progress bar while the
-  APK downloads; nothing where the updater is inactive.
-  `ShipglowsUpdaterStrings.fr` / `.en`.
+- The experience, the same on every app: nothing interrupts a session. A
+  new version is announced once, at launch only (`ShipglowsUpdateAnnouncer`
+  in `MaterialApp.builder`, given the navigator key; `announcedVersion` /
+  `onAnnounced` keep it once per version). Afterwards a quiet
+  `ShipglowsUpdatePill(appName:, compact:)` in the app's chrome (sidebar,
+  menu) and `ShipglowsUpdateBadge(child:)` (a dot on the settings icon)
+  stay while the update waits.
+- `openShipglowsUpdate(context, appName:)` from any entry point:
+  `showShipglowsUpdateDialog` on Android (the version and the installed
+  one, « Nouveautés » from the manifest's `notes`, what installing does to
+  the person's work, then progress, « Masquer » that lets the download carry
+  on, the « install unknown apps » step resumed on return, the system
+  installer offered again if cancelled, calm errors with « Réessayer »),
+  WinSparkle's own window on Windows.
+- `ShipglowsUpdateSetting(appName:, strings:)`: the settings row: the state
+  as an announced subtitle (or the installed version), « Rechercher une mise
+  à jour », « Voir la mise à jour » or « Réessayer »; nothing where the
+  updater is inactive. `ShipglowsUpdaterStrings.fr` / `.en` (`{app}`,
+  `{version}`, `{current}`, `{percent}`).
 - The plugin adds `INTERNET` and `REQUEST_INSTALL_PACKAGES`. A Play Store
   build must remove the second one, which Play restricts:
 
@@ -768,7 +782,8 @@ take a release APK); web does nothing.
 Releases live in one public repository (`dianedef/shipglows-releases`); the
 apps' code stays private. `tool/publish-release.ps1 -Repo -App -Apk
 -WindowsInstaller -Appcast` puts the files in a versioned release
-`<app>-v1.2.3-45` (never replaced), then `android.json` and `appcast.xml`
+`<app>-v1.2.3-45` (never replaced; `-Notes` for « Nouveautés »), then
+`android.json` and `appcast.xml`
 in the rolling `<app>-latest` release, last, so an app never sees a version
 whose files are missing. The apps read:
 

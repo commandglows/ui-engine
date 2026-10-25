@@ -9,6 +9,7 @@ import 'app_version.dart';
 ///   "sha256": "<64 hex>",
 ///   "size": 31457280,
 ///   "publishedAt": "2026-10-25T12:00:00Z",
+///   "notes": "A few short lines for people.",
 ///   "notesUrl": "https://…"
 /// }
 /// ```
@@ -21,6 +22,7 @@ final class ShipglowsRelease {
     required this.sha256,
     this.size,
     this.publishedAt,
+    this.notes,
     this.notesUrl,
   });
 
@@ -45,6 +47,7 @@ final class ShipglowsRelease {
     }
     final size = json['size'];
     final publishedAt = json['publishedAt'];
+    final notes = json['notes'];
     final notesUrl = json['notesUrl'];
     return ShipglowsRelease(
       version: AppVersion.parse(text('version')),
@@ -54,6 +57,7 @@ final class ShipglowsRelease {
       publishedAt: publishedAt is String
           ? DateTime.tryParse(publishedAt)
           : null,
+      notes: notes is String && notes.trim().isNotEmpty ? notes.trim() : null,
       notesUrl: notesUrl is String ? Uri.tryParse(notesUrl) : null,
     );
   }
@@ -65,5 +69,8 @@ final class ShipglowsRelease {
   final String sha256;
   final int? size;
   final DateTime? publishedAt;
+
+  /// What changed, a few short lines shown under « Nouveautés ».
+  final String? notes;
   final Uri? notesUrl;
 }

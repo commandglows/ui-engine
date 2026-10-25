@@ -21,6 +21,9 @@ abstract interface class UpdaterBackend {
 
   Future<void> install();
 
+  /// Android: the system page where « install unknown apps » is turned on.
+  Future<void> openInstallPermission();
+
   void dispose();
 }
 

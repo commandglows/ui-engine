@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import 'app_version.dart';
 import 'update_release.dart';
@@ -16,7 +17,9 @@ import 'updater_config.dart';
 /// version and signing certificate before it opens the system installer.
 /// Android itself refuses an update signed with another key; the checks
 /// give a clear error first and never hand an unverified file over.
-final class AndroidUpdaterBackend implements UpdaterBackend {
+final class AndroidUpdaterBackend
+    with WidgetsBindingObserver
+    implements UpdaterBackend {
   AndroidUpdaterBackend({
     required this.manifestUrl,
     this.channel = const MethodChannel('shipglows_updater'),
@@ -35,6 +38,7 @@ final class AndroidUpdaterBackend implements UpdaterBackend {
   ShipglowsRelease? _release;
   Timer? _timer;
   bool _installing = false;
+  bool _awaitingPermission = false;
 
   static void _ignore(ShipglowsUpdateState _) {}
 
@@ -56,6 +60,7 @@ final class AndroidUpdaterBackend implements UpdaterBackend {
         : AppVersion(name.parts, build: code is int ? code : name.build);
     _updatesDir = Directory(info['updatesDir']! as String);
     _emit = emit;
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_deleteOldDownloads());
     unawaited(check(userInitiated: false));
     _timer = Timer.periodic(
@@ -117,10 +122,11 @@ final class AndroidUpdaterBackend implements UpdaterBackend {
       final allowed =
           await channel.invokeMethod<bool>('canRequestInstalls') ?? false;
       if (!allowed) {
+        _awaitingPermission = true;
         _emit(ShipglowsUpdateNeedsPermission(release));
-        await channel.invokeMethod<void>('openInstallPermission');
         return;
       }
+      _awaitingPermission = false;
       final file = await _download(release);
       await channel.invokeMethod<void>('install', {
         'path': file.path,
@@ -156,7 +162,22 @@ final class AndroidUpdaterBackend implements UpdaterBackend {
   }
 
   @override
-  void dispose() => _timer?.cancel();
+  Future<void> openInstallPermission() =>
+      channel.invokeMethod<void>('openInstallPermission');
+
+  /// Back from the « install unknown apps » page: carry on without a second tap.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingPermission) {
+      unawaited(install());
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+  }
 
   Future<ShipglowsRelease> _fetchManifest() async {
     final client = HttpClient()..connectionTimeout = _connectTimeout;

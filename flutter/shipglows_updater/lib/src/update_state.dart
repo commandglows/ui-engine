@@ -37,8 +37,9 @@ final class ShipglowsUpdateDownloading extends ShipglowsUpdateState {
   final double? progress;
 }
 
-/// Android: the user must allow this app to install apps first; the system
-/// settings page was opened. [ShipglowsUpdater.install] again once back.
+/// Android: the user must allow this app to install apps first
+/// ([ShipglowsUpdater.openInstallPermission]); the install carries on by
+/// itself when the app comes back to the foreground.
 final class ShipglowsUpdateNeedsPermission extends ShipglowsUpdateState {
   const ShipglowsUpdateNeedsPermission(this.release);
 

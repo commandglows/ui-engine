@@ -32,7 +32,9 @@ param(
     [string]$Apk = '',
     [string]$WindowsInstaller = '',
     [string]$Appcast = '',
-    [string]$NotesUrl = ''
+    [string]$NotesUrl = '',
+    # A few short lines for people, shown under « Nouveautés » in the update dialog.
+    [string]$Notes = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -99,6 +101,7 @@ try {
             size        = $file.Length
             publishedAt = [DateTimeOffset]::UtcNow.ToString('o')
         }
+        if ($Notes) { $manifest.notes = $Notes }
         if ($NotesUrl) { $manifest.notesUrl = $NotesUrl }
         $json = Join-Path $work 'android.json'
         [System.IO.File]::WriteAllText($json, ($manifest | ConvertTo-Json) + "`n", [System.Text.UTF8Encoding]::new($false))
