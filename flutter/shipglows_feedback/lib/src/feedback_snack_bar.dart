@@ -6,6 +6,7 @@ import 'package:shipglows_theme/shipglows_theme.dart';
 
 import 'feedback_content.dart';
 import 'feedback_kind.dart';
+import 'feedback_log.dart';
 import 'strings.dart';
 
 /// Widest a message gets on a large window; a narrow one takes its width.
@@ -211,6 +212,16 @@ class FeedbackMessenger {
       return last.controller;
     }
     if (replaceCurrent) messenger.hideCurrentSnackBar();
+    if (FeedbackLog.hasListeners) {
+      FeedbackLog.record(
+        FeedbackRecord(
+          message: message,
+          kind: kind,
+          shownAt: DateTime.now(),
+          details: details?.call(),
+        ),
+      );
+    }
     final shown = _Shown(message, kind);
     _last[messenger] = shown;
     final controller = messenger.showSnackBar(

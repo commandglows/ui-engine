@@ -12,10 +12,12 @@
 /// - [FeedbackErrorState]: a screen whose loading failed, with « Retry ».
 /// - [FeedbackContent]: icon and text of a message, for an app's own surface.
 /// - [FeedbackStrings] and [FeedbackStringsScope]: the app's texts.
+/// - [FeedbackLog]: every message shown, for a history of past messages.
 library;
 
 export 'src/feedback_content.dart';
 export 'src/feedback_error_state.dart';
 export 'src/feedback_kind.dart';
+export 'src/feedback_log.dart';
 export 'src/feedback_snack_bar.dart';
 export 'src/strings.dart';
