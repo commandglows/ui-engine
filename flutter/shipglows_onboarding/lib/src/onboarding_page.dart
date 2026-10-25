@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 
 /// One page of the introduction: the left column's texts and actions, the
@@ -32,7 +33,7 @@ class OnboardingPage {
   /// Small uppercase line above the title (`What you can do · 2/6`).
   final String? eyebrow;
 
-  /// Above the title: an icon badge, the app's mark.
+  /// Before the title, on its line: an icon badge, the app's mark.
   final Widget? leading;
   final String? description;
 
@@ -103,4 +104,33 @@ class OnboardingLanguagePage extends OnboardingPage {
 
   final List<OnboardingLanguageOption> options;
   final ValueChanged<Locale> onSelected;
+}
+
+/// A theme the user can pick on an [OnboardingThemePage].
+@immutable
+class OnboardingThemeOption {
+  const OnboardingThemeOption({required this.mode, required this.label});
+
+  final ThemeMode mode;
+
+  /// Button label, in the chosen language (`Sombre`).
+  final String label;
+}
+
+/// Page twin of [OnboardingLanguagePage]: one button per theme, no other
+/// action, a specimen of the themes as preview. Picking one calls
+/// [onSelected] and moves to the next page.
+@immutable
+class OnboardingThemePage extends OnboardingPage {
+  const OnboardingThemePage({
+    required super.id,
+    required String super.title,
+    super.description,
+    super.leading,
+    required this.options,
+    required this.onSelected,
+  }) : super(showBack: false, showSkip: false);
+
+  final List<OnboardingThemeOption> options;
+  final ValueChanged<ThemeMode> onSelected;
 }

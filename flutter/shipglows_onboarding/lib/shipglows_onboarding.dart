@@ -2,7 +2,7 @@
 ///
 /// - [OnboardingPage]: one page of the card — title, text, optional body and
 ///   the preview drawn in the right column. [OnboardingLanguagePage] asks for
-///   the language first. [OnboardingStatements] fills a mission page
+///   the language first, [OnboardingThemePage] the theme. [OnboardingStatements] fills a mission page
 ///   (mission, vision, goal).
 /// - [OnboardingFlow]: the card itself, its segmented progress bar and the
 ///   Back / Skip / Next actions.

@@ -1331,7 +1331,7 @@ teaser of what the app does, not a walkthrough of its controls (that is
 texts, previews, storage and the signed-in account are the app's.
 
 - `OnboardingPage`: `title` (null when the `body` brings its own heading,
-  like an embedded sign-in form), optional `eyebrow`, `leading` (icon badge),
+  like an embedded sign-in form), optional `eyebrow`, `leading` (icon badge, before the title on its line),
   `description` (`descriptionLines` keeps a series aligned), `note` (italic
   word from the maker), `body` (status, links), `preview` builder.
   `centered` for feature pages, `scrollable` for a page whose body grows,
@@ -1341,6 +1341,9 @@ texts, previews, storage and the signed-in account are the app's.
 - `OnboardingLanguagePage`: first page, one button per
   `OnboardingLanguageOption` (label and greeting in its own language), a
   specimen of the greetings as preview; picking one moves on.
+- `OnboardingThemePage`: its twin for the theme, one button per
+  `OnboardingThemeOption` (`ThemeMode` and label), small light, dark and
+  system windows as preview; picking one moves on.
 - `OnboardingStatements`: labelled statements (mission, vision, goal) for a
   page `body`, with `scrollable: true`.
 - `OnboardingFlow(pages:, strings:, onFinish:)`: Skip jumps to the last page,

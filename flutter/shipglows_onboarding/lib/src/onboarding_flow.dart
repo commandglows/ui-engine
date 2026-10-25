@@ -50,7 +50,7 @@ class OnboardingFlow extends StatefulWidget {
 
 class _OnboardingFlowState extends State<OnboardingFlow> {
   int _index = 0;
-  int? _hoveredLanguage;
+  int? _hoveredOption;
   final _titleFocus = FocusNode(debugLabel: 'onboarding-title');
 
   List<OnboardingPage> get _pages => widget.pages;
@@ -97,6 +97,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     page.onSelected(locale);
   }
 
+  void _selectTheme(OnboardingThemePage page, ThemeMode mode) {
+    _go(_current + 1);
+    page.onSelected(mode);
+  }
+
+  bool get _isChoice =>
+      _page is OnboardingLanguagePage || _page is OnboardingThemePage;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -139,12 +147,17 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     switchInCurve: look.motionCurve!,
                     child: KeyedSubtree(
                       key: ValueKey(_page.id),
-                      child: _page is OnboardingLanguagePage
-                          ? _LanguageSpecimen(
-                              page: _page as OnboardingLanguagePage,
-                              active: _hoveredLanguage ?? 0,
-                            )
-                          : preview?.call(context) ?? const SizedBox.shrink(),
+                      child: switch (_page) {
+                        final OnboardingLanguagePage page => _LanguageSpecimen(
+                          page: page,
+                          active: _hoveredOption ?? 0,
+                        ),
+                        final OnboardingThemePage page => _ThemeSpecimen(
+                          page: page,
+                          active: _hoveredOption,
+                        ),
+                        _ => preview?.call(context) ?? const SizedBox.shrink(),
+                      },
                     ),
                   ),
                 ),
@@ -218,9 +231,33 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     bool narrow,
   ) {
     final page = _page;
-    final body = page is OnboardingLanguagePage
-        ? _languageBody(context, page, look)
-        : _textBody(context, page, look);
+    final body = switch (page) {
+      final OnboardingLanguagePage page => _choiceBody(
+        page,
+        look,
+        [
+          for (final option in page.options)
+            (
+              key: 'onboarding-language-${option.locale.languageCode}',
+              label: option.label,
+              onTap: () => _selectLanguage(page, option.locale),
+            ),
+        ],
+      ),
+      final OnboardingThemePage page => _choiceBody(
+        page,
+        look,
+        [
+          for (final option in page.options)
+            (
+              key: 'onboarding-theme-${option.mode.name}',
+              label: option.label,
+              onTap: () => _selectTheme(page, option.mode),
+            ),
+        ],
+      ),
+      _ => _textBody(context, page, look),
+    };
     final back = page.showBack && _current > 0
         ? TextButton(
             key: const Key('onboarding-back'),
@@ -228,8 +265,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             child: Text(widget.strings.back),
           )
         : null;
-    final actions =
-        page is OnboardingLanguagePage || (back == null && !page.showPrimary)
+    final actions = _isChoice || (back == null && !page.showPrimary)
         ? null
         : _Actions(
             back: back,
@@ -299,6 +335,20 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
+  /// The title, with the page's icon badge before it on the same line.
+  Widget _heading(OnboardingPage page, OnboardingThemeData look) {
+    final title = _title(page.title!, look);
+    final leading = page.leading;
+    if (leading == null) return title;
+    return Row(
+      children: [
+        leading,
+        const SizedBox(width: 16),
+        Flexible(child: title),
+      ],
+    );
+  }
+
   Widget _description(String text, OnboardingThemeData look, {int? lines}) {
     final style = look.descriptionStyle!;
     return ConstrainedBox(
@@ -328,11 +378,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           Text(page.eyebrow!.toUpperCase(), style: look.eyebrowStyle),
           const SizedBox(height: 16),
         ],
-        if (page.leading != null) ...[
+        if (page.title != null)
+          _heading(page, look)
+        else if (page.leading != null) ...[
           page.leading!,
           const SizedBox(height: 16),
         ],
-        if (page.title != null) _title(page.title!, look),
         if (page.description != null) ...[
           const SizedBox(height: 16),
           _description(page.description!, look, lines: page.descriptionLines),
@@ -362,37 +413,34 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  Widget _languageBody(
-    BuildContext context,
-    OnboardingLanguagePage page,
+  /// Language and theme pages: heading, then one button per option.
+  Widget _choiceBody(
+    OnboardingPage page,
     OnboardingThemeData look,
+    List<({String key, String label, VoidCallback onTap})> options,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (page.leading != null) ...[
-          page.leading!,
-          const SizedBox(height: 24),
-        ],
-        _title(page.title!, look),
+        _heading(page, look),
         if (page.description != null) ...[
           const SizedBox(height: 16),
           _description(page.description!, look),
         ],
         const SizedBox(height: 24),
-        for (final (i, option) in page.options.indexed) ...[
+        for (final (i, option) in options.indexed) ...[
           if (i > 0) const SizedBox(height: 8),
           MouseRegion(
-            onEnter: (_) => setState(() => _hoveredLanguage = i),
-            onExit: (_) => setState(() => _hoveredLanguage = null),
-            child: _LanguageButton(
-              key: Key('onboarding-language-${option.locale.languageCode}'),
+            onEnter: (_) => setState(() => _hoveredOption = i),
+            onExit: (_) => setState(() => _hoveredOption = null),
+            child: _ChoiceButton(
+              key: Key(option.key),
               label: option.label,
               radius: look.buttonRadius!,
               style: look.descriptionStyle!,
-              onTap: () => _selectLanguage(page, option.locale),
+              onTap: option.onTap,
               onFocusChange: (focused) =>
-                  setState(() => _hoveredLanguage = focused ? i : null),
+                  setState(() => _hoveredOption = focused ? i : null),
             ),
           ),
         ],
@@ -574,8 +622,8 @@ class _ProgressBar extends StatelessWidget {
   }
 }
 
-class _LanguageButton extends StatelessWidget {
-  const _LanguageButton({
+class _ChoiceButton extends StatelessWidget {
+  const _ChoiceButton({
     super.key,
     required this.label,
     required this.radius,
@@ -646,4 +694,161 @@ class _LanguageSpecimen extends StatelessWidget {
       ],
     );
   }
+}
+
+/// One small window per theme, the hovered or focused one inked.
+class _ThemeSpecimen extends StatelessWidget {
+  const _ThemeSpecimen({required this.page, required this.active});
+
+  final OnboardingThemePage page;
+  final int? active;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final look = OnboardingThemeData.of(context);
+    final label = look.descriptionStyle!.copyWith(fontSize: 14);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (i, option) in page.options.indexed) ...[
+          if (i > 0) const SizedBox(width: 20),
+          AnimatedOpacity(
+            duration: look.motionDuration!,
+            opacity: i == (active ?? 0) ? 1 : 0.45,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _MiniWindow(
+                  mode: option.mode,
+                  accent: scheme.primary,
+                  selected: i == (active ?? 0),
+                ),
+                const SizedBox(height: 12),
+                Text(option.label, style: label),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A window drawn in light or dark ink; system splits it on the diagonal.
+class _MiniWindow extends StatelessWidget {
+  const _MiniWindow({
+    required this.mode,
+    required this.accent,
+    required this.selected,
+  });
+
+  final ThemeMode mode;
+  final Color accent;
+  final bool selected;
+
+  static const _light = (
+    background: Color(0xFFFAFAF7),
+    line: Color(0xFFDADAD4),
+    ink: Color(0xFF2B2B2B),
+  );
+  static const _dark = (
+    background: Color(0xFF1C1C1E),
+    line: Color(0xFF3A3A3C),
+    ink: Color(0xFFE5E5E5),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(12);
+    Widget window(bool dark) {
+      final ink = dark ? _dark : _light;
+      return Container(
+        color: ink.background,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                for (var i = 0; i < 3; i++) ...[
+                  if (i > 0) const SizedBox(width: 4),
+                  _Bar(color: ink.line, width: 6, height: 6),
+                ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            _Bar(color: ink.ink, width: 56, height: 6),
+            const SizedBox(height: 8),
+            _Bar(color: ink.line, width: 88, height: 5),
+            const SizedBox(height: 6),
+            _Bar(color: ink.line, width: 72, height: 5),
+            const Spacer(),
+            _Bar(color: accent, width: 36, height: 10),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: 132,
+      height: 100,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        border: Border.all(
+          color: selected ? accent : _light.line,
+          width: selected ? 2 : 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: switch (mode) {
+          ThemeMode.light => window(false),
+          ThemeMode.dark => window(true),
+          ThemeMode.system => Stack(
+            fit: StackFit.expand,
+            children: [
+              window(false),
+              ClipPath(clipper: const _DiagonalClipper(), child: window(true)),
+            ],
+          ),
+        },
+      ),
+    );
+  }
+}
+
+class _Bar extends StatelessWidget {
+  const _Bar({required this.color, required this.width, required this.height});
+
+  final Color color;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+    );
+  }
+}
+
+/// Lower-right half of the box.
+class _DiagonalClipper extends CustomClipper<Path> {
+  const _DiagonalClipper();
+
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(size.width, 0)
+    ..lineTo(size.width, size.height)
+    ..lineTo(0, size.height)
+    ..close();
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
