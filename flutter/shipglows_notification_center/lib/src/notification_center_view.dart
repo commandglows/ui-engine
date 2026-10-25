@@ -717,7 +717,10 @@ class NotificationCenterActions extends StatelessWidget {
           title: Text(texts.deleteAllTitle),
           content: Text(texts.deleteAllMessage),
           actions: [
+            // Explicit color: the dialog captures the themes around the
+            // actions, an app bar's light text button theme included.
             TextButton(
+              style: TextButton.styleFrom(foregroundColor: theme.accent),
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(texts.cancel),
             ),
