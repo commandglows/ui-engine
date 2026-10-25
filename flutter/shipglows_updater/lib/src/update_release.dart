@@ -5,7 +5,7 @@ import 'app_version.dart';
 /// ```json
 /// {
 ///   "version": "1.2.3+45",
-///   "url": "https://github.com/<owner>/shipglows-releases/releases/download/<app>-v1.2.3-45/<App>-1.2.3-45.apk",
+///   "url": "https://github.com/dianedef/shipglows-releases/releases/download/<app>-v1.2.3-45/<App>-1.2.3-45.apk",
 ///   "sha256": "<64 hex>",
 ///   "size": 31457280,
 ///   "publishedAt": "2026-10-25T12:00:00Z",

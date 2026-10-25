@@ -9,11 +9,11 @@ final class ShipglowsUpdaterConfig {
   });
 
   /// WinSparkle appcast, usually
-  /// `https://github.com/<owner>/shipglows-releases/releases/download/<app>-latest/appcast.xml`.
+  /// `https://github.com/dianedef/shipglows-releases/releases/download/<app>-latest/appcast.xml`.
   final String windowsFeedUrl;
 
   /// Android manifest ([ShipglowsRelease] JSON), usually
-  /// `https://github.com/<owner>/shipglows-releases/releases/download/<app>-latest/android.json`.
+  /// `https://github.com/dianedef/shipglows-releases/releases/download/<app>-latest/android.json`.
   final String androidManifestUrl;
 
   /// Background check while the app runs; WinSparkle refuses less than one

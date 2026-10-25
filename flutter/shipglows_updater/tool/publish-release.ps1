@@ -17,7 +17,7 @@ The Windows appcast must point at the versioned release: package it with
 Needs `gh` signed in with write access to the repository.
 
 .EXAMPLE
-.\publish-release.ps1 -Repo <owner>/shipglows-releases -App contentglows `
+.\publish-release.ps1 -Repo dianedef/shipglows-releases -App contentglows `
   -PubspecPath ..\..\..\contentglows\app\pubspec.yaml `
   -Apk ..\..\..\contentglows\app\build\app\outputs\flutter-apk\app-release.apk
 #>

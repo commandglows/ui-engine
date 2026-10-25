@@ -765,7 +765,7 @@ take a release APK); web does nothing.
 
 ### Publishing
 
-Releases live in one public repository (`<owner>/shipglows-releases`); the
+Releases live in one public repository (`dianedef/shipglows-releases`); the
 apps' code stays private. `tool/publish-release.ps1 -Repo -App -Apk
 -WindowsInstaller -Appcast` puts the files in a versioned release
 `<app>-v1.2.3-45` (never replaced), then `android.json` and `appcast.xml`
@@ -773,8 +773,8 @@ in the rolling `<app>-latest` release, last, so an app never sees a version
 whose files are missing. The apps read:
 
 ```text
-https://github.com/<owner>/shipglows-releases/releases/download/<app>-latest/android.json
-https://github.com/<owner>/shipglows-releases/releases/download/<app>-latest/appcast.xml
+https://github.com/dianedef/shipglows-releases/releases/download/<app>-latest/android.json
+https://github.com/dianedef/shipglows-releases/releases/download/<app>-latest/appcast.xml
 ```
 
 ```dart
