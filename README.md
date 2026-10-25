@@ -948,6 +948,9 @@ audit, item 12).
 - `feedbackSnackBar(context, …, wrapContent:)` builds the same snack bar for
   code that shows it itself; `FeedbackContent` is the icon and text alone,
   for an app's own surface.
+- `FeedbackLog.addListener` hears every message shown through
+  `showFeedback` / `FeedbackMessenger` (repeats not queued are not heard),
+  for a history: `FeedbackHistory` of `shipglows_notification_center`.
 - Errors take `danger`, which the `ColorScheme` fallback sets to
   `scheme.error`: an app keeping red for emergencies sets its own.
 
@@ -962,6 +965,73 @@ try {
 } catch (error) {
   feedback.showError('Could not save', details: () => '$error');
 }
+```
+
+## `flutter/shipglows_notification_center`
+
+The notification center: the latest lasting notifications (a new replay, a
+comment, a reminder), read or unread, distinct from the passing messages of
+`shipglows_feedback`. Depends on `shipglows_feedback`, `shipglows_icons`
+and `shipglows_theme`; stores nothing itself.
+
+- `NotificationStore` is the port the app plugs in, like the settings
+  storage: `watch()` (newest first, again on every change), `refresh()`
+  after an error, `markRead`, `markAllRead(ids)`, `delete`, `deleteAll(ids)`
+  with `canDelete` / `canDeleteAll`. `CallbackNotificationStore` wraps an
+  existing client (without `delete` the delete buttons and « Delete all »
+  are hidden; without `deleteAll` it deletes one by one);
+  `MemoryNotificationStore` for tests, demos and device-only logs.
+- `NotificationItem(id, title, body, createdAt, read, icon, kind,
+  payload)`: the app maps its own record to it and gets it back in
+  `payload` on « open »; `kind` (a `FeedbackKind`) tints the icon.
+- `NotificationCenterController(store:)`: list, loading, error,
+  `unreadCount`; read and delete show at once and come back when the store
+  fails; `retry()`. One per screen or panel, disposed with it.
+- `NotificationCenterView(controller:, onOpen:, leadingBuilder:)`: the
+  body: rows with the type's icon in a tinted circle (or the app's
+  thumbnail through `leadingBuilder`, given the icon as fallback), the
+  title bold when unread, the body, « 3 min ago » refreshed every minute
+  (the medium date after four weeks, `formatDate:`), an unread dot, a
+  44 px delete button. Over the list « 3 unread » / « All caught up »,
+  announced on change. Opening marks read first. Empty state (`empty`,
+  `emptyDescription`), `FeedbackErrorState` when loading fails (an inline
+  error over a list already shown). `showToolbar: true` puts the summary
+  and the actions over the list, for a panel without an app bar.
+- `NotificationCenterActions(controller:)`: « Mark all as read » and, when
+  the store can, « Delete all » in a menu, confirmed (`confirm:` for the
+  app's own dialog). Failed actions show an error message with « Copy
+  details »; `onError:` (on the view and the actions) hears every failure
+  for the app's log, the background read mark of an opened one included.
+- `NotificationBadge(count:, child:)` (hidden at 0, « 99+ ») and
+  `NotificationBellButton(count:, onPressed:)`, read « Notifications, 3
+  unread notifications ».
+- `FeedbackHistory()..attach()`: a store of the in-app messages already
+  shown (`FeedbackLog` of `shipglows_feedback`), errors unread, their
+  details as the body: a « Recent messages » center to see again an error
+  that went by too fast.
+- Texts: `NotificationStrings.en`, `.fr` (from the app locale), `copyWith`,
+  `NotificationStringsScope` for the whole app.
+
+```dart
+final controller = NotificationCenterController(
+  store: CallbackNotificationStore(
+    watch: () => api.notifications().map((rows) => [
+      for (final row in rows)
+        NotificationItem(id: row.id, title: row.title,
+            createdAt: row.createdAt, read: row.read, payload: row),
+    ]),
+    markRead: api.markRead,
+    markAllRead: (_) => api.markAllRead(),
+  ),
+);
+
+Scaffold(
+  appBar: AppBar(actions: [NotificationCenterActions(controller: controller)]),
+  body: NotificationCenterView(
+    controller: controller,
+    onOpen: (item) => open(item.payload! as Row),
+  ),
+);
 ```
 
 ## `flutter/shipglows_undo_trash`
