@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "encodable_utils.h"
+#include "jump_list.h"
 #include "launch_at_startup.h"
 #include "single_instance_internal.h"
 #include "tray_host.h"
@@ -49,20 +50,28 @@ std::wstring ExecutableDirectory() {
                                          : path.substr(0, separator);
 }
 
-// The icon |image| describes (ShipglowsTrayImage.toMap), at the small icon
-// size; the executable's icon when it cannot be loaded.
-HICON LoadTrayIcon(const flutter::EncodableValue* image) {
-  const int width = GetSystemMetrics(SM_CXSMICON);
-  const int height = GetSystemMetrics(SM_CYSMICON);
+// The .ico file |image| describes (ShipglowsTrayImage.toMap); empty for the
+// executable's icon.
+std::wstring ImagePath(const flutter::EncodableValue* image) {
   const std::string kind = StringField(image, "kind");
   std::wstring path = Wide(StringField(image, "path"));
-  if (kind == "asset" && !path.empty()) {
+  if (path.empty() || (kind != "asset" && kind != "file")) return {};
+  if (kind == "asset") {
     for (wchar_t& character : path) {
       if (character == L'/') character = L'\\';
     }
     path = ExecutableDirectory() + L"\\data\\flutter_assets\\" + path;
   }
-  if ((kind == "asset" || kind == "file") && !path.empty()) {
+  return path;
+}
+
+// The icon |image| describes, at the small icon size; the executable's icon
+// when it cannot be loaded.
+HICON LoadTrayIcon(const flutter::EncodableValue* image) {
+  const int width = GetSystemMetrics(SM_CXSMICON);
+  const int height = GetSystemMetrics(SM_CYSMICON);
+  const std::wstring path = ImagePath(image);
+  if (!path.empty()) {
     if (auto* icon = static_cast<HICON>(LoadImageW(
             nullptr, path.c_str(), IMAGE_ICON, width, height,
             LR_LOADFROMFILE))) {
@@ -109,6 +118,55 @@ std::string ProductVersion() {
   return Utf8(value);
 }
 
+// Jump List links from a list of ShipglowsJumpListEntry maps.
+std::vector<JumpListLink> LinksFrom(const flutter::EncodableValue* value) {
+  std::vector<JumpListLink> links;
+  const auto* list =
+      value ? std::get_if<flutter::EncodableList>(value) : nullptr;
+  if (list == nullptr) return links;
+  for (const auto& entry : *list) {
+    JumpListLink link;
+    link.title = Wide(StringField(&entry, "title"));
+    link.description = Wide(StringField(&entry, "description"));
+    link.icon_path = ImagePath(Field(&entry, "icon"));
+    const auto* arguments = Field(&entry, "arguments");
+    if (const auto* items =
+            arguments ? std::get_if<flutter::EncodableList>(arguments)
+                      : nullptr) {
+      for (const auto& argument : *items) {
+        if (const auto* text = std::get_if<std::string>(&argument)) {
+          link.arguments.push_back(Wide(*text));
+        }
+      }
+    }
+    if (!link.title.empty()) links.push_back(std::move(link));
+  }
+  return links;
+}
+
+flutter::EncodableValue JumpListValue(const flutter::EncodableValue* arguments) {
+  JumpListContent content;
+  content.app_id = Wide(StringField(arguments, "appUserModelId"));
+  content.recent_title = Wide(StringField(arguments, "recentTitle"));
+  content.recent = LinksFrom(Field(arguments, "recent"));
+  content.tasks = LinksFrom(Field(arguments, "tasks"));
+  const JumpListResult result = CommitJumpList(content);
+  flutter::EncodableList removed;
+  for (const auto& line : result.removed) {
+    flutter::EncodableList values;
+    for (const auto& argument : line) values.emplace_back(Utf8(argument));
+    removed.emplace_back(std::move(values));
+  }
+  return flutter::EncodableValue(flutter::EncodableMap{
+      {flutter::EncodableValue("committed"),
+       flutter::EncodableValue(result.committed)},
+      {flutter::EncodableValue("recentShown"),
+       flutter::EncodableValue(result.recent_shown)},
+      {flutter::EncodableValue("removed"),
+       flutter::EncodableValue(std::move(removed))},
+  });
+}
+
 class ShipglowsTrayPlugin : public flutter::Plugin {
  public:
   explicit ShipglowsTrayPlugin(flutter::PluginRegistrarWindows* registrar)
@@ -143,6 +201,8 @@ class ShipglowsTrayPlugin : public flutter::Plugin {
     const auto* arguments = call.arguments();
     if (method == "version") {
       result->Success(flutter::EncodableValue(ProductVersion()));
+    } else if (method == "jumpList") {
+      result->Success(JumpListValue(arguments));
     } else if (method == "launchAtStartup") {
       result->Success(LaunchAtStartupValue(
           Wide(StringField(arguments, "name"))));

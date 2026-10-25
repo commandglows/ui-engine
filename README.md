@@ -666,6 +666,23 @@ web, macOS and Linux). Native Win32, no third-party plugin.
 - Single instance: a later launch hands its command line to the running app
   (`ShipglowsTraySecondInstance`) and exits; the running app comes to the
   front.
+- Jump List of the taskbar button (right click on it), like the
+  « Épinglé » / « Récent » of document apps: `ShipglowsJumpListRecents`
+  keeps the last opened items (`opened(ShipglowsJumpListItem(id, title))`,
+  10 by default, in `%APPDATA%\<appFolder>\jump_list.json`, `items` for an
+  in-app menu) and shows them under « Récent ». Windows lets the user pin
+  each one (« Épingler à cette liste », kept by Windows even once the app
+  forgets it) or remove it (the app forgets it at the next update). Fixed
+  tasks (`ShipglowsJumpListTask`) go below. Choosing an item starts the app
+  with `--shipglows-open=<id>`: `ShipglowsJumpList.itemIdFrom(args)` at
+  launch, `ShipglowsTraySecondInstance.openedItemId` while it runs (needs
+  `ShipglowsTrayForwardToPrimary`). A pinned id can point to a deleted
+  item. « Récent » stays empty while Windows hides recently opened items
+  (Paramètres › Personnalisation › Démarrer). The list replaces any list
+  the runner commits itself (move its tasks to `tasks`), and a runner that
+  sets an explicit AppUserModelID passes it as `appUserModelId`.
+  `ShipglowsJumpList.instance.update(recent:, tasks:)` for an app that keeps
+  its recents itself.
 
 ```yaml
 dependencies:
@@ -697,12 +714,22 @@ ShipglowsTray.instance.events.listen((event) {
       commandBar.open(previousForeground: previousForeground);
     case ShipglowsTrayItemSelected(:final id):
       runCommand(id);
+    case ShipglowsTraySecondInstance(openedItemId: final id?):
+      openDocument(id); // untrusted: look it up
     case ShipglowsTraySecondInstance(:final arguments):
       handleArguments(arguments); // untrusted: validate
     case ShipglowsTrayClicked():
       break;
   }
 });
+
+// Jump List: recent items the user can pin from the taskbar.
+final recents = ShipglowsJumpListRecents(appFolder: 'ContentGlows');
+await recents.load();
+if (ShipglowsJumpList.itemIdFrom(args) case final id?) openDocument(id);
+// Each time a document opens:
+await recents.opened(ShipglowsJumpListItem(doc.id, doc.title,
+    description: doc.path));
 ```
 
 Single instance, in `windows/runner/main.cpp` before the window is created:

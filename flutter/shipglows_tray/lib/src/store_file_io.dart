@@ -1,15 +1,18 @@
 import 'dart:convert';
 import 'dart:io';
 
-File? _file(String appFolder) {
+File? _file(String appFolder, String fileName) {
   final roaming = Platform.environment['APPDATA'];
   if (roaming == null || roaming.isEmpty || appFolder.isEmpty) return null;
-  return File('$roaming\\$appFolder\\tray.json');
+  return File('$roaming\\$appFolder\\$fileName');
 }
 
 /// The decoded file; null when it is missing or not JSON.
-Future<Object?> readTrayDocument(String appFolder) async {
-  final file = _file(appFolder);
+Future<Object?> readTrayDocument(
+  String appFolder, {
+  String fileName = 'tray.json',
+}) async {
+  final file = _file(appFolder, fileName);
   if (file == null) return null;
   try {
     return jsonDecode(await file.readAsString());
@@ -20,8 +23,12 @@ Future<Object?> readTrayDocument(String appFolder) async {
 
 /// Writes [document] through a temporary file, so a crash never leaves half a
 /// file.
-Future<bool> writeTrayDocument(String appFolder, Object document) async {
-  final file = _file(appFolder);
+Future<bool> writeTrayDocument(
+  String appFolder,
+  Object document, {
+  String fileName = 'tray.json',
+}) async {
+  final file = _file(appFolder, fileName);
   if (file == null) return false;
   try {
     await file.parent.create(recursive: true);

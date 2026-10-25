@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'jump_list.dart';
+
 /// Something the user did with the tray or with a new launch of the app.
 @immutable
 sealed class ShipglowsTrayEvent {
@@ -35,4 +37,8 @@ final class ShipglowsTraySecondInstance extends ShipglowsTrayEvent {
 
   /// Command line arguments, without the executable.
   final List<String> arguments;
+
+  /// The Jump List item this launch asks to open, or null
+  /// (`ShipglowsJumpList.itemIdFrom`).
+  String? get openedItemId => ShipglowsJumpList.itemIdFrom(arguments);
 }

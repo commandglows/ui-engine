@@ -9,6 +9,7 @@ library;
 
 export 'package:shipglows_menu/shipglows_menu_model.dart';
 
+export 'src/jump_list.dart';
 export 'src/tray.dart';
 export 'src/tray_close_dialog.dart';
 export 'src/tray_config.dart';
