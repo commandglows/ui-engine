@@ -158,6 +158,7 @@ HRESULT AppendCategory(ICustomDestinationList* list,
   std::wstring title = category.title;
   if (title.empty()) {
     title = PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_FRENCH
+                // Escaped: MSVC reads a source without BOM in the ANSI code page.
                 ? L"Récent"
                 : L"Recent";
   }
