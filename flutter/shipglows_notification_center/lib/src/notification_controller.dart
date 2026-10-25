@@ -28,6 +28,8 @@ class NotificationCenterController extends ChangeNotifier {
   StackTrace? _stackTrace;
   final Set<String> _pendingRead = {};
   final Set<String> _pendingDeleted = {};
+  bool _unreadOnly = false;
+  String? _source;
   bool _markingAllRead = false;
   bool _deletingAll = false;
   bool _disposed = false;
@@ -59,14 +61,47 @@ class NotificationCenterController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  /// The notifications shown, newest first, with the actions in flight
-  /// applied.
-  List<NotificationItem> get items => [
+  /// Every notification, newest first, with the actions in flight applied,
+  /// before the filters.
+  List<NotificationItem> get allItems => [
     for (final item in _snapshot ?? const <NotificationItem>[])
       if (!_pendingDeleted.contains(item.id))
         _pendingRead.contains(item.id) && !item.read
             ? item.copyWith(read: true)
             : item,
+  ];
+
+  /// The notifications shown: [allItems] through [unreadOnly] and
+  /// [source]. The global actions work on these.
+  List<NotificationItem> get items => [
+    for (final item in allItems)
+      if ((!_unreadOnly || !item.read) &&
+          (_source == null || item.source == _source))
+        item,
+  ];
+
+  /// Shows the unread ones only.
+  bool get unreadOnly => _unreadOnly;
+  set unreadOnly(bool value) {
+    if (value == _unreadOnly) return;
+    _unreadOnly = value;
+    _notify();
+  }
+
+  /// Shows one source only; null for all.
+  String? get source => _source;
+  set source(String? value) {
+    if (value == _source) return;
+    _source = value;
+    _notify();
+  }
+
+  /// The sources of [allItems], in order of first appearance.
+  List<String> get sources => [
+    ...{
+      for (final item in allItems)
+        if (item.source case final source?) source,
+    },
   ];
 
   /// No list yet and no error.
@@ -79,7 +114,11 @@ class NotificationCenterController extends ChangeNotifier {
   Object? get error => _error;
   StackTrace? get stackTrace => _stackTrace;
 
-  int get unreadCount => items.where((item) => !item.read).length;
+  /// Unread among [allItems], whatever the filters: the badge's count.
+  int get unreadCount => allItems.where((item) => !item.read).length;
+
+  /// Unread among the [items] shown.
+  int get shownUnreadCount => items.where((item) => !item.read).length;
 
   bool get markingAllRead => _markingAllRead;
   bool get deletingAll => _deletingAll;
@@ -101,7 +140,7 @@ class NotificationCenterController extends ChangeNotifier {
 
   /// Marks [id] read; does nothing when it already is.
   Future<void> markRead(String id) async {
-    final item = items.where((it) => it.id == id).firstOrNull;
+    final item = allItems.where((it) => it.id == id).firstOrNull;
     if (item == null || item.read) return;
     _pendingRead.add(id);
     _notify();

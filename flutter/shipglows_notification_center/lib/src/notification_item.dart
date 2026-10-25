@@ -14,6 +14,8 @@ class NotificationItem {
     this.read = false,
     this.icon,
     this.kind,
+    this.source,
+    this.count,
     this.payload,
   });
 
@@ -33,6 +35,14 @@ class NotificationItem {
   /// (the accent) when null.
   final FeedbackKind? kind;
 
+  /// Where it comes from (an account, a channel, a project): shown over
+  /// the title and offered as a filter when there are several.
+  final String? source;
+
+  /// A live counter the row stands for (« 12 new messages »), shown at the
+  /// end of the row.
+  final int? count;
+
   /// The app's own record, handed back by « open ».
   final Object? payload;
 
@@ -44,6 +54,8 @@ class NotificationItem {
     read: read ?? this.read,
     icon: icon,
     kind: kind,
+    source: source,
+    count: count,
     payload: payload,
   );
 
@@ -57,9 +69,21 @@ class NotificationItem {
       other.read == read &&
       other.icon == icon &&
       other.kind == kind &&
+      other.source == source &&
+      other.count == count &&
       other.payload == payload;
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, body, createdAt, read, icon, kind, payload);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    body,
+    createdAt,
+    read,
+    icon,
+    kind,
+    source,
+    count,
+    payload,
+  );
 }

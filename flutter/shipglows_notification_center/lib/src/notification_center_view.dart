@@ -52,6 +52,7 @@ class NotificationCenterView extends StatefulWidget {
     this.now,
     this.showSummary = true,
     this.showToolbar = false,
+    this.showFilters = true,
     this.emptyIcon,
     this.padding = EdgeInsets.zero,
   });
@@ -84,6 +85,9 @@ class NotificationCenterView extends StatefulWidget {
 
   /// The summary and the actions in a row over the list.
   final bool showToolbar;
+
+  /// « Unread only » and, with several sources, one chip per source.
+  final bool showFilters;
 
   /// Icon of the empty state; the bell by default.
   final IconData? emptyIcon;
@@ -178,14 +182,15 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
         child: CircularProgressIndicator(semanticsLabel: texts.title),
       );
     }
-    if (error != null && items.isEmpty) {
+    final hasAny = controller.allItems.isNotEmpty;
+    if (error != null && !hasAny) {
       return FeedbackErrorState(
         message: texts.loadFailed,
         onRetry: () => unawaited(controller.retry()),
         details: () => '$error\n${controller.stackTrace ?? ''}'.trim(),
       );
     }
-    if (items.isEmpty) {
+    if (!hasAny) {
       return _EmptyState(texts: texts, icon: widget.emptyIcon);
     }
 
@@ -250,8 +255,22 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
                 ),
               ),
             ),
+          if (widget.showFilters)
+            _FilterBar(controller: controller, texts: texts),
           Expanded(
-            child: ListView.builder(
+            child: items.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(theme.spaceXl),
+                      child: Text(
+                        texts.filteredEmpty,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: theme.textMuted),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
@@ -292,6 +311,52 @@ void _report(
     NotificationOperation.deleteAll => texts.deleteFailed,
   };
   feedback.showError(message, details: () => '$error\n$stackTrace');
+}
+
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({required this.controller, required this.texts});
+
+  final NotificationCenterController controller;
+  final NotificationStrings texts;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShipglowsTheme.of(context);
+    final sources = controller.sources;
+    final selected = controller.source;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        theme.spaceMd,
+        0,
+        theme.spaceMd,
+        theme.spaceSm,
+      ),
+      child: Wrap(
+        spacing: theme.spaceSm,
+        runSpacing: theme.spaceXs,
+        children: [
+          FilterChip(
+            label: Text(texts.unreadOnly),
+            selected: controller.unreadOnly,
+            onSelected: (value) => controller.unreadOnly = value,
+          ),
+          if (sources.length > 1) ...[
+            ChoiceChip(
+              label: Text(texts.allSources),
+              selected: selected == null,
+              onSelected: (_) => controller.source = null,
+            ),
+            for (final source in sources)
+              ChoiceChip(
+                label: Text(source),
+                selected: selected == source,
+                onSelected: (value) => controller.source = value ? source : null,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {
@@ -402,10 +467,14 @@ class NotificationTile extends StatelessWidget {
     );
     final leading = leadingBuilder?.call(context, item, fallback) ?? fallback;
 
+    final source = item.source;
+    final count = item.count;
     final label = [
       if (unread) texts.unread,
+      ?source,
       item.title,
       ?body,
+      if (count != null) texts.countLabel(count),
       time,
     ].join('. ');
 
@@ -434,6 +503,15 @@ class NotificationTile extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (source != null)
+                        Text(
+                          source,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: theme.textMuted,
+                          ),
+                        ),
                       Text(
                         item.title,
                         maxLines: 2,
@@ -466,6 +544,30 @@ class NotificationTile extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (count != null) ...[
+                  SizedBox(width: theme.spaceSm),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color.alphaBlend(
+                        theme.accent.withValues(alpha: 0.14),
+                        theme.surfaceRaised,
+                      ),
+                      borderRadius: BorderRadius.circular(theme.radiusSm),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: theme.spaceSm,
+                        vertical: theme.spaceXs / 2,
+                      ),
+                      child: Text(
+                        '$count',
+                        style: textTheme.labelMedium?.copyWith(
+                          color: theme.text,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 if (unread) ...[
                   SizedBox(width: theme.spaceSm),
                   // Unread is also said by the weight and, to a screen
@@ -641,7 +743,7 @@ class NotificationCenterActions extends StatelessWidget {
       builder: (context, _) {
         final hasItems = controller.items.isNotEmpty;
         final canMarkAll =
-            controller.unreadCount > 0 && !controller.markingAllRead;
+            controller.shownUnreadCount > 0 && !controller.markingAllRead;
         final canDeleteAll =
             controller.canDeleteAll && hasItems && !controller.deletingAll;
         return Row(

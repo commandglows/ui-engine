@@ -982,11 +982,15 @@ and `shipglows_theme`; stores nothing itself.
   are hidden; without `deleteAll` it deletes one by one);
   `MemoryNotificationStore` for tests, demos and device-only logs.
 - `NotificationItem(id, title, body, createdAt, read, icon, kind,
-  payload)`: the app maps its own record to it and gets it back in
-  `payload` on « open »; `kind` (a `FeedbackKind`) tints the icon.
+  source, count, payload)`: the app maps its own record to it and gets it
+  back in `payload` on « open »; `kind` (a `FeedbackKind`) tints the icon;
+  `source` (an account, a channel) shows over the title; `count` stands for
+  a live counter row (« 12 new »).
 - `NotificationCenterController(store:)`: list, loading, error,
   `unreadCount`; read and delete show at once and come back when the store
-  fails; `retry()`. One per screen or panel, disposed with it.
+  fails; `retry()`. Filters `unreadOnly` and `source` (`sources` lists
+  them); `unreadCount` ignores the filters (the badge), the global actions
+  work on the `items` shown. One per screen or panel, disposed with it.
 - `NotificationCenterView(controller:, onOpen:, leadingBuilder:)`: the
   body: rows with the type's icon in a tinted circle (or the app's
   thumbnail through `leadingBuilder`, given the icon as fallback), the
@@ -996,7 +1000,9 @@ and `shipglows_theme`; stores nothing itself.
   announced on change. Opening marks read first. Empty state (`empty`,
   `emptyDescription`), `FeedbackErrorState` when loading fails (an inline
   error over a list already shown). `showToolbar: true` puts the summary
-  and the actions over the list, for a panel without an app bar.
+  and the actions over the list, for a panel without an app bar;
+  `showFilters` (on by default) adds « Unread only » and, with several
+  sources, one chip per source (from the CommunityGlows center).
 - `NotificationCenterActions(controller:)`: « Mark all as read » and, when
   the store can, « Delete all » in a menu, confirmed (`confirm:` for the
   app's own dialog). Failed actions show an error message with « Copy

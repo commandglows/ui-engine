@@ -21,6 +21,10 @@ class NotificationStrings {
     this.allRead = 'All caught up',
     this.badgeLabel = '{n} unread notifications',
     this.empty = 'No notifications yet',
+    this.filteredEmpty = 'No notifications match these filters',
+    this.unreadOnly = 'Unread only',
+    this.allSources = 'All',
+    this.countTemplate = '{n} new',
     this.emptyDescription,
     this.loadFailed = 'Could not load the notifications',
     this.markReadFailed = 'Could not mark as read',
@@ -65,6 +69,16 @@ class NotificationStrings {
   /// subscriptions »).
   final String? emptyDescription;
 
+  /// When the filters leave nothing.
+  final String filteredEmpty;
+
+  /// Filter chips.
+  final String unreadOnly;
+  final String allSources;
+
+  /// Read for [NotificationItem.count].
+  final String countTemplate;
+
   final String loadFailed;
   final String markReadFailed;
   final String deleteFailed;
@@ -93,6 +107,10 @@ class NotificationStrings {
     allRead: 'Tout est lu',
     badgeLabel: '{n} notifications non lues',
     empty: 'Aucune notification pour l’instant',
+    filteredEmpty: 'Aucune notification pour ces filtres',
+    unreadOnly: 'Non lues seulement',
+    allSources: 'Toutes',
+    countTemplate: '{n} nouveautés',
     loadFailed: 'Impossible de charger les notifications',
     markReadFailed: 'Impossible de marquer comme lu',
     deleteFailed: 'Impossible de supprimer',
@@ -119,6 +137,8 @@ class NotificationStrings {
   };
 
   String badge(int count) => _count(badgeLabel, count);
+
+  String countLabel(int count) => _count(countTemplate, count);
 
   /// How long ago [time] was, or null when older than four weeks (the date
   /// is shown instead).
@@ -152,6 +172,10 @@ class NotificationStrings {
     String? badgeLabel,
     String? empty,
     String? emptyDescription,
+    String? filteredEmpty,
+    String? unreadOnly,
+    String? allSources,
+    String? countTemplate,
     String? loadFailed,
     String? markReadFailed,
     String? deleteFailed,
@@ -177,6 +201,10 @@ class NotificationStrings {
     badgeLabel: badgeLabel ?? this.badgeLabel,
     empty: empty ?? this.empty,
     emptyDescription: emptyDescription ?? this.emptyDescription,
+    filteredEmpty: filteredEmpty ?? this.filteredEmpty,
+    unreadOnly: unreadOnly ?? this.unreadOnly,
+    allSources: allSources ?? this.allSources,
+    countTemplate: countTemplate ?? this.countTemplate,
     loadFailed: loadFailed ?? this.loadFailed,
     markReadFailed: markReadFailed ?? this.markReadFailed,
     deleteFailed: deleteFailed ?? this.deleteFailed,
