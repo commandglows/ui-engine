@@ -74,6 +74,18 @@ class ShipglowsJumpListItem {
   int get hashCode => Object.hash(id, title, description);
 }
 
+/// A titled group of items in the Jump List, for example « Brouillons en
+/// cours ». Windows lets the user pin or remove each item.
+@immutable
+class ShipglowsJumpListCategory {
+  const ShipglowsJumpListCategory(this.title, this.items);
+
+  final String title;
+
+  /// In the order shown.
+  final List<ShipglowsJumpListItem> items;
+}
+
 /// A fixed action of the Jump List (« Tâches »): the app started with
 /// [arguments], for example `['--capture=image']`.
 @immutable
@@ -126,43 +138,81 @@ class ShipglowsJumpList {
     return id.isEmpty ? null : id;
   }
 
-  /// Replaces the whole list: [recent] most recent first (Windows shows as
-  /// many as its setting allows, 10 by default), then [tasks]. Pinned items
-  /// stay; Windows keeps them.
+  /// Replaces the whole list: [recent] most recent first under « Récent »
+  /// ([recentTitle]; « Recent » outside French), then [categories], then
+  /// [tasks]. Windows shows 10 items by default, shared between the
+  /// categories. Pinned items stay; Windows keeps them.
   ///
-  /// [recentTitle] defaults to « Récent » (« Recent » outside French).
   /// [appUserModelId] is needed when the runner gives the taskbar button an
-  /// explicit one (`SetCurrentProcessExplicitAppUserModelID`) from another
-  /// process; the process's own is used otherwise.
+  /// explicit one (`SetCurrentProcessExplicitAppUserModelID`); the process's
+  /// own is used otherwise.
   ///
   /// Returns the ids of the items the user removed from the list since the
-  /// last update: they are left out, and the app should forget them.
+  /// last update: they are left out, and the app should forget them. With
+  /// [appFolder], they are also kept in `%APPDATA%\<appFolder>\jump_list.json`
+  /// and left out of every later update, for lists the app derives from its
+  /// data (latest drafts…) rather than keeps.
   Future<Set<String>> update({
     List<ShipglowsJumpListItem> recent = const [],
-    List<ShipglowsJumpListTask> tasks = const [],
     String? recentTitle,
+    List<ShipglowsJumpListCategory> categories = const [],
+    List<ShipglowsJumpListTask> tasks = const [],
     String? appUserModelId,
+    String? appFolder,
   }) async {
     if (!isSupported) return const {};
+    final dismissed = appFolder == null
+        ? const <String>{}
+        : await _dismissed(appFolder);
+    List<Map<String, Object?>> native(List<ShipglowsJumpListItem> items) => [
+      for (final item in items)
+        if (!dismissed.contains(item.id)) item._toNative(),
+    ];
     try {
       final result = await _channel
           .invokeMapMethod<Object?, Object?>('jumpList', {
-            'recent': [for (final item in recent) item._toNative()],
+            'categories': [
+              if (recent.isNotEmpty)
+                {'title': recentTitle ?? '', 'items': native(recent)},
+              for (final category in categories)
+                {'title': category.title, 'items': native(category.items)},
+            ],
             'tasks': [for (final task in tasks) task._toNative()],
-            'recentTitle': recentTitle ?? '',
             'appUserModelId': appUserModelId ?? '',
           });
       final removed = result?['removed'];
-      return {
+      final ids = {
         if (removed is List)
           for (final arguments in removed)
             if (arguments is List)
               if (itemIdFrom([for (final a in arguments) '$a']) case final id?)
                 id,
       };
+      if (appFolder != null && ids.isNotEmpty) {
+        // Oldest first: the oldest go once there are too many.
+        final all = [...dismissed, ...ids.difference(dismissed)];
+        await _writeJumpListKey(
+          appFolder,
+          'dismissed',
+          all.sublist(all.length > _maxDismissed ? all.length - _maxDismissed : 0),
+        );
+      }
+      return ids;
     } on MissingPluginException {
       return const {};
     }
+  }
+
+  static const _maxDismissed = 200;
+
+  static Future<Set<String>> _dismissed(String appFolder) async {
+    final document = await readTrayDocument(appFolder, fileName: _fileName);
+    final saved = document is Map ? document['dismissed'] : null;
+    return {
+      if (saved is List)
+        for (final id in saved)
+          if (id is String) id,
+    };
   }
 
   /// Empties the list; pinned items stay.
@@ -194,8 +244,6 @@ class ShipglowsJumpListRecents {
   final List<ShipglowsJumpListTask> tasks;
   final String? recentTitle;
   final String? appUserModelId;
-
-  static const _fileName = 'jump_list.json';
 
   final _items = ValueNotifier<List<ShipglowsJumpListItem>>(const []);
   Future<void> _queue = Future.value();
@@ -269,11 +317,22 @@ class ShipglowsJumpListRecents {
     }
     final folder = appFolder;
     if (!save || folder == null) return;
-    await writeTrayDocument(folder, {
-      'version': 1,
-      'recent': [for (final item in _items.value) item.toJson()],
-    }, fileName: _fileName);
+    await _writeJumpListKey(folder, 'recent', [
+      for (final item in _items.value) item.toJson(),
+    ]);
   }
+}
+
+const _fileName = 'jump_list.json';
+
+/// Rewrites the file with [key] changed, keeping the other keys.
+Future<bool> _writeJumpListKey(String appFolder, String key, Object value) async {
+  final document = await readTrayDocument(appFolder, fileName: _fileName);
+  return writeTrayDocument(appFolder, {
+    if (document is Map) ...document,
+    'version': 1,
+    key: value,
+  }, fileName: _fileName);
 }
 
 ShipglowsTrayImage? _imageFrom(Object? map) {

@@ -134,14 +134,15 @@ HRESULT NewCollection(ComPtr<IObjectCollection>* collection) {
                           CLSCTX_INPROC_SERVER, IID_PPV_ARGS(collection->GetAddressOf()));
 }
 
-HRESULT AppendRecent(ICustomDestinationList* list, const JumpListContent& content,
-                     const std::wstring& executable,
-                     const std::vector<std::wstring>& removed, UINT slots) {
+HRESULT AppendCategory(ICustomDestinationList* list,
+                       const JumpListCategory& category,
+                       const std::wstring& executable,
+                       const std::vector<std::wstring>& removed, UINT slots) {
   ComPtr<IObjectCollection> links;
   HRESULT hr = NewCollection(&links);
   if (FAILED(hr)) return hr;
   UINT added = 0;
-  for (const auto& entry : content.recent) {
+  for (const auto& entry : category.links) {
     if (added >= slots) break;
     const std::wstring line = CommandLine(entry.arguments);
     // Windows refuses the category when it holds a link the user removed.
@@ -154,7 +155,7 @@ HRESULT AppendRecent(ICustomDestinationList* list, const JumpListContent& conten
   if (added == 0) return S_FALSE;
   ComPtr<IObjectArray> array;
   if (FAILED(hr = links.As(&array))) return hr;
-  std::wstring title = content.recent_title;
+  std::wstring title = category.title;
   if (title.empty()) {
     title = PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_FRENCH
                 ? L"Récent"
@@ -199,11 +200,21 @@ JumpListResult CommitJumpList(const JumpListContent& content) {
   for (const auto& line : removed_lines) {
     result.removed.push_back(SplitCommandLine(line));
   }
-  if (!content.recent.empty()) {
+  size_t filled = 0;
+  for (const auto& category : content.categories) {
+    if (!category.links.empty()) ++filled;
+  }
+  // Windows cuts the last categories past its slots: share them out.
+  const UINT per_category =
+      filled == 0 ? 0
+                  : (std::max)(1u, slots / static_cast<UINT>(filled));
+  for (const auto& category : content.categories) {
+    if (category.links.empty()) continue;
     // E_ACCESSDENIED while Windows hides recent items: keep the tasks.
-    result.recent_shown =
-        AppendRecent(list.Get(), content, executable, removed_lines, slots) ==
-        S_OK;
+    if (AppendCategory(list.Get(), category, executable, removed_lines,
+                       per_category) == S_OK) {
+      result.categories_shown = true;
+    }
   }
   if (!content.tasks.empty() &&
       FAILED(AddTasks(list.Get(), content, executable))) {

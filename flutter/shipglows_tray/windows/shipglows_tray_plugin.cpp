@@ -147,8 +147,15 @@ std::vector<JumpListLink> LinksFrom(const flutter::EncodableValue* value) {
 flutter::EncodableValue JumpListValue(const flutter::EncodableValue* arguments) {
   JumpListContent content;
   content.app_id = Wide(StringField(arguments, "appUserModelId"));
-  content.recent_title = Wide(StringField(arguments, "recentTitle"));
-  content.recent = LinksFrom(Field(arguments, "recent"));
+  const auto* categories = Field(arguments, "categories");
+  if (const auto* list =
+          categories ? std::get_if<flutter::EncodableList>(categories)
+                     : nullptr) {
+    for (const auto& value : *list) {
+      content.categories.push_back(JumpListCategory{
+          Wide(StringField(&value, "title")), LinksFrom(Field(&value, "items"))});
+    }
+  }
   content.tasks = LinksFrom(Field(arguments, "tasks"));
   const JumpListResult result = CommitJumpList(content);
   flutter::EncodableList removed;
@@ -160,8 +167,8 @@ flutter::EncodableValue JumpListValue(const flutter::EncodableValue* arguments) 
   return flutter::EncodableValue(flutter::EncodableMap{
       {flutter::EncodableValue("committed"),
        flutter::EncodableValue(result.committed)},
-      {flutter::EncodableValue("recentShown"),
-       flutter::EncodableValue(result.recent_shown)},
+      {flutter::EncodableValue("categoriesShown"),
+       flutter::EncodableValue(result.categories_shown)},
       {flutter::EncodableValue("removed"),
        flutter::EncodableValue(std::move(removed))},
   });

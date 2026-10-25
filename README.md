@@ -681,8 +681,11 @@ web, macOS and Linux). Native Win32, no third-party plugin.
   (Paramètres › Personnalisation › Démarrer). The list replaces any list
   the runner commits itself (move its tasks to `tasks`), and a runner that
   sets an explicit AppUserModelID passes it as `appUserModelId`.
-  `ShipglowsJumpList.instance.update(recent:, tasks:)` for an app that keeps
-  its recents itself.
+  `ShipglowsJumpList.instance.update(recent:, categories:, tasks:)` for an
+  app that derives its lists from its data (« Publiés récemment »,
+  « Brouillons en cours »: `ShipglowsJumpListCategory`); the 10 default
+  slots are shared between categories, and with `appFolder` the items the
+  user removed stay out of later updates.
 
 ```yaml
 dependencies:

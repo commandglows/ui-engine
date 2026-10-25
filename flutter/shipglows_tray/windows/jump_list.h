@@ -19,20 +19,25 @@ struct JumpListLink {
   std::vector<std::wstring> arguments;
 };
 
+// A titled group of links; Windows offers to pin each of them.
+struct JumpListCategory {
+  // « Récent » or « Recent » when empty.
+  std::wstring title;
+  std::vector<JumpListLink> links;
+};
+
 struct JumpListContent {
   // The taskbar button's AppUserModelID; the process's when empty.
   std::wstring app_id;
-  // Title of the recent category; « Récent » or « Recent » when empty.
-  std::wstring recent_title;
-  // Most recent first. Windows offers to pin each of them.
-  std::vector<JumpListLink> recent;
+  // In order; Windows' slots (10 by default) are shared between them.
+  std::vector<JumpListCategory> categories;
   std::vector<JumpListLink> tasks;
 };
 
 struct JumpListResult {
   bool committed = false;
   // False when Windows hides recent items (Start settings) or there are none.
-  bool recent_shown = false;
+  bool categories_shown = false;
   // Arguments of the links the user removed from the list since the last
   // commit; they are left out of this one.
   std::vector<std::vector<std::wstring>> removed;
