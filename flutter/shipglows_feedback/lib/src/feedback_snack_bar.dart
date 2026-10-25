@@ -19,6 +19,8 @@ const double kFeedbackMaxWidth = 480;
 /// - [showCloseIcon] defaults to errors only.
 /// - With an action, it stays until dismissed for assistive-technology
 ///   users, who need time to reach it.
+/// - [secondaryActionLabel] adds a second action beside the message (a
+///   snack bar takes only one [SnackBarAction]); it closes the message too.
 /// - [wrapContent] wraps the [FeedbackContent], to tie the snack bar to
 ///   something else (the « Undo » snack bar closes once undone elsewhere).
 ///
@@ -34,12 +36,16 @@ SnackBar feedbackSnackBar(
   Duration? duration,
   bool? showCloseIcon,
   FeedbackStrings? strings,
+  String? secondaryActionLabel,
+  VoidCallback? onSecondaryAction,
   Widget Function(Widget content)? wrapContent,
 }) => FeedbackMessenger._read(context, null).snackBar(
   message: message,
   kind: kind,
   actionLabel: actionLabel,
   onAction: onAction,
+  secondaryActionLabel: secondaryActionLabel,
+  onSecondaryAction: onSecondaryAction,
   duration: duration,
   showCloseIcon: showCloseIcon,
   strings: strings,
@@ -110,14 +116,39 @@ class FeedbackMessenger {
     Duration? duration,
     bool? showCloseIcon,
     FeedbackStrings? strings,
+    String? secondaryActionLabel,
+    VoidCallback? onSecondaryAction,
     Widget Function(Widget content)? wrapContent,
   }) {
     final theme = _theme;
-    final content = FeedbackContent(
+    final secondaryLabel = secondaryActionLabel;
+    final onSecondary = onSecondaryAction;
+    final hasSecondary = secondaryLabel != null && onSecondary != null;
+    Widget content = FeedbackContent(
       message: message,
       kind: kind,
       strings: strings ?? _strings,
     );
+    if (secondaryLabel != null && onSecondary != null) {
+      content = Row(
+        children: [
+          Expanded(child: content),
+          SizedBox(width: theme.spaceSm),
+          Builder(
+            builder: (context) => TextButton(
+              style: TextButton.styleFrom(foregroundColor: theme.accent),
+              onPressed: () {
+                ScaffoldMessenger.maybeOf(
+                  context,
+                )?.hideCurrentSnackBar(reason: SnackBarClosedReason.action);
+                onSecondary();
+              },
+              child: Text(secondaryLabel),
+            ),
+          ),
+        ],
+      );
+    }
     final wide = _width >= kFeedbackMaxWidth + 2 * theme.spaceXl;
     return SnackBar(
       content: wrapContent?.call(content) ?? content,
@@ -129,7 +160,9 @@ class FeedbackMessenger {
         side: BorderSide(color: theme.border, width: theme.lineWidth),
       ),
       duration: duration ?? kind.duration,
-      persist: actionLabel != null && onAction != null && _accessibleNavigation,
+      persist:
+          ((actionLabel != null && onAction != null) || hasSecondary) &&
+          _accessibleNavigation,
       showCloseIcon: showCloseIcon ?? kind == FeedbackKind.error,
       closeIconColor: theme.icon,
       action: actionLabel != null && onAction != null
@@ -149,6 +182,8 @@ class FeedbackMessenger {
     FeedbackKind kind = FeedbackKind.info,
     String? actionLabel,
     VoidCallback? onAction,
+    String? secondaryActionLabel,
+    VoidCallback? onSecondaryAction,
     Duration? duration,
     bool? showCloseIcon,
     bool replaceCurrent = false,
@@ -157,10 +192,16 @@ class FeedbackMessenger {
   }) {
     final messenger = this.messenger;
     if (messenger == null || !messenger.mounted) return null;
-    if (details != null && actionLabel == null) {
+    if (details != null) {
       final texts = strings ?? _strings;
-      actionLabel = texts.copyDetails;
-      onAction = () => _copy(details, texts);
+      void copy() => unawaited(_copy(details, texts));
+      if (actionLabel == null) {
+        actionLabel = texts.copyDetails;
+        onAction = copy;
+      } else if (secondaryActionLabel == null) {
+        secondaryActionLabel = texts.copyDetails;
+        onSecondaryAction = copy;
+      }
     }
     final last = _last[messenger];
     if (!replaceCurrent &&
@@ -178,6 +219,8 @@ class FeedbackMessenger {
         kind: kind,
         actionLabel: actionLabel,
         onAction: onAction,
+        secondaryActionLabel: secondaryActionLabel,
+        onSecondaryAction: onSecondaryAction,
         duration: duration,
         showCloseIcon: showCloseIcon,
         strings: strings,
@@ -230,8 +273,8 @@ class FeedbackMessenger {
     replaceCurrent: replaceCurrent,
   );
 
-  /// With [details] and no other action, offers « Copy details »: the
-  /// technical text for a bug report, read when copied.
+  /// With [details], offers « Copy details »: the technical text for a bug
+  /// report, read when copied; beside [actionLabel] when there is one.
   void showError(
     String message, {
     String? actionLabel,
@@ -262,14 +305,17 @@ class FeedbackMessenger {
 /// Messages queue one after the other; [replaceCurrent] closes the one on
 /// screen first. The same message of the same kind, still queued or on
 /// screen, is not queued again (a failing sync reporting each retry): its
-/// controller is returned. [details] adds « Copy details » when there is
-/// no other action. After an await, use [FeedbackMessenger].
+/// controller is returned. [secondaryActionLabel] adds a second action;
+/// [details] adds « Copy details », as the second action when there is
+/// already one. After an await, use [FeedbackMessenger].
 ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? showFeedback(
   BuildContext context,
   String message, {
   FeedbackKind kind = FeedbackKind.info,
   String? actionLabel,
   VoidCallback? onAction,
+  String? secondaryActionLabel,
+  VoidCallback? onSecondaryAction,
   Duration? duration,
   bool? showCloseIcon,
   bool replaceCurrent = false,
@@ -280,6 +326,8 @@ ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? showFeedback(
   kind: kind,
   actionLabel: actionLabel,
   onAction: onAction,
+  secondaryActionLabel: secondaryActionLabel,
+  onSecondaryAction: onSecondaryAction,
   duration: duration,
   showCloseIcon: showCloseIcon,
   replaceCurrent: replaceCurrent,

@@ -56,7 +56,8 @@ class FeedbackContent extends StatelessWidget {
 ///
 /// Sized to its content ([dense]: tighter padding, smaller icon), so it
 /// fits in a [Row] or a [Wrap] as well as a [Column]; [trailing] holds an
-/// action (a « Retry » text button).
+/// action beside the text (a « Retry » text button), [actions] one or more
+/// under it.
 class FeedbackInline extends StatelessWidget {
   const FeedbackInline({
     super.key,
@@ -65,6 +66,7 @@ class FeedbackInline extends StatelessWidget {
     this.title,
     this.dense = false,
     this.trailing,
+    this.actions = const [],
     this.strings,
   });
 
@@ -73,6 +75,9 @@ class FeedbackInline extends StatelessWidget {
   final String? title;
   final bool dense;
   final Widget? trailing;
+
+  /// Buttons under the message, start-aligned, wrapping when narrow.
+  final List<Widget> actions;
 
   /// Defaults to [FeedbackStrings.of] the context.
   final FeedbackStrings? strings;
@@ -112,25 +117,42 @@ class FeedbackInline extends StatelessWidget {
               ),
               SizedBox(width: dense ? theme.spaceSm : theme.spaceMd),
               Flexible(
-                child: ExcludeSemantics(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (title != null)
-                        Text(
-                          title,
-                          style: textTheme.titleSmall?.copyWith(
-                            color: theme.text,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ExcludeSemantics(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (title != null)
+                            Text(
+                              title,
+                              style: textTheme.titleSmall?.copyWith(
+                                color: theme.text,
+                              ),
+                            ),
+                          Text(
+                            message,
+                            style:
+                                (dense
+                                        ? textTheme.bodySmall
+                                        : textTheme.bodyMedium)
+                                    ?.copyWith(color: theme.text),
                           ),
-                        ),
-                      Text(
-                        message,
-                        style: (dense ? textTheme.bodySmall : textTheme.bodyMedium)
-                            ?.copyWith(color: theme.text),
+                        ],
+                      ),
+                    ),
+                    if (actions.isNotEmpty) ...[
+                      SizedBox(height: theme.spaceSm),
+                      Wrap(
+                        spacing: theme.spaceSm,
+                        runSpacing: theme.spaceXs,
+                        children: actions,
                       ),
                     ],
-                  ),
+                  ],
                 ),
               ),
               if (trailing case final trailing?) ...[

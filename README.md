@@ -927,16 +927,21 @@ audit, item 12).
   Never pass the `ScaffoldMessenger`'s own context to `feedbackSnackBar`:
   `MaterialApp` puts it above the theme, so the brand roles are lost.
 - `showError(…, details: () => error.toString())` offers « Copy details »
-  when there is no other action, then confirms « Details copied ».
+  (beside the action when there is one), then confirms « Details copied ».
+- Two actions: `secondaryActionLabel:` / `onSecondaryAction:` on
+  `showFeedback`, `FeedbackMessenger.show` and `feedbackSnackBar`; a snack
+  bar takes one `SnackBarAction`, so the second is a text button beside the
+  message, which closes it too.
 - `replaceCurrent: true` also skips the repeat check.
-- `FeedbackInline(message:, kind:, title:, dense:, trailing:)`: a message in
+- `FeedbackInline(message:, kind:, title:, dense:, trailing:, actions:)`: a message in
   place (under a form, in a panel), tinted with its kind, announced when it
   appears. `FeedbackContent(liveRegion: true)` for the bare icon and text.
 - `FeedbackErrorState(message:, title:, onRetry:, details:)`: what a screen
   shows when loading it failed, with « Retry » and « Copy details ».
   `compact: true` aligns it to the start with a smaller icon (a panel, a
   card); `helperText:` says what to do; `selectable: true` lets the message
-  be copied by hand; `showIcon:`, `copyLabel:`.
+  be copied by hand; `secondaryLabel:` / `onSecondary:` for a second
+  action; `showIcon:`, `copyLabel:`.
 - `FeedbackStringsScope(strings: FeedbackStrings.fr, child:)` in
   `MaterialApp.builder` sets the texts for the whole app (French apps
   without `flutter_localizations` read as English otherwise).
