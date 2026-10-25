@@ -159,7 +159,7 @@ HRESULT AppendCategory(ICustomDestinationList* list,
   if (title.empty()) {
     title = PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_FRENCH
                 // Escaped: MSVC reads a source without BOM in the ANSI code page.
-                ? L"Récent"
+                ? L"R\u00e9cent"
                 : L"Recent";
   }
   return list->AppendCategory(title.c_str(), array.Get());
