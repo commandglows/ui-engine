@@ -25,6 +25,16 @@ design-token source, as its Astro site does) and adds it to
 ThemeData(extensions: [ShipglowsTheme(surface: …, keyBorder: …, …)])
 ```
 
+`ShipglowsScale` is the shared design scale, as constants usable in `const`
+code and in screens: spacing `spaceXs`…`spaceXxxl` (4, 8, 12, 16, 24, 32, 48),
+radii `radiusXs`…`radiusXl` plus `radiusFull` (4, 6, 10, 16, 24, 999), motion
+`motionFast` / `motionNormal` / `motionSlow` (120, 200, 320 ms) with
+`curveStandard` and `curveEmphasized`, type sizes `textXs`…`textHero` (11, 14,
+16, 18, 22, 38), icon sizes `iconSm` / `iconMd` / `iconLg` (16, 20, 24) and the
+Material 3 window breakpoints `breakpointCompact` / `breakpointMedium` /
+`breakpointExpanded` (600, 840, 1200). `ShipglowsTheme`'s default spacing,
+radii and motion come from it; an app overrides a brand role, not the scale.
+
 Without one, `ShipglowsTheme.of(context)` (or `.from(themeData)`) derives the
 roles from the `ColorScheme`: the former default look of the command bar,
 guide and title bar. The menu changed to match the bar: its highlighted row

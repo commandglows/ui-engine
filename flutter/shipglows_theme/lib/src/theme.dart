@@ -2,6 +2,7 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 
+import 'scale.dart';
 import 'typography.dart';
 
 /// The semantic roles every ShipGlows surface draws with, set once in the
@@ -35,22 +36,22 @@ class ShipglowsTheme extends ThemeExtension<ShipglowsTheme> {
     required this.keyBorder,
     required this.keyShadow,
     this.lineWidth = 1,
-    this.radiusSm = 6,
-    this.radiusMd = 10,
-    this.radiusLg = 16,
-    this.spaceXs = 4,
-    this.spaceSm = 8,
-    this.spaceMd = 12,
-    this.spaceLg = 16,
-    this.spaceXl = 24,
+    this.radiusSm = ShipglowsScale.radiusSm,
+    this.radiusMd = ShipglowsScale.radiusMd,
+    this.radiusLg = ShipglowsScale.radiusLg,
+    this.spaceXs = ShipglowsScale.spaceXs,
+    this.spaceSm = ShipglowsScale.spaceSm,
+    this.spaceMd = ShipglowsScale.spaceMd,
+    this.spaceLg = ShipglowsScale.spaceLg,
+    this.spaceXl = ShipglowsScale.spaceXl,
     this.keyMinSize = 22,
     this.keyDepth = 1,
     this.keyPaddingX = 6,
     this.keyPaddingY = 2,
     this.keyLabelStyle,
     this.controlMinHeight = 44,
-    this.motionFast = const Duration(milliseconds: 120),
-    this.motionNormal = const Duration(milliseconds: 200),
+    this.motionFast = ShipglowsScale.motionFast,
+    this.motionNormal = ShipglowsScale.motionNormal,
     this.fontSans = ShipglowsFonts.sans,
     this.fontDisplay = ShipglowsFonts.display,
     this.fontMono = ShipglowsFonts.mono,
