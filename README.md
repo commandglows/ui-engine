@@ -1667,3 +1667,19 @@ ShipGlows app `com.shipglows.app` 47822, GoCharbon `fr.gocharbon.quiz`
 47823, ReplayGlows `com.replayglows.app` 47824, ContentGlows
 `com.contentglows.app` 47825. The Clerk applications and client ids are listed
 in CommandGlows `shipglows_data/workflow/docs/technical/suite-authentication.md`.
+
+## `flutter/shipglows_convex`
+
+Convex HTTP client for the native apps (Android, Windows), used instead of
+Firestore where an app runs on Convex. No Convex SDK, no codegen:
+`ConvexHttpClient` calls `/api/query`, `/api/mutation` and `/api/action`, and
+uploads files to Convex storage, with `Authorization: Bearer` from a `token`
+callback (for Clerk, `ClerkAuthClient.accessToken`).
+
+- `ConvexException.code` is stable: `unauthenticated` (retried once after the
+  token runs again), `convex_error` (payload in `data`, or an app code such as
+  `no_access`), `function_error`, `network`, `bad_response`.
+- Plain JSON only: no int64, bytes or `DateTime` args. Files go through
+  `uploadBytes`, times through `dateTimeToConvexMillis`. No realtime
+  subscriptions.
+- Usage and error table in `flutter/shipglows_convex/README.md`.
