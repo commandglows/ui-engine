@@ -34,6 +34,11 @@ class CalendarStrings {
     required this.eventCount,
     required this.todayDay,
     required this.more,
+    required this.tomorrow,
+    required this.dayAfterTomorrow,
+    required this.inWeek,
+    required this.inMonth,
+    required this.inHours,
   });
 
   /// `fr` writes « lundi 26 octobre », `en` « Monday, October 26 ».
@@ -90,6 +95,15 @@ class CalendarStrings {
 
   /// Hidden events of a month cell: `{count}`.
   final String more;
+
+  /// Quick picks of a date field.
+  final String tomorrow;
+  final String dayAfterTomorrow;
+  final String inWeek;
+  final String inMonth;
+
+  /// Quick pick of a date and time field: `{count}` hours from now.
+  final String inHours;
 
   static const en = CalendarStrings(
     languageCode: 'en',
@@ -152,6 +166,11 @@ class CalendarStrings {
     eventCount: '{count} planned',
     todayDay: 'Today, {day}',
     more: '+{count}',
+    tomorrow: 'Tomorrow',
+    dayAfterTomorrow: 'In 2 days',
+    inWeek: 'In a week',
+    inMonth: 'In a month',
+    inHours: 'In {count} h',
   );
 
   static const fr = CalendarStrings(
@@ -219,6 +238,11 @@ class CalendarStrings {
     eventCount: '{count} prévus',
     todayDay: 'Aujourd’hui, {day}',
     more: '+{count}',
+    tomorrow: 'Demain',
+    dayAfterTomorrow: 'Après-demain',
+    inWeek: 'Dans une semaine',
+    inMonth: 'Dans un mois',
+    inHours: 'Dans {count} h',
   );
 
   /// French for a French [locale], English otherwise.
@@ -379,6 +403,11 @@ class CalendarStrings {
     String? eventCount,
     String? todayDay,
     String? more,
+    String? tomorrow,
+    String? dayAfterTomorrow,
+    String? inWeek,
+    String? inMonth,
+    String? inHours,
   }) => CalendarStrings(
     languageCode: languageCode ?? this.languageCode,
     weekdays: weekdays ?? this.weekdays,
@@ -406,6 +435,11 @@ class CalendarStrings {
     eventCount: eventCount ?? this.eventCount,
     todayDay: todayDay ?? this.todayDay,
     more: more ?? this.more,
+    tomorrow: tomorrow ?? this.tomorrow,
+    dayAfterTomorrow: dayAfterTomorrow ?? this.dayAfterTomorrow,
+    inWeek: inWeek ?? this.inWeek,
+    inMonth: inMonth ?? this.inMonth,
+    inHours: inHours ?? this.inHours,
   );
 
   /// The label of [view] in the view switch.
