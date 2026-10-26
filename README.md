@@ -1229,6 +1229,13 @@ Undo, redo and trash, extracted from ContentGlows. Depends on
   change, changed:)` folds a batch (an AI pass) into one step, and records
   nothing when `changed` says it was a no-op. Capped at `limit` (oldest
   dropped); optional labels for « Undo: … » tooltips; a `ChangeNotifier`.
+- `UndoCommandStack<T>`: a bounded stack of compensating commands for an app
+  that keeps both events instead of rewriting history. `push(command, label:)`
+  returns the `UndoCommandEntry` kept (oldest dropped past `limit`); `latest`
+  and `popLatest()` serve Ctrl/⌘+Z; `remove(entry)` takes a specific one (its
+  own « Undo » message); `clear()`. It only orders the entries: the caller runs
+  the commands and checks whether a change is still undoable. Undo-only, no
+  redo; a `ChangeNotifier`.
 - `UndoShortcuts`: Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z (and Ctrl+Y off Apple)
   redoes for the subtree; keys typed in a text field stay its own
   (`isTextInputFocused()`), disabled actions let the key through. A command
