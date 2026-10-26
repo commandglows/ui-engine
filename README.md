@@ -1513,8 +1513,13 @@ reports what the user does. It stores nothing.
   so the app's own list tiles can be dragged onto a day.
 - Dates: `calendarDay`, `calendarAddDays`, `calendarSameDay`,
   `calendarShift(view, date, step)`, `CalendarRange.of(view, date)`,
-  `.week`, `.month`.
+  `.week`, `.month`. `parseCivilDate('2026-10-18')` reads a `YYYY-MM-DD`
+  day (null otherwise).
 - Texts: `CalendarStrings.fr`, `.en`, `forLocale(locale)`, `copyWith`.
+  Short labels in the same language: `shortDay(day)` « sam. 18 oct. »,
+  `shortDateTime(date)` « sam. 18 oct. à 14:05 », `shortRange(start, end)`
+  « 12 – 18 oct. » (the year appears only outside `reference`, today by
+  default).
   Sizes: `CalendarMetrics` (`const CalendarMetrics(hourHeight: 48)`).
 - Colors come from `ShipglowsTheme` and the `ColorScheme`; reduced motion
   turns the slide off.

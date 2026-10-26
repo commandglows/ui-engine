@@ -15,6 +15,18 @@ DateTime calendarAddDays(DateTime day, int days) =>
 bool calendarSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+/// The civil day written `YYYY-MM-DD`, at UTC midnight like [calendarDay];
+/// null when [value] is not one.
+DateTime? parseCivilDate(String? value) {
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value ?? '');
+  if (match == null) return null;
+  return DateTime.utc(
+    int.parse(match[1]!),
+    int.parse(match[2]!),
+    int.parse(match[3]!),
+  );
+}
+
 /// The date [step] periods of [view] away from [date]: one day, one week,
 /// or the first day of another month.
 DateTime calendarShift(CalendarView view, DateTime date, int step) =>

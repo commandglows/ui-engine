@@ -291,6 +291,47 @@ class CalendarStrings {
     return '$start – $end, ${last.year}';
   }
 
+  /// Short day: « sam. 18 oct. », or « sam. 18 oct. 2025 » outside
+  /// [reference]'s year (today by default). English: « Sat, Oct 18 ».
+  String shortDay(DateTime day, {DateTime? reference, bool weekday = true}) {
+    final sameYear = (reference ?? DateTime.now()).year == day.year;
+    if (_french) {
+      final year = sameYear ? '' : ' ${day.year}';
+      final date = '${day.day} ${monthsShort[day.month - 1]}$year';
+      // French weekday abbreviations are the lower-case first letters, dotted.
+      final name = '${weekdays[day.weekday - 1].toLowerCase()}.';
+      return weekday ? '$name $date' : date;
+    }
+    final year = sameYear ? '' : ', ${day.year}';
+    final date = '${monthsShort[day.month - 1]} ${day.day}$year';
+    return weekday ? '${weekdays[day.weekday - 1]}, $date' : date;
+  }
+
+  /// « sam. 18 oct. à 14:05 », or « Sat, Oct 18 at 14:05 ».
+  String shortDateTime(DateTime date, {DateTime? reference}) {
+    final time = '${_two(date.hour)}:${_two(date.minute)}';
+    final day = shortDay(date, reference: reference);
+    return _french ? '$day à $time' : '$day at $time';
+  }
+
+  /// « 12 – 18 oct. », « 28 sept. – 4 oct. » across months. English days
+  /// stay whole on both sides: « Oct 12 – Oct 18 ».
+  String shortRange(DateTime start, DateTime end, {DateTime? reference}) {
+    final sameYear = start.year == end.year;
+    if (!_french) {
+      return '${shortDay(start, reference: reference, weekday: false)} – '
+          '${shortDay(end, reference: reference, weekday: false)}';
+    }
+    final last = shortDay(end, reference: reference, weekday: false);
+    if (sameYear && start.month == end.month) {
+      return '${start.day} – $last';
+    }
+    final first = sameYear
+        ? '${start.day} ${monthsShort[start.month - 1]}'
+        : shortDay(start, reference: reference, weekday: false);
+    return '$first – $last';
+  }
+
   CalendarStrings copyWith({
     String? languageCode,
     List<String>? weekdays,
@@ -355,3 +396,5 @@ class CalendarStrings {
     CalendarView.agenda => viewAgenda,
   };
 }
+
+String _two(int value) => value.toString().padLeft(2, '0');

@@ -1,6 +1,7 @@
 /// Shared calendar for ShipGlows Flutter apps: one event model, one time-zone
-/// seam and the views every app draws them with. Each app keeps its own
-/// data and converts it to [CalendarEvent]s.
+/// seam, the views every app draws them with, and the civil-date vocabulary
+/// (`parseCivilDate`, the short day labels of [CalendarStrings]). Each app
+/// keeps its own data and converts it to [CalendarEvent]s.
 library;
 
 export 'src/agenda.dart';
