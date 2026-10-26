@@ -976,22 +976,36 @@ another S3-compatible bucket is an endpoint change.
   relative forward-slash path (`checkBlobKey`). Failures are a sealed
   `BlobStoreException` with a French message: `BlobPreconditionFailed`,
   `BlobAccessDenied` (do not retry), `BlobTransientFailure` (may retry),
-  `BlobInvalidKey`.
-- `S3BlobStore(config)`: path-style requests over `dart:io`, signed by
-  `SigV4Signer` (checked on the AWS test vectors), no AWS SDK; files over
-  64 MB go up in 16 MB parts and a failed upload is aborted.
+  `BlobInvalidKey`, `BlobTransferCancelled`.
+- `TransferControl(onProgress: (done, total) {…})`, passed to `putBytes`,
+  `putFile`, `getBytes` and `download`: progress (bytes kept from an
+  interrupted attempt count as done) and `cancel()`, which aborts the request
+  under way.
+- `S3BlobStore(config, retry:, journal:, multipartThreshold:, partBytes:)`:
+  path-style requests over `dart:io`, signed by `SigV4Signer` (checked on the
+  AWS test vectors), no AWS SDK; files over 64 MB go up in 16 MB parts.
+  `RetryPolicy` (4 tries, waits from 0.5 s doubling up to 30 s, with
+  jitter) sends again every request that can safely be sent twice, a single
+  part rather than the whole file; a conditional write is never resent. With
+  a `TransferJournal` (`FileTransferJournal(dir)` survives a restart,
+  `MemoryTransferJournal` does not), a cancelled or failed multipart upload
+  is kept and resumes from its stored parts (started over if the bucket
+  dropped it), and a download resumes from its `.part` file with a `Range`
+  bound to the version by `If-Match`. Without a journal an interrupted
+  upload is aborted.
 - `FolderBlobStore(root, incomingSuffix:)`: a folder kept in sync by another
   program; writes go through a temporary file, the tag is the SHA-256, a
   missing root (unmounted drive) is reported, never created.
 - `MemoryBlobStore` for tests; `parseS3Endpoint` (https, or http on this
   computer for MinIO) and `testBlobStore` (write, read back, delete a probe)
   for a settings page.
-- Tests: one contract suite run on every store; the S3 run needs
-  `SHIPGLOWS_S3_ENDPOINT`, `_BUCKET`, `_REGION`, `_KEY_ID`, `_SECRET` and is
-  skipped without them.
+- Tests: one contract suite run on every store, including a local fake S3
+  bucket (`test/fake_s3_server.dart`) that also proves retries and resumes;
+  the run on a real bucket needs `SHIPGLOWS_S3_ENDPOINT`, `_BUCKET`,
+  `_REGION`, `_KEY_ID`, `_SECRET` and is skipped without them.
 
-Not yet: progress, cancellation, retry, resumable uploads, a local cache,
-and the backend-signed uploader (presigned parts) used by ContentGlows.
+Not yet: a local cache, background transfers, and the backend-signed
+uploader (presigned parts) used by ContentGlows.
 
 ## `flutter/shipglows_xml`
 

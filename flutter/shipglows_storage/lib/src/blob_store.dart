@@ -14,6 +14,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import 'transfer.dart';
+
 /// What a stored object is: its key, its size in bytes and its version tag.
 ///
 /// The [etag] is opaque: compare it, pass it back in [WriteCondition.ifMatch],
@@ -84,7 +86,15 @@ final class BlobInvalidKey extends BlobStoreException {
   BlobInvalidKey(String key) : super('Clé de stockage invalide : « $key ».');
 }
 
+/// The transfer was stopped through [TransferControl.cancel].
+final class BlobTransferCancelled extends BlobStoreException {
+  const BlobTransferCancelled() : super('Transfert annulé.');
+}
+
 /// A place that keeps objects by key.
+///
+/// The calls that move content take an optional [TransferControl] to follow
+/// their progress and cancel them.
 abstract interface class BlobStore {
   /// Stores [bytes] under [key] when [condition] holds, and returns what is
   /// now stored.
@@ -94,18 +104,26 @@ abstract interface class BlobStore {
     String key,
     Uint8List bytes, {
     WriteCondition condition = WriteCondition.always,
+    TransferControl? control,
   });
 
   /// Stores the content of [file] under [key], streamed so a large file
   /// never sits whole in memory.
-  Future<BlobInfo> putFile(String key, File file);
+  Future<BlobInfo> putFile(String key, File file, {TransferControl? control});
 
   /// The bytes under [key], or null when there is none.
-  Future<({Uint8List bytes, BlobInfo info})?> getBytes(String key);
+  Future<({Uint8List bytes, BlobInfo info})?> getBytes(
+    String key, {
+    TransferControl? control,
+  });
 
   /// Writes the object under [key] to [target] and returns what was written,
   /// or null when there is none; [target] is then left untouched.
-  Future<BlobInfo?> download(String key, File target);
+  Future<BlobInfo?> download(
+    String key,
+    File target, {
+    TransferControl? control,
+  });
 
   /// What is stored under [key], or null when there is none.
   Future<BlobInfo?> head(String key);
@@ -136,8 +154,10 @@ class MemoryBlobStore implements BlobStore {
     String key,
     Uint8List bytes, {
     WriteCondition condition = WriteCondition.always,
+    TransferControl? control,
   }) async {
     checkBlobKey(key);
+    control?.check();
     final current = _objects[key];
     final allowed = switch (condition) {
       AlwaysWrite() => true,
@@ -148,18 +168,28 @@ class MemoryBlobStore implements BlobStore {
     final copy = Uint8List.fromList(bytes);
     final etag = sha256.convert(copy).toString();
     _objects[key] = (bytes: copy, etag: etag);
+    control?.report(copy.length, copy.length);
     return (key: key, bytes: copy.length, etag: etag);
   }
 
   @override
-  Future<BlobInfo> putFile(String key, File file) async =>
-      putBytes(key, await file.readAsBytes());
+  Future<BlobInfo> putFile(
+    String key,
+    File file, {
+    TransferControl? control,
+  }) async =>
+      putBytes(key, await file.readAsBytes(), control: control);
 
   @override
-  Future<({Uint8List bytes, BlobInfo info})?> getBytes(String key) async {
+  Future<({Uint8List bytes, BlobInfo info})?> getBytes(
+    String key, {
+    TransferControl? control,
+  }) async {
     checkBlobKey(key);
+    control?.check();
     final object = _objects[key];
     if (object == null) return null;
+    control?.report(object.bytes.length, object.bytes.length);
     return (
       bytes: Uint8List.fromList(object.bytes),
       info: (key: key, bytes: object.bytes.length, etag: object.etag),
@@ -167,8 +197,12 @@ class MemoryBlobStore implements BlobStore {
   }
 
   @override
-  Future<BlobInfo?> download(String key, File target) async {
-    final object = await getBytes(key);
+  Future<BlobInfo?> download(
+    String key,
+    File target, {
+    TransferControl? control,
+  }) async {
+    final object = await getBytes(key, control: control);
     if (object == null) return null;
     await target.parent.create(recursive: true);
     await target.writeAsBytes(object.bytes, flush: true);

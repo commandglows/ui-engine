@@ -113,6 +113,36 @@ void runBlobStoreContract(
     }, timeout: const Timeout(Duration(minutes: 5)));
   }
 
+  test('putFile and download report progress up to the size', () async {
+    final source = File('${scratch.path}/progress.bin')
+      ..writeAsBytesSync(List.filled(200000, 7));
+    final sent = <(int, int)>[];
+    await store.putFile(
+      '${prefix}files/progress.bin',
+      source,
+      control: TransferControl(onProgress: (done, total) {
+        sent.add((done, total));
+      }),
+    );
+    expect(sent.last, (200000, 200000));
+    final received = <int>[];
+    await store.download(
+      '${prefix}files/progress.bin',
+      File('${scratch.path}/progress.out'),
+      control: TransferControl(onProgress: (done, _) => received.add(done)),
+    );
+    expect(received.last, 200000);
+  });
+
+  test('a cancelled transfer throws and stores nothing', () async {
+    final control = TransferControl()..cancel();
+    await expectLater(
+      store.putBytes('${prefix}cancelled', bytesOf('x'), control: control),
+      throwsA(isA<BlobTransferCancelled>()),
+    );
+    expect(await store.head('${prefix}cancelled'), isNull);
+  });
+
   test('keys with .. or a leading slash are refused', () async {
     for (final key in ['../x', '/x', 'a//b', r'a\b', '']) {
       await expectLater(store.putBytes(key, bytesOf('x')),

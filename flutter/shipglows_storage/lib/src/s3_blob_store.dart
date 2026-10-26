@@ -5,19 +5,27 @@
 /// and MinIO both accept. Files over [S3BlobStore.multipartThreshold] go up
 /// in parts so an upload of a long recording or video never holds it whole
 /// in memory.
+///
+/// Every request that can safely be sent twice is retried after a
+/// [BlobTransientFailure] by [S3BlobStore.retry]; a conditional write is
+/// not, since its first try may have landed. With a [TransferJournal], a
+/// multipart upload or a download interrupted by a cancellation, a lost
+/// connection or a restart picks up where it stopped when started again.
 library;
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-
 import 'package:shipglows_xml/shipglows_xml.dart';
 
 import 'blob_store.dart';
 import 'sigv4.dart';
+import 'transfer.dart';
+import 'transfer_journal.dart';
 
 /// Where a bucket is and how to sign for it. The keys live in secure
 /// storage; this value only travels in memory.
@@ -29,8 +37,15 @@ typedef S3Config = ({
 });
 
 class S3BlobStore implements BlobStore {
-  S3BlobStore(this.config, {HttpClient? client, DateTime Function()? clock})
-      : _client = client ??
+  S3BlobStore(
+    this.config, {
+    HttpClient? client,
+    DateTime Function()? clock,
+    this.retry = const RetryPolicy(),
+    this.journal,
+    this.multipartThreshold = 64 * 1024 * 1024,
+    this.partBytes = 16 * 1024 * 1024,
+  })  : _client = client ??
             (HttpClient()..connectionTimeout = const Duration(seconds: 15)),
         _clock = clock ?? DateTime.now,
         _signer = SigV4Signer(
@@ -38,16 +53,27 @@ class S3BlobStore implements BlobStore {
           region: config.region,
         );
 
-  /// Size from which a file goes up in parts.
-  static const multipartThreshold = 64 * 1024 * 1024;
-
-  /// Size of each part but the last.
-  static const partBytes = 16 * 1024 * 1024;
-
   final S3Config config;
+
+  /// How requests are tried again after a network hiccup.
+  final RetryPolicy retry;
+
+  /// Where interrupted uploads and downloads are noted to be resumed; none
+  /// is resumed without it, and an interrupted upload is then aborted.
+  final TransferJournal? journal;
+
+  /// Size from which a file goes up in parts.
+  final int multipartThreshold;
+
+  /// Size of each part but the last; S3 wants at least 5 MiB.
+  final int partBytes;
+
   final HttpClient _client;
   final DateTime Function() _clock;
   final SigV4Signer _signer;
+
+  /// Size of the slices a body is written in, between progress reports.
+  static const _sendSlice = 256 * 1024;
 
   /// Closes the connections; the store cannot be used afterwards.
   void close() => _client.close(force: true);
@@ -57,178 +83,374 @@ class S3BlobStore implements BlobStore {
     String key,
     Uint8List bytes, {
     WriteCondition condition = WriteCondition.always,
+    TransferControl? control,
   }) async {
     checkBlobKey(key);
-    final response = await _send(
-      'PUT',
-      key,
-      body: bytes,
-      headers: switch (condition) {
-        AlwaysWrite() => const {},
-        WriteIfAbsent() => const {'if-none-match': '*'},
-        WriteIfMatch(:final etag) => {'if-match': etag},
-      },
-    );
-    await _expectOk(response, conditional: condition is! AlwaysWrite);
-    return (key: key, bytes: bytes.length, etag: _etagOf(response));
+    Future<BlobInfo> attempt() async {
+      final response = await _send(
+        'PUT',
+        key,
+        body: bytes,
+        headers: switch (condition) {
+          AlwaysWrite() => const {},
+          WriteIfAbsent() => const {'if-none-match': '*'},
+          WriteIfMatch(:final etag) => {'if-match': etag},
+        },
+        control: control,
+        onSent: (sent) => control?.report(sent, bytes.length),
+      );
+      await _expectOk(
+        response,
+        conditional: condition is! AlwaysWrite,
+        control: control,
+      );
+      return (key: key, bytes: bytes.length, etag: _etagOf(response));
+    }
+
+    // A conditional write that timed out may have landed: sent again, it
+    // would fail on its own success.
+    return condition is AlwaysWrite
+        ? retry.run(attempt, control: control)
+        : attempt();
   }
 
   @override
-  Future<BlobInfo> putFile(String key, File file) async {
+  Future<BlobInfo> putFile(
+    String key,
+    File file, {
+    TransferControl? control,
+  }) async {
     checkBlobKey(key);
     final length = await file.length();
     if (length <= multipartThreshold) {
-      return putBytes(key, await file.readAsBytes());
+      return putBytes(key, await file.readAsBytes(), control: control);
     }
-    return _putMultipart(key, file, length);
+    return _putMultipart(key, file, length, control);
   }
 
-  Future<BlobInfo> _putMultipart(String key, File file, int length) async {
-    final created = await _send('POST', key, query: {'uploads': ''});
-    final uploadId = parseSafeXml(await _expectOk(created))
-        .descendants('UploadId')
-        .firstOrNull
-        ?.text;
-    if (uploadId == null || uploadId.isEmpty) {
-      throw const BlobTransientFailure('Réponse S3 sans identifiant d’envoi.');
+  Future<BlobInfo> _putMultipart(
+    String key,
+    File file,
+    int length,
+    TransferControl? control,
+  ) async {
+    final modified = (await file.stat()).modified.toUtc();
+    final journalId = _journalId([
+      'put',
+      key,
+      file.absolute.path,
+      '$length',
+      '${modified.microsecondsSinceEpoch}',
+    ]);
+    final resumed = await _readUpload(journalId);
+    if (resumed != null) {
+      try {
+        return await _sendParts(key, file, length, resumed, journalId, control);
+      } on _UploadGone {
+        // The bucket dropped it (expired or aborted): start over.
+      }
     }
+    final created = await retry.run(
+      () async {
+        final response =
+            await _send('POST', key, query: {'uploads': ''}, control: control);
+        final uploadId = parseSafeXml(
+          await _expectOk(response, control: control),
+        ).descendants('UploadId').firstOrNull?.text;
+        if (uploadId == null || uploadId.isEmpty) {
+          throw const BlobTransientFailure(
+            'Réponse S3 sans identifiant d’envoi.',
+          );
+        }
+        return uploadId;
+      },
+      control: control,
+    );
+    final upload = _Upload(created, partBytes, {});
+    await journal?.write(journalId, upload.toJson());
     try {
-      final etags = <String>[];
+      return await _sendParts(key, file, length, upload, journalId, control);
+    } on _UploadGone {
+      throw const BlobTransientFailure('Envoi abandonné par le stockage.');
+    }
+  }
+
+  /// Sends the parts [upload] lacks, then assembles them. A transient
+  /// failure or a cancellation keeps the upload and its note for a resume
+  /// when there is a [journal]; anything else aborts it.
+  Future<BlobInfo> _sendParts(
+    String key,
+    File file,
+    int length,
+    _Upload upload,
+    String journalId,
+    TransferControl? control,
+  ) async {
+    try {
+      final count = (length + partBytes - 1) ~/ partBytes;
+      var done = 0;
       final handle = await file.open();
       try {
-        for (var offset = 0; offset < length; offset += partBytes) {
-          final part = await handle.read(partBytes);
-          final response = await _send(
-            'PUT',
-            key,
-            query: {
-              'partNumber': '${etags.length + 1}',
-              'uploadId': uploadId,
+        for (var number = 1; number <= count; number++) {
+          final offset = (number - 1) * partBytes;
+          final size = min(partBytes, length - offset);
+          if (upload.parts.containsKey(number)) {
+            done += size;
+            control?.report(done, length);
+            continue;
+          }
+          control?.check();
+          await handle.setPosition(offset);
+          final part = await handle.read(size);
+          final sentBefore = done;
+          upload.parts[number] = await retry.run(
+            () async {
+              final response = await _send(
+                'PUT',
+                key,
+                query: {
+                  'partNumber': '$number',
+                  'uploadId': upload.uploadId,
+                },
+                body: part,
+                control: control,
+                onSent: (sent) => control?.report(sentBefore + sent, length),
+              );
+              await _expectOk(response, control: control);
+              return _etagOf(response);
             },
-            body: part,
+            control: control,
           );
-          await _expectOk(response);
-          etags.add(_etagOf(response));
+          done += size;
+          await journal?.write(journalId, upload.toJson());
         }
       } finally {
         await handle.close();
       }
       final manifest = StringBuffer('<CompleteMultipartUpload>');
-      for (final (index, etag) in etags.indexed) {
-        manifest.write('<Part><PartNumber>${index + 1}</PartNumber>'
-            '<ETag>${const HtmlEscape().convert(etag)}</ETag></Part>');
+      for (var number = 1; number <= count; number++) {
+        manifest.write('<Part><PartNumber>$number</PartNumber>'
+            '<ETag>${const HtmlEscape().convert(upload.parts[number]!)}'
+            '</ETag></Part>');
       }
       manifest.write('</CompleteMultipartUpload>');
-      final done = await _send(
+      // Not retried: a completion sent twice fails with NoSuchUpload.
+      final completed = await _send(
         'POST',
         key,
-        query: {'uploadId': uploadId},
+        query: {'uploadId': upload.uploadId},
         body: utf8.encode(manifest.toString()),
+        control: control,
       );
-      final body = parseSafeXml(await _expectOk(done));
+      final body = parseSafeXml(await _expectOk(completed, control: control));
       // S3 may answer 200 with an <Error> body when completion fails late.
       if (body.localName == 'Error') {
         throw const BlobTransientFailure('Assemblage de l’envoi refusé.');
       }
+      await journal?.delete(journalId);
       final etag = body.descendants('ETag').firstOrNull?.text ?? '';
       return (key: key, bytes: length, etag: etag);
-    } catch (_) {
-      try {
-        await (await _send('DELETE', key, query: {'uploadId': uploadId}))
-            .drain<void>();
-      } on Object {
-        // The bucket drops abandoned uploads on its own; the first error
-        // is the one worth reporting.
+    } on Object catch (error) {
+      final resumable = journal != null &&
+          (error is BlobTransientFailure || error is BlobTransferCancelled);
+      if (!resumable) {
+        try {
+          await (await _send(
+            'DELETE',
+            key,
+            query: {'uploadId': upload.uploadId},
+          ))
+              .drain<void>();
+        } on Object {
+          // The bucket drops abandoned uploads on its own; the first error
+          // is the one worth reporting.
+        }
+        await journal?.delete(journalId);
+      }
+      rethrow;
+    }
+  }
+
+  /// The noted upload for [journalId], or null when there is none or it
+  /// was cut in parts of another size.
+  Future<_Upload?> _readUpload(String journalId) async {
+    final note = await journal?.read(journalId);
+    if (note == null) return null;
+    final upload = _Upload.fromJson(note);
+    if (upload == null || upload.partBytes != partBytes) {
+      await journal?.delete(journalId);
+      return null;
+    }
+    return upload;
+  }
+
+  @override
+  Future<({Uint8List bytes, BlobInfo info})?> getBytes(
+    String key, {
+    TransferControl? control,
+  }) async {
+    checkBlobKey(key);
+    return retry.run(
+      () async {
+        final response = await _send('GET', key, control: control);
+        if (response.statusCode == HttpStatus.notFound) {
+          await response.drain<void>();
+          return null;
+        }
+        final bytes = await _expectOk(response, control: control);
+        return (
+          bytes: bytes,
+          info: (key: key, bytes: bytes.length, etag: _etagOf(response)),
+        );
+      },
+      control: control,
+    );
+  }
+
+  @override
+  Future<BlobInfo?> download(
+    String key,
+    File target, {
+    TransferControl? control,
+  }) async {
+    checkBlobKey(key);
+    await target.parent.create(recursive: true);
+    final partial = File('${target.path}.part');
+    final journalId = _journalId(['get', key, target.absolute.path]);
+    final note = await journal?.read(journalId);
+    // The version the bytes in [partial] belong to; without it they are
+    // leftovers of unknown origin.
+    var etag = note?['etag'] is String ? note!['etag'] as String : null;
+    if (etag == null) await _deleteQuietly(partial);
+    try {
+      final got = await retry.run(
+        () async {
+          final have = etag != null && await partial.exists()
+              ? await partial.length()
+              : 0;
+          final response = await _send(
+            'GET',
+            key,
+            headers: {
+              if (have > 0) 'range': 'bytes=$have-',
+              if (have > 0) 'if-match': etag!,
+            },
+            control: control,
+          );
+          final status = response.statusCode;
+          if (status == HttpStatus.notFound) {
+            await response.drain<void>();
+            return null;
+          }
+          if (have > 0 &&
+              (status == HttpStatus.preconditionFailed ||
+                  status == HttpStatus.requestedRangeNotSatisfiable)) {
+            // Changed since, or already whole: fetch it again from the start.
+            await response.drain<void>();
+            await _deleteQuietly(partial);
+            etag = null;
+            throw const BlobTransientFailure(
+              'Objet modifié, reprise à zéro.',
+            );
+          }
+          if (status != HttpStatus.ok && status != HttpStatus.partialContent) {
+            await _expectOk(response, control: control);
+          }
+          final append = status == HttpStatus.partialContent;
+          final start = append ? have : 0;
+          final total = response.contentLength < 0
+              ? -1
+              : start + response.contentLength;
+          if (!append) {
+            etag = _etagOf(response);
+            await journal?.write(journalId, {'etag': etag});
+          }
+          var bytes = start;
+          final sink = partial.openWrite(
+            mode: append ? FileMode.append : FileMode.write,
+          );
+          try {
+            await for (final chunk in response) {
+              control?.check();
+              bytes += chunk.length;
+              sink.add(chunk);
+              control?.report(bytes, total);
+            }
+            await sink.flush();
+          } on Object catch (error) {
+            throw _failure(error, control);
+          } finally {
+            await sink.close();
+          }
+          return (bytes: bytes, etag: etag ?? '');
+        },
+        control: control,
+      );
+      if (got == null) {
+        await _deleteQuietly(partial);
+        await journal?.delete(journalId);
+        return null;
+      }
+      await partial.rename(target.path);
+      await journal?.delete(journalId);
+      return (key: key, bytes: got.bytes, etag: got.etag);
+    } on Object catch (error) {
+      final resumable = journal != null &&
+          (error is BlobTransientFailure || error is BlobTransferCancelled);
+      if (!resumable) {
+        await _deleteQuietly(partial);
+        await journal?.delete(journalId);
       }
       rethrow;
     }
   }
 
   @override
-  Future<({Uint8List bytes, BlobInfo info})?> getBytes(String key) async {
-    checkBlobKey(key);
-    final response = await _send('GET', key);
-    if (response.statusCode == HttpStatus.notFound) {
-      await response.drain<void>();
-      return null;
-    }
-    final bytes = await _expectOk(response);
-    return (
-      bytes: bytes,
-      info: (key: key, bytes: bytes.length, etag: _etagOf(response)),
-    );
-  }
-
-  @override
-  Future<BlobInfo?> download(String key, File target) async {
-    checkBlobKey(key);
-    final response = await _send('GET', key);
-    if (response.statusCode == HttpStatus.notFound) {
-      await response.drain<void>();
-      return null;
-    }
-    if (response.statusCode != HttpStatus.ok) {
-      await _expectOk(response);
-    }
-    await target.parent.create(recursive: true);
-    final partial = File('${target.path}.part');
-    var bytes = 0;
-    final sink = partial.openWrite();
-    try {
-      await for (final chunk in response) {
-        bytes += chunk.length;
-        sink.add(chunk);
-      }
-      await sink.flush();
-    } on Object catch (error) {
-      await sink.close();
-      await _deleteQuietly(partial);
-      throw _transient(error);
-    }
-    await sink.close();
-    await partial.rename(target.path);
-    return (key: key, bytes: bytes, etag: _etagOf(response));
-  }
-
-  @override
   Future<BlobInfo?> head(String key) async {
     checkBlobKey(key);
-    final response = await _send('HEAD', key);
-    await response.drain<void>();
-    if (response.statusCode == HttpStatus.notFound) return null;
-    _checkStatus(response.statusCode, conditional: false);
-    return (
-      key: key,
-      bytes: response.contentLength < 0 ? 0 : response.contentLength,
-      etag: _etagOf(response),
-    );
+    return retry.run(() async {
+      final response = await _send('HEAD', key);
+      await response.drain<void>();
+      if (response.statusCode == HttpStatus.notFound) return null;
+      _checkStatus(response.statusCode, conditional: false);
+      return (
+        key: key,
+        bytes: response.contentLength < 0 ? 0 : response.contentLength,
+        etag: _etagOf(response),
+      );
+    });
   }
 
   @override
   Future<void> delete(String key) async {
     checkBlobKey(key);
-    final response = await _send('DELETE', key);
-    if (response.statusCode == HttpStatus.notFound) {
-      await response.drain<void>();
-      return;
-    }
-    await _expectOk(response);
+    await retry.run(() async {
+      final response = await _send('DELETE', key);
+      if (response.statusCode == HttpStatus.notFound) {
+        await response.drain<void>();
+        return;
+      }
+      await _expectOk(response);
+    });
   }
 
   @override
   Stream<BlobInfo> list(String prefix) async* {
     String? token;
     do {
-      final response = await _send(
-        'GET',
-        null,
-        query: {
-          'list-type': '2',
-          'prefix': prefix,
-          if (token != null) 'continuation-token': token,
-        },
-      );
-      final root = parseSafeXml(await _expectOk(response));
+      final page = token;
+      final root = await retry.run(() async {
+        final response = await _send(
+          'GET',
+          null,
+          query: {
+            'list-type': '2',
+            'prefix': prefix,
+            if (page != null) 'continuation-token': page,
+          },
+        );
+        return parseSafeXml(await _expectOk(response));
+      });
       for (final item in root.childrenNamed('Contents')) {
         yield (
           key: item.child('Key')?.text ?? '',
@@ -242,14 +464,18 @@ class S3BlobStore implements BlobStore {
   }
 
   /// Sends one signed request for [key], or for the bucket itself when
-  /// [key] is null.
+  /// [key] is null. [onSent] hears how many bytes of [body] went out; a
+  /// cancelled [control] aborts the request.
   Future<HttpClientResponse> _send(
     String method,
     String? key, {
     Map<String, String> query = const {},
     Map<String, String> headers = const {},
     List<int>? body,
+    TransferControl? control,
+    void Function(int sent)? onSent,
   }) async {
+    control?.check();
     final basePath = config.endpoint.path.endsWith('/')
         ? config.endpoint.path.substring(0, config.endpoint.path.length - 1)
         : config.endpoint.path;
@@ -275,14 +501,28 @@ class S3BlobStore implements BlobStore {
     );
     try {
       final request = await _client.openUrl(method, uri);
+      // Stops a request still waiting for its answer; a download already
+      // streaming stops at its next chunk.
+      control?.whenCancelled.then((_) {
+        try {
+          request.abort(const BlobTransferCancelled());
+        } on Object {
+          // Already over.
+        }
+      });
       for (final entry in {...headers, ...signed}.entries) {
         request.headers.set(entry.key, entry.value, preserveHeaderCase: true);
       }
       request.contentLength = payload.length;
-      if (payload.isNotEmpty) request.add(payload);
+      for (var offset = 0; offset < payload.length; offset += _sendSlice) {
+        final end = min(offset + _sendSlice, payload.length);
+        request.add(payload.sublist(offset, end));
+        await request.flush();
+        onSent?.call(end);
+      }
       return await request.close();
     } on Object catch (error) {
-      throw _transient(error);
+      throw _failure(error, control);
     }
   }
 
@@ -290,6 +530,7 @@ class S3BlobStore implements BlobStore {
   Future<Uint8List> _expectOk(
     HttpClientResponse response, {
     bool conditional = false,
+    TransferControl? control,
   }) async {
     final Uint8List bytes;
     try {
@@ -299,7 +540,7 @@ class S3BlobStore implements BlobStore {
       }
       bytes = builder.takeBytes();
     } on Object catch (error) {
-      throw _transient(error);
+      throw _failure(error, control);
     }
     _checkStatus(response.statusCode, conditional: conditional, body: bytes);
     return bytes;
@@ -322,6 +563,9 @@ class S3BlobStore implements BlobStore {
     if (status == HttpStatus.notFound && code == 'NoSuchBucket') {
       throw BlobAccessDenied('Bucket « ${config.bucket} » introuvable.');
     }
+    if (status == HttpStatus.notFound && code == 'NoSuchUpload') {
+      throw const _UploadGone();
+    }
     throw BlobTransientFailure(
       'Le stockage a répondu $status${code == null ? '' : ' ($code)'}.',
     );
@@ -339,12 +583,24 @@ class S3BlobStore implements BlobStore {
   static String _etagOf(HttpClientResponse response) =>
       response.headers.value(HttpHeaders.etagHeader) ?? '';
 
-  static BlobStoreException _transient(Object error) => switch (error) {
-        BlobStoreException() => error,
-        SocketException() || TimeoutException() || HandshakeException() =>
-          const BlobTransientFailure('Stockage injoignable.'),
-        _ => BlobTransientFailure('Échange interrompu : $error'),
-      };
+  /// An id for the journal note of one transfer on this bucket.
+  String _journalId(List<String> parts) => sha256
+      .convert(utf8.encode(
+        [config.endpoint.toString(), config.bucket, ...parts].join('\n'),
+      ))
+      .toString();
+
+  /// [error] as a store failure: cancelled when [control] was, else as it
+  /// is when already one, else transient.
+  static Object _failure(Object error, TransferControl? control) {
+    if (control?.isCancelled ?? false) return const BlobTransferCancelled();
+    return switch (error) {
+      BlobStoreException() || _UploadGone() => error,
+      SocketException() || TimeoutException() || HandshakeException() =>
+        const BlobTransientFailure('Stockage injoignable.'),
+      _ => BlobTransientFailure('Échange interrompu : $error'),
+    };
+  }
 
   static Future<void> _deleteQuietly(File file) async {
     try {
@@ -353,4 +609,42 @@ class S3BlobStore implements BlobStore {
       // Already gone.
     }
   }
+}
+
+/// A multipart upload under way: its id, the part size it was cut in and
+/// the tag of each part already stored, by part number.
+class _Upload {
+  _Upload(this.uploadId, this.partBytes, this.parts);
+
+  final String uploadId;
+  final int partBytes;
+  final Map<int, String> parts;
+
+  static _Upload? fromJson(Map<String, Object?> json) {
+    final uploadId = json['uploadId'];
+    final partBytes = json['partBytes'];
+    final parts = json['parts'];
+    if (uploadId is! String || partBytes is! int || parts is! Map) return null;
+    final read = <int, String>{};
+    for (final entry in parts.entries) {
+      final number = int.tryParse('${entry.key}');
+      final etag = entry.value;
+      if (number == null || etag is! String) return null;
+      read[number] = etag;
+    }
+    return _Upload(uploadId, partBytes, read);
+  }
+
+  Map<String, Object?> toJson() => {
+        'uploadId': uploadId,
+        'partBytes': partBytes,
+        'parts': {
+          for (final entry in parts.entries) '${entry.key}': entry.value,
+        },
+      };
+}
+
+/// The bucket no longer knows the multipart upload.
+class _UploadGone implements Exception {
+  const _UploadGone();
 }

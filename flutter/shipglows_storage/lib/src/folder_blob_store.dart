@@ -3,8 +3,12 @@
 ///
 /// Each object is a plain file at its key under the folder. Writes go to a
 /// file named with [FolderBlobStore.incomingSuffix] first and are renamed in
-/// place, so the sync client never uploads half a file. The tag of an object is the SHA-256 of
-/// its bytes, which the sync client keeps when it copies the file elsewhere.
+/// place, so the sync client never uploads half a file. The tag of an object
+/// is the SHA-256 of its bytes, which the sync client keeps when it copies
+/// the file elsewhere.
+///
+/// A copy is local and short: a cancelled one starts over, there is nothing
+/// to resume or retry.
 library;
 
 import 'dart:async';
@@ -14,6 +18,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import 'blob_store.dart';
+import 'transfer.dart';
 
 class FolderBlobStore implements BlobStore {
   FolderBlobStore(this.root, {this.incomingSuffix = '.shipglows-incoming'});
@@ -39,6 +44,7 @@ class FolderBlobStore implements BlobStore {
     String key,
     Uint8List bytes, {
     WriteCondition condition = WriteCondition.always,
+    TransferControl? control,
   }) {
     final File file;
     try {
@@ -47,6 +53,7 @@ class FolderBlobStore implements BlobStore {
       return Future.error(error);
     }
     final result = _writing.then((_) async {
+      control?.check();
       await _ensureRoot();
       if (condition is! AlwaysWrite) {
         final current = await _infoOf(key, file);
@@ -57,7 +64,11 @@ class FolderBlobStore implements BlobStore {
         };
         if (!allowed) throw const BlobPreconditionFailed();
       }
-      await _replace(file, (partial) => partial.writeAsBytes(bytes, flush: true));
+      await _replace(
+        file,
+        (partial) => partial.writeAsBytes(bytes, flush: true),
+      );
+      control?.report(bytes.length, bytes.length);
       return (
         key: key,
         bytes: bytes.length,
@@ -69,36 +80,31 @@ class FolderBlobStore implements BlobStore {
   }
 
   @override
-  Future<BlobInfo> putFile(String key, File source) async {
+  Future<BlobInfo> putFile(
+    String key,
+    File source, {
+    TransferControl? control,
+  }) async {
     final file = _fileOf(key);
     await _ensureRoot();
-    late Digest digest;
-    var bytes = 0;
+    final total = await source.length();
+    late ({int bytes, Digest digest}) copied;
     await _replace(file, (partial) async {
-      final output = _DigestSink<Digest>();
-      final hasher = sha256.startChunkedConversion(output);
-      final sink = partial.openWrite();
-      try {
-        await for (final chunk in source.openRead()) {
-          bytes += chunk.length;
-          hasher.add(chunk);
-          sink.add(chunk);
-        }
-        await sink.flush();
-      } finally {
-        await sink.close();
-      }
-      hasher.close();
-      digest = output.events.single;
+      copied = await _copy(source.openRead(), partial, total, control);
     });
-    return (key: key, bytes: bytes, etag: digest.toString());
+    return (key: key, bytes: copied.bytes, etag: copied.digest.toString());
   }
 
   @override
-  Future<({Uint8List bytes, BlobInfo info})?> getBytes(String key) async {
+  Future<({Uint8List bytes, BlobInfo info})?> getBytes(
+    String key, {
+    TransferControl? control,
+  }) async {
     final file = _fileOf(key);
+    control?.check();
     try {
       final bytes = await file.readAsBytes();
+      control?.report(bytes.length, bytes.length);
       return (
         bytes: bytes,
         info: (
@@ -115,16 +121,24 @@ class FolderBlobStore implements BlobStore {
   }
 
   @override
-  Future<BlobInfo?> download(String key, File target) async {
+  Future<BlobInfo?> download(
+    String key,
+    File target, {
+    TransferControl? control,
+  }) async {
     final file = _fileOf(key);
     if (!await file.exists()) return null;
     await target.parent.create(recursive: true);
+    late ({int bytes, Digest digest}) copied;
     try {
-      await _replace(target, (partial) => file.copy(partial.path));
+      final total = await file.length();
+      await _replace(target, (partial) async {
+        copied = await _copy(file.openRead(), partial, total, control);
+      });
     } on PathNotFoundException {
       return null;
     }
-    return _infoOf(key, target);
+    return (key: key, bytes: copied.bytes, etag: copied.digest.toString());
   }
 
   @override
@@ -189,7 +203,36 @@ class FolderBlobStore implements BlobStore {
     }
   }
 
-  /// Writes [target] through a temporary file next to it.
+  /// Writes [from] to [partial], hashing it and reporting to [control],
+  /// which is checked between chunks.
+  static Future<({int bytes, Digest digest})> _copy(
+    Stream<List<int>> from,
+    File partial,
+    int total,
+    TransferControl? control,
+  ) async {
+    final output = _DigestSink<Digest>();
+    final hasher = sha256.startChunkedConversion(output);
+    final sink = partial.openWrite();
+    var bytes = 0;
+    try {
+      await for (final chunk in from) {
+        control?.check();
+        bytes += chunk.length;
+        hasher.add(chunk);
+        sink.add(chunk);
+        control?.report(bytes, total);
+      }
+      await sink.flush();
+    } finally {
+      await sink.close();
+    }
+    hasher.close();
+    return (bytes: bytes, digest: output.events.single);
+  }
+
+  /// Writes [target] through a temporary file next to it; nothing is left
+  /// behind when [write] fails or is cancelled.
   Future<void> _replace(
     File target,
     Future<void> Function(File partial) write,
@@ -199,13 +242,15 @@ class FolderBlobStore implements BlobStore {
       await target.parent.create(recursive: true);
       await write(partial);
       await partial.rename(target.path);
-    } on FileSystemException catch (error) {
+    } on Object catch (error) {
       try {
         await partial.delete();
       } on FileSystemException {
         // Nothing was written.
       }
-      if (error is PathNotFoundException) rethrow;
+      if (error is! FileSystemException || error is PathNotFoundException) {
+        rethrow;
+      }
       throw _failure(error);
     }
   }
