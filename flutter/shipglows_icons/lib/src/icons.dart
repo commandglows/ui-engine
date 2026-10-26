@@ -263,6 +263,11 @@ abstract final class ShipglowsIcons {
   /// Send to the tray, keep running.
   static const IconData toTray = LucideIcons.arrowDownRight;
 
+  /// A value that went up, down, or did not move.
+  static const IconData trendUp = LucideIcons.trendingUp;
+  static const IconData trendDown = LucideIcons.trendingDown;
+  static const IconData trendFlat = LucideIcons.moveRight;
+
   /// Every base icon by name, the names shared with the menu model and the
   /// Astro sites.
   static const Map<String, IconData> byName = {
@@ -351,6 +356,9 @@ abstract final class ShipglowsIcons {
     'syncing': syncing,
     'conflict': conflict,
     'toTray': toTray,
+    'trendUp': trendUp,
+    'trendDown': trendDown,
+    'trendFlat': trendFlat,
   };
 
   /// The icon named [name] for [context]: the app's [ShipglowsIconSet]

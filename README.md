@@ -1082,6 +1082,69 @@ try {
 }
 ```
 
+## `flutter/shipglows_metrics`
+
+Metrics dashboards: the same tiles, trends and layout in every app. Only
+draws: the app fetches, computes and formats its values (currency, units,
+locale) and hands them over. Depends on `shipglows_theme` and
+`shipglows_icons`.
+
+- `Metric(label:, value:, delta:, series:, caption:)`: one value, already
+  formatted (« 1 240 € »), its change and its recent values, oldest first.
+- `MetricDelta(0.12, polarity:, label:)`: the change as a fraction.
+  `MetricPolarity.higherIsBetter` (default), `lowerIsBetter` (load time,
+  churn) or `neutral` decides the color; under `flatThreshold` (0.5 %) it
+  counts as unchanged. `label` replaces the default « +12 % ».
+- `MetricTile(metric, onTap:)`: label, value in `fontDisplay` with tabular
+  figures, `MetricDeltaBadge`, caption and sparkline on `surfaceRaised` with
+  a `border` outline. Read as one sentence (« Revenue, 1 240 €, up 12 %,
+  vs. last week »). `MetricTile.loading(label:)`, `.empty(label:, message:)`
+  and `.error(label:, message:, onRetry:)` keep the label and the value
+  line's height, so the dashboard does not jump when data arrives.
+- `MetricDeltaBadge(delta)`: arrow and signed text in a pill, `success` when
+  good, `danger` when bad, `textMuted` when neither, so the trend never
+  rests on color alone. New base icons `trendUp`, `trendDown`, `trendFlat`.
+- `MetricSparkline(values, color:)`: a small line with a faint area under
+  it, decorative (no semantics); nothing under two values. In a tile it
+  takes the badge's color.
+- `MetricGrid(children:, minTileWidth: 220, maxColumns: 4)`: equal columns,
+  as many as fit, the tiles of a row as tall as the tallest; one column on a
+  phone. Its children must not use `LayoutBuilder` (rows are measured with
+  `IntrinsicHeight`).
+- `MetricSection(title:, trailing:, child:)`: a heading, a control on its
+  right (under it below 480 wide), then the grid.
+- `MetricPeriodSelector(periods: [MetricPeriod(value, '7 j'), …], selected:,
+  onChanged:)`: the periods as a segmented button, `highlight` on the
+  selected one.
+- `MetricStrings.en`, `.fr` (picked from the app locale) or the app's own;
+  `MetricStringsScope` in `MaterialApp.builder` for the whole app.
+
+```dart
+MetricSection(
+  title: 'Activité',
+  trailing: MetricPeriodSelector(
+    periods: const [MetricPeriod(7, '7 j'), MetricPeriod(30, '30 j')],
+    selected: days,
+    onChanged: setDays,
+  ),
+  child: MetricGrid(children: [
+    MetricTile(Metric(
+      label: 'Revenus',
+      value: '1 240 €',
+      delta: const MetricDelta(0.12),
+      series: revenueByDay,
+      caption: 'vs. 7 jours précédents',
+    )),
+    const MetricTile(Metric(
+      label: 'Temps de chargement',
+      value: '1,2 s',
+      delta: MetricDelta(-0.08, polarity: MetricPolarity.lowerIsBetter),
+    )),
+    const MetricTile.loading(label: 'Utilisateurs actifs'),
+  ]),
+)
+```
+
 ## `flutter/shipglows_notification_center`
 
 The notification center: the latest lasting notifications (a new replay, a
