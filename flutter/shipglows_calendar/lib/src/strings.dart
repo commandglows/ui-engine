@@ -328,6 +328,12 @@ class CalendarStrings {
     return _french ? '$day à $time' : '$day at $time';
   }
 
+  /// « lundi 26 octobre 2026 à 09:00 », « Monday, October 26, 2026 at 09:00 ».
+  String longDateTime(DateTime date) {
+    final time = '${_two(date.hour)}:${_two(date.minute)}';
+    return _french ? '${longDate(date)} à $time' : '${longDate(date)} at $time';
+  }
+
   /// « 12 – 18 oct. », « 28 sept. – 4 oct. » across months. English days
   /// stay whole on both sides: « Oct 12 – Oct 18 ».
   String shortRange(DateTime start, DateTime end, {DateTime? reference}) {

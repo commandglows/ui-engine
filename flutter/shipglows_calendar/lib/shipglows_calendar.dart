@@ -6,6 +6,7 @@ library;
 
 export 'src/agenda.dart';
 export 'src/calendar.dart';
+export 'src/date_field.dart';
 export 'src/dates.dart';
 export 'src/day_strip.dart';
 export 'src/event.dart';
