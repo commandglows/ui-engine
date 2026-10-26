@@ -1,10 +1,10 @@
 ---
 artifact: technical_context
 metadata_schema_version: "1.0"
-artifact_version: "1.3.0"
+artifact_version: "1.4.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
-updated: "2026-10-25"
+updated: "2026-10-26"
 status: active
 source_skill: sg-docs
 scope: package-map
@@ -26,6 +26,7 @@ evidence:
   - "2026-10-23: DreamGlows (6ba8566, PathTheme preset, mode and calendar zone) consumes shipglows_settings."
   - "2026-10-25: shipglows_updater added (WinSparkle on Windows from ContentGlows, verified sideloaded APK on Android, releases in a public shipglows-releases repository); no consumer yet, not run on a device."
   - "2026-10-23: shipglows_flutter_zoom added after its move from shipglows-email-engine (ea6ec1a); Ctrl+= / Ctrl+- / Ctrl+0 checked by the operator in CommandGlows."
+  - "2026-10-26: shipglows_clerk_auth added from the CommandGlows Clerk OIDC spike (proven by the operator on Android and Windows); decision: Clerk is the single auth provider, one Clerk application per product."
 next_review: "2027-01-22"
 next_step: "Update the consumer column when an app adopts or drops a package."
 ---
@@ -59,6 +60,7 @@ do nothing or fall back to plain Flutter.
 | `shipglows_feedback` | In-app messages info/success/warning/error: `showFeedback` / `context.showError`…, floating snack bar from `ShipglowsTheme` (new `success` and `warning` roles), durations by kind, repeats not queued, kind spoken (`FeedbackStrings` FR/EN, app-wide `FeedbackStringsScope`), `FeedbackMessenger` read before an await, « Copy details » (`details:`), a second action, `FeedbackInline` (in place, announced), `FeedbackErrorState` (retry, compact), `FeedbackLog` of messages shown; `shipglows_undo_trash` draws its « Undo » snack bar with it | no | `shipglows_undo_trash`, BeatGlows, BestFriedChicken, Claiire, CommandGlows, CommunityGlows, ContentGlows, DreamGlows, GoCharbon, ReplayGlows, ShipGlows app (2026-10-24) |
 | `shipglows_notification_center` | Notification center: latest notifications read/unread, open, delete, « Mark all as read », « Delete all » (confirmed), unread summary and `NotificationBadge` / `NotificationBellButton`, empty and error states (`FeedbackErrorState`); storage is a `NotificationStore` port (callback, memory); `FeedbackHistory` keeps the in-app messages shown (`FeedbackLog` of `shipglows_feedback`); `NotificationStrings` FR/EN | no | ReplayGlows (2026-10-25) |
 | `shipglows_onboarding` | First-run introduction: two-column card of `OnboardingPage`s (language, welcome, features, access) with previews, segmented progress bar, narrow single-column layout, per-account `OnboardingGate` over an `OnboardingCompletionStore`, `OnboardingThemeData`; extracted from the ReplayGlows introduction | no | ReplayGlows (web; key `onboarding_completed:v1:<user>`) |
+| `shipglows_clerk_auth` | Clerk sign-in for native apps without the beta Clerk SDK: OIDC Authorization Code + PKCE through the system browser (Custom Tab, Windows loopback), `ClerkAuthClient` (`restore`, `signIn`, `accessToken` with refresh, `signOut` with revocation), session in secure storage per OAuth client; one Clerk application and one public OAuth client per product | via plugin dep (`flutter_web_auth_2`, `flutter_secure_storage`) | CommandGlows (Android + Windows, 2026-10-26) |
 
 ## Cross-Package Contracts
 

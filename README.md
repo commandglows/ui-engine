@@ -1538,3 +1538,63 @@ the demo or creating an account does; the package only draws and asks.
 ```dart
 if (await showDemoExitDialog(context)) await repository.exitDemoMode();
 ```
+
+## `flutter/shipglows_clerk_auth`
+
+Clerk sign-in for native apps (Android, Windows), without the Clerk Flutter
+SDK (still beta). OpenID Connect, Authorization Code + PKCE (S256), through
+the system browser: a Custom Tab on Android, the default browser with a
+loopback listener on Windows (RFC 8252, no embedded webview).
+
+- One Clerk application per product, one **public** OAuth client in it (no
+  secret, « Require PKCE » on, consent screen off), with exactly these
+  redirect URIs: `<scheme>://oauth/clerk` and
+  `http://localhost:<port>/callback`. The scheme is reverse-DNS and
+  lowercase, usually the Android application id; `_` is not allowed in a
+  scheme, so drop it when the id has one.
+- `ClerkAuthConfig.fromEnvironment(androidScheme:, desktopPort:)` reads
+  `CLERK_OIDC_ISSUER` (the instance's Frontend API URL) and
+  `CLERK_OIDC_CLIENT_ID` from `--dart-define`; both are public values.
+- `ClerkAuthClient`: `restore()` once at launch, `signIn()`,
+  `accessToken()` (refreshed shortly before expiry, one refresh at a time),
+  `signOut()` (revokes the refresh token, forgets the session); `session`
+  is a `ValueListenable` for the UI. A revoked session is forgotten; offline,
+  the stored one is kept.
+- The session lives in secure storage (Keystore on Android, DPAPI on
+  Windows), one entry per OAuth client; `MemoryClerkSessionStore` for tests.
+- Every failure is a `ClerkAuthException` with a stable `code`
+  (`canceled`, `invalid_grant` → sign in again, `network`…), never a token.
+- Signing out does not sign the browser out of Clerk: the next sign-in may
+  complete at once with the same account.
+
+Android: the app declares the callback activity of `flutter_web_auth_2` in
+its `AndroidManifest.xml`, with its scheme:
+
+```xml
+<activity android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+    android:exported="true" android:taskAffinity="">
+  <intent-filter android:label="flutter_web_auth_2">
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="com.example.app" />
+  </intent-filter>
+</activity>
+```
+
+```dart
+final clerk = ClerkAuthClient(
+  config: ClerkAuthConfig.fromEnvironment(
+    androidScheme: 'com.example.app',
+    desktopPort: 47821,
+  ),
+);
+await clerk.restore();
+final token = await clerk.accessToken(); // Bearer for the product backend
+```
+
+Schemes and desktop ports in use: CommandGlows `com.commandglows.app` 47821,
+ShipGlows app `com.shipglows.app` 47822, GoCharbon `fr.gocharbon.quiz`
+47823, ReplayGlows `com.replayglows.app` 47824, ContentGlows
+`com.contentglows.app` 47825. The Clerk applications and client ids are listed
+in CommandGlows `shipglows_data/workflow/docs/technical/suite-authentication.md`.
