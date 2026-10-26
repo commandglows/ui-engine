@@ -963,6 +963,45 @@ Flutter; `shipglows_settings` builds on it, and business-data stores can too.
   `.en`, `forLocale`; `labelOf` / `describe` name settings and values in the
   app's words.
 
+## `flutter/shipglows_storage`
+
+Files kept away from this computer (audio, video, images), extracted from
+BeatGlows. Business-data sync is not here: it belongs to `shipglows_sync`.
+The chosen provider is Cloudflare R2, spoken to only through the S3 API so
+another S3-compatible bucket is an endpoint change.
+
+- `BlobStore`: `putBytes` (with `WriteCondition.always`, `.ifAbsent`,
+  `.ifMatch(etag)`), `putFile` (streamed), `getBytes`, `download` (to a
+  `.part` file, then renamed), `head`, `delete`, `list(prefix)`. A key is a
+  relative forward-slash path (`checkBlobKey`). Failures are a sealed
+  `BlobStoreException` with a French message: `BlobPreconditionFailed`,
+  `BlobAccessDenied` (do not retry), `BlobTransientFailure` (may retry),
+  `BlobInvalidKey`.
+- `S3BlobStore(config)`: path-style requests over `dart:io`, signed by
+  `SigV4Signer` (checked on the AWS test vectors), no AWS SDK; files over
+  64 MB go up in 16 MB parts and a failed upload is aborted.
+- `FolderBlobStore(root, incomingSuffix:)`: a folder kept in sync by another
+  program; writes go through a temporary file, the tag is the SHA-256, a
+  missing root (unmounted drive) is reported, never created.
+- `MemoryBlobStore` for tests; `parseS3Endpoint` (https, or http on this
+  computer for MinIO) and `testBlobStore` (write, read back, delete a probe)
+  for a settings page.
+- Tests: one contract suite run on every store; the S3 run needs
+  `SHIPGLOWS_S3_ENDPOINT`, `_BUCKET`, `_REGION`, `_KEY_ID`, `_SECRET` and is
+  skipped without them.
+
+Not yet: progress, cancellation, retry, resumable uploads, a local cache,
+and the backend-signed uploader (presigned parts) used by ContentGlows.
+
+## `flutter/shipglows_xml`
+
+A small XML reader for untrusted documents, extracted from BeatGlows:
+`parseSafeXml` builds a `SafeXmlNode` tree (`child`, `childrenNamed`,
+`descendants`, `text`) and rejects every `<!` declaration but an optional
+plain `DOCTYPE`, so entities are never expanded; `SafeXmlLimits` bounds size,
+depth, node count and text. Used by `shipglows_storage` for S3 answers and by
+BeatGlows for MusicXML and Guitar Pro.
+
 ## `flutter/shipglows_settings`
 
 User settings (not business data), merged from CommandGlows (sync engine),
