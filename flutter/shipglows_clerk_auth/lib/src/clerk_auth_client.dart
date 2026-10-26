@@ -12,6 +12,10 @@ import 'clerk_browser.dart';
 import 'clerk_session.dart';
 import 'clerk_session_store.dart';
 
+/// Same margin as the access token: an id_token this close to `exp` is
+/// refreshed before use.
+const _idTokenMargin = Duration(minutes: 2);
+
 /// Signs in with Clerk's hosted pages and keeps the session across launches.
 ///
 /// Call [restore] once at launch, then read [session]. [accessToken] returns
@@ -135,6 +139,31 @@ class ClerkAuthClient {
       return current.accessToken;
     }
     return (await _refresh(current)).accessToken;
+  }
+
+  /// A usable id_token for the product backend (Convex checks it), or `null`
+  /// when signed out. Refreshes first when the stored id_token is missing or
+  /// its `exp` falls within the freshness margin. A refresh that returns no
+  /// id_token keeps the previous one only while it is still valid; otherwise
+  /// this throws [ClerkAuthException] rather than sending a stale token.
+  Future<String?> idToken() async {
+    final current = _session.value;
+    if (current == null) {
+      return null;
+    }
+    final stored = current.idToken;
+    if (stored != null && _isIdTokenFresh(stored, _clock())) {
+      return stored;
+    }
+    final refreshed = await _refresh(current);
+    final fresh = refreshed.idToken;
+    if (fresh != null && _isIdTokenFresh(fresh, _clock())) {
+      return fresh;
+    }
+    throw const ClerkAuthException(
+      'id-token-unavailable',
+      'No fresh id_token after refresh.',
+    );
   }
 
   /// Revokes the refresh token (best effort) and forgets the session.
@@ -268,6 +297,34 @@ class ClerkAuthClient {
         'unsupported-platform',
         'Clerk native sign-in runs on Android and Windows.',
       );
+    }
+  }
+
+  static bool _isIdTokenFresh(String jwt, DateTime now) {
+    final expiresAt = _jwtExpiry(jwt);
+    return expiresAt != null &&
+        now.toUtc().add(_idTokenMargin).isBefore(expiresAt);
+  }
+
+  /// The `exp` claim of a JWT, or `null` when it cannot be read.
+  static DateTime? _jwtExpiry(String jwt) {
+    final parts = jwt.split('.');
+    if (parts.length != 3) {
+      return null;
+    }
+    final payload = parts[1].padRight((parts[1].length + 3) ~/ 4 * 4, '=');
+    try {
+      final claims = jsonDecode(utf8.decode(base64Url.decode(payload)));
+      final exp = claims is Map ? claims['exp'] : null;
+      if (exp is! num) {
+        return null;
+      }
+      return DateTime.fromMillisecondsSinceEpoch(
+        exp.toInt() * 1000,
+        isUtc: true,
+      );
+    } on FormatException {
+      return null;
     }
   }
 
