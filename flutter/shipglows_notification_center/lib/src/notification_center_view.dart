@@ -271,8 +271,15 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
                     ),
                   )
                 : ListView.builder(
-              itemCount: items.length,
+              itemCount: items.length + (controller.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == items.length) {
+                  return _LoadMore(
+                    controller: controller,
+                    label: texts.loadingMore,
+                    onError: widget.onError,
+                  );
+                }
                 final item = items[index];
                 return NotificationTile(
                   key: ValueKey(item.id),
@@ -309,8 +316,73 @@ void _report(
     NotificationOperation.markAllRead => texts.markReadFailed,
     NotificationOperation.delete ||
     NotificationOperation.deleteAll => texts.deleteFailed,
+    NotificationOperation.loadMore => texts.loadFailed,
   };
   feedback.showError(message, details: () => '$error\n$stackTrace');
+}
+
+/// The end of a list with older pages: asks for the next one once built,
+/// that is once scrolled near.
+class _LoadMore extends StatefulWidget {
+  const _LoadMore({
+    required this.controller,
+    required this.label,
+    this.onError,
+  });
+
+  final NotificationCenterController controller;
+  final String label;
+  final NotificationErrorHandler? onError;
+
+  @override
+  State<_LoadMore> createState() => _LoadMoreState();
+}
+
+class _LoadMoreState extends State<_LoadMore> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        widget.controller.loadMore().catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          final onError = widget.onError;
+          if (onError != null) {
+            onError(error, stackTrace, NotificationOperation.loadMore);
+          } else {
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stackTrace,
+                library: 'shipglows_notification_center',
+                context: ErrorDescription('loading older notifications'),
+              ),
+            );
+          }
+        }),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShipglowsTheme.of(context);
+    return Padding(
+      padding: EdgeInsets.all(theme.spaceMd),
+      child: Center(
+        child: SizedBox.square(
+          dimension: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            semanticsLabel: widget.label,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _FilterBar extends StatelessWidget {

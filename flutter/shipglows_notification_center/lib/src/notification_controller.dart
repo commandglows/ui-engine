@@ -6,7 +6,13 @@ import 'notification_item.dart';
 import 'notification_store.dart';
 
 /// The action that failed, for `NotificationCenterView.onError`.
-enum NotificationOperation { markRead, markAllRead, delete, deleteAll }
+enum NotificationOperation {
+  markRead,
+  markAllRead,
+  delete,
+  deleteAll,
+  loadMore,
+}
 
 /// The center's state over a [NotificationStore]: the list, loading and
 /// error, the unread count. Actions show at once (read, gone) and come back
@@ -32,6 +38,7 @@ class NotificationCenterController extends ChangeNotifier {
   String? _source;
   bool _markingAllRead = false;
   bool _deletingAll = false;
+  bool _loadingMore = false;
   bool _disposed = false;
 
   void _listen() {
@@ -39,6 +46,7 @@ class NotificationCenterController extends ChangeNotifier {
     _subscription = store.watch().listen(
       _onList,
       onError: (Object error, StackTrace stackTrace) {
+        _loadingMore = false;
         _error = error;
         _stackTrace = stackTrace;
         _notify();
@@ -49,6 +57,7 @@ class NotificationCenterController extends ChangeNotifier {
 
   void _onList(List<NotificationItem> list) {
     _snapshot = list;
+    _loadingMore = false;
     _error = null;
     _stackTrace = null;
     final byId = {for (final item in list) item.id: item};
@@ -123,6 +132,12 @@ class NotificationCenterController extends ChangeNotifier {
   bool get markingAllRead => _markingAllRead;
   bool get deletingAll => _deletingAll;
 
+  /// Older notifications are left to load.
+  bool get hasMore => store.hasMore;
+
+  /// A [loadMore] waits for its longer list.
+  bool get loadingMore => _loadingMore;
+
   bool get canDelete => store.canDelete;
   bool get canDeleteAll => store.canDeleteAll;
 
@@ -136,6 +151,21 @@ class NotificationCenterController extends ChangeNotifier {
       _listen();
     }
     await store.refresh();
+  }
+
+  /// Loads the next older page; does nothing while one is on its way or
+  /// when there is none. The page is in once the store's next list comes.
+  Future<void> loadMore() async {
+    if (_loadingMore || !store.hasMore) return;
+    _loadingMore = true;
+    _notify();
+    try {
+      await store.loadMore();
+    } catch (_) {
+      _loadingMore = false;
+      _notify();
+      rethrow;
+    }
   }
 
   /// Marks [id] read; does nothing when it already is.

@@ -30,12 +30,20 @@ abstract interface class NotificationStore {
   /// Deletes every notification in [ids] (the ones shown, never one that
   /// arrived after the confirmation).
   Future<void> deleteAll(List<String> ids);
+
+  /// Whether older notifications are left to load: the list then ends with
+  /// a loader that calls [loadMore] once it scrolls into view.
+  bool get hasMore;
+
+  /// Loads the next older page. The longer list comes through [watch].
+  Future<void> loadMore();
 }
 
 /// Plugs an existing client in (a backend subscription, a provider) without
 /// a dependency in this package. Without [delete] the delete buttons are
 /// hidden; without [deleteAll], « Delete all » deletes one by one through
-/// [delete].
+/// [delete]. With [hasMore] and [loadMore], the list loads older pages as
+/// it scrolls.
 class CallbackNotificationStore implements NotificationStore {
   const CallbackNotificationStore({
     required Stream<List<NotificationItem>> Function() watch,
@@ -44,12 +52,16 @@ class CallbackNotificationStore implements NotificationStore {
     Future<void> Function()? refresh,
     Future<void> Function(String id)? delete,
     Future<void> Function(List<String> ids)? deleteAll,
+    bool Function()? hasMore,
+    Future<void> Function()? loadMore,
   }) : _watch = watch,
        _markRead = markRead,
        _markAllRead = markAllRead,
        _refresh = refresh,
        _delete = delete,
-       _deleteAll = deleteAll;
+       _deleteAll = deleteAll,
+       _hasMore = hasMore,
+       _loadMore = loadMore;
 
   final Stream<List<NotificationItem>> Function() _watch;
   final Future<void> Function(String id) _markRead;
@@ -57,6 +69,8 @@ class CallbackNotificationStore implements NotificationStore {
   final Future<void> Function()? _refresh;
   final Future<void> Function(String id)? _delete;
   final Future<void> Function(List<String> ids)? _deleteAll;
+  final bool Function()? _hasMore;
+  final Future<void> Function()? _loadMore;
 
   @override
   Stream<List<NotificationItem>> watch() => _watch();
@@ -93,6 +107,12 @@ class CallbackNotificationStore implements NotificationStore {
       await delete(id);
     }
   }
+
+  @override
+  bool get hasMore => _loadMore != null && (_hasMore?.call() ?? false);
+
+  @override
+  Future<void> loadMore() async => _loadMore?.call();
 }
 
 /// In memory only: tests, previews, demo mode, a device-only log. Newest
@@ -185,6 +205,13 @@ class MemoryNotificationStore implements NotificationStore {
     _items.removeWhere((it) => wanted.contains(it.id));
     _emit();
   }
+
+  /// Everything is in memory: nothing more to load.
+  @override
+  bool get hasMore => false;
+
+  @override
+  Future<void> loadMore() async {}
 
   /// Closes the change stream; the store is not used after.
   Future<void> close() => _changes.close();

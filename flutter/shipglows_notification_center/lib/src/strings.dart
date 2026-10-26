@@ -29,6 +29,7 @@ class NotificationStrings {
     this.loadFailed = 'Could not load the notifications',
     this.markReadFailed = 'Could not mark as read',
     this.deleteFailed = 'Could not delete',
+    this.loadingMore = 'Loading older notifications',
     this.justNow = 'just now',
     this.minutesAgo = '{n} min ago',
     this.hoursAgo = '{n} h ago',
@@ -83,6 +84,9 @@ class NotificationStrings {
   final String markReadFailed;
   final String deleteFailed;
 
+  /// Read for the loader at the end of the list.
+  final String loadingMore;
+
   /// Relative time of a notification; older than four weeks, the date.
   final String justNow;
   final String minutesAgo;
@@ -114,6 +118,7 @@ class NotificationStrings {
     loadFailed: 'Impossible de charger les notifications',
     markReadFailed: 'Impossible de marquer comme lu',
     deleteFailed: 'Impossible de supprimer',
+    loadingMore: 'Chargement des notifications plus anciennes',
     justNow: 'à l’instant',
     minutesAgo: 'il y a {n} min',
     hoursAgo: 'il y a {n} h',
@@ -179,6 +184,7 @@ class NotificationStrings {
     String? loadFailed,
     String? markReadFailed,
     String? deleteFailed,
+    String? loadingMore,
     String? justNow,
     String? minutesAgo,
     String? hoursAgo,
@@ -208,6 +214,7 @@ class NotificationStrings {
     loadFailed: loadFailed ?? this.loadFailed,
     markReadFailed: markReadFailed ?? this.markReadFailed,
     deleteFailed: deleteFailed ?? this.deleteFailed,
+    loadingMore: loadingMore ?? this.loadingMore,
     justNow: justNow ?? this.justNow,
     minutesAgo: minutesAgo ?? this.minutesAgo,
     hoursAgo: hoursAgo ?? this.hoursAgo,
