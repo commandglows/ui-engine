@@ -68,6 +68,63 @@ class CalendarTimeGrid extends StatefulWidget {
   State<CalendarTimeGrid> createState() => _CalendarTimeGridState();
 }
 
+/// Title of a day column: the first of [labels] that fits the column, measured
+/// with the style it is drawn with. Never shrunk, clipped or ellipsised; the
+/// last label is the shortest. Screen readers hear [fullLabel].
+class _ColumnTitle extends StatelessWidget {
+  const _ColumnTitle({
+    required this.labels,
+    required this.fullLabel,
+    required this.style,
+  });
+
+  final List<String> labels;
+  final String fullLabel;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final effective = DefaultTextStyle.of(context).style.merge(style);
+    final direction = Directionality.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    return Semantics(
+      label: fullLabel,
+      child: ExcludeSemantics(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final label = labels.firstWhere(
+              (label) =>
+                  _width(label, effective, direction, scaler) <=
+                  constraints.maxWidth,
+              orElse: () => labels.last,
+            );
+            return Center(
+              child: Text(label, maxLines: 1, style: style),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  static double _width(
+    String label,
+    TextStyle style,
+    TextDirection direction,
+    TextScaler scaler,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: direction,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+}
+
 typedef _Hover = ({DateTime day, int minutes, int length});
 
 class _CalendarTimeGridState extends State<CalendarTimeGrid> {
@@ -226,15 +283,14 @@ class _CalendarTimeGridState extends State<CalendarTimeGrid> {
           for (final day in days)
             SizedBox(
               width: dayWidth,
-              child: Center(
-                child: Text(
-                  widget.strings.column(day),
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: calendarSameDay(day, today) ? roles.accent : null,
-                    fontWeight: calendarSameDay(day, today)
-                        ? FontWeight.w700
-                        : null,
-                  ),
+              child: _ColumnTitle(
+                labels: widget.strings.columnLabels(day, reference: today),
+                fullLabel: widget.strings.shortDay(day, reference: today),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: calendarSameDay(day, today) ? roles.accent : null,
+                  fontWeight: calendarSameDay(day, today)
+                      ? FontWeight.w700
+                      : null,
                 ),
               ),
             ),

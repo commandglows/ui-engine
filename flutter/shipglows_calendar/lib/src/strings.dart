@@ -254,6 +254,20 @@ class CalendarStrings {
       ? '${weekdays[day.weekday - 1]} ${day.day}/${day.month}'
       : '${weekdays[day.weekday - 1]} ${day.month}/${day.day}';
 
+  /// Titles of a column of the week grid, the fullest first: « lun. 19 oct. »,
+  /// « lun. 19 », « 19 » (English « Mon, Oct 19 », « Mon 19 », « 19 »). The
+  /// grid draws the first one that fits the column.
+  List<String> columnLabels(DateTime day, {DateTime? reference}) {
+    final weekday = _french
+        ? '${weekdays[day.weekday - 1].toLowerCase()}.'
+        : weekdays[day.weekday - 1];
+    return [
+      shortDay(day, reference: reference),
+      '$weekday ${day.day}',
+      '${day.day}',
+    ];
+  }
+
   /// Day of the day strip: « Lun 26 ».
   String stripDay(DateTime day) => '${weekdays[day.weekday - 1]} ${day.day}';
 
