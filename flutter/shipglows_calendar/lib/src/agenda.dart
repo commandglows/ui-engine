@@ -38,8 +38,6 @@ class CalendarAgenda extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roles = ShipglowsTheme.of(context);
-    final theme = Theme.of(context);
     final placed = <String>{};
     final days = <(DateTime, List<CalendarSegment>)>[];
     for (final day in range.dates) {
@@ -53,6 +51,20 @@ class CalendarAgenda extends StatelessWidget {
     if (days.isEmpty) {
       return Padding(padding: metrics.padding, child: Text(strings.empty));
     }
+    // ListTiles paint on the nearest Material: a transparent one keeps them
+    // visible on any panel the app draws, colored or not.
+    return Material(
+      type: MaterialType.transparency,
+      child: _list(context, days),
+    );
+  }
+
+  Widget _list(
+    BuildContext context,
+    List<(DateTime, List<CalendarSegment>)> days,
+  ) {
+    final roles = ShipglowsTheme.of(context);
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
