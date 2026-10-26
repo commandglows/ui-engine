@@ -42,6 +42,14 @@ Base components drawn from the roles, the same everywhere:
   `controlMinHeight`; the selected one is opaque, the others fade.
 - `ShipglowsKeyHint(keys: ['Alt', 'Entrée'], label: 'actions')`: a footer
   hint.
+- `ShipglowsEmptyState(icon: …, message: 'Aucune …', actionLabel: 'Créer …',
+  onAction: …)`: an empty list that says what belongs there and offers the
+  first step; no button without `actionLabel`. The icon takes `accent`, the
+  spacing the space roles; the texts are the caller's.
+- `ShipglowsFocusRing(child: …, radius: …, width: …)`: a `focus` outline drawn
+  while keyboard focus is inside `child` (never on a mouse click), for rows
+  whose Material ink hides the focus. `radius` defaults to `radiusMd`, `width`
+  to twice `lineWidth`.
 
 The command bar, `shipglows_menu`, `shipglows_guide` and the
 `shipglows_window` title bar read these roles for every value their own theme

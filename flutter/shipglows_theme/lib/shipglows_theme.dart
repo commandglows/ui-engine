@@ -2,7 +2,7 @@
 /// ([ShipglowsTheme]) that each app fills from its own brand tokens, the
 /// bundled fonts ([ShipglowsFonts]) and scrollbars, and the base components
 /// drawn from them ([ShipglowsKeycap], [ShipglowsKeyButton],
-/// [ShipglowsKeyHint]).
+/// [ShipglowsKeyHint], [ShipglowsEmptyState], [ShipglowsFocusRing]).
 ///
 /// `ShipglowsTheme(...).applyTo(themeData)` sets the fonts, scrollbars and
 /// roles in one call.
@@ -13,5 +13,7 @@
 library;
 
 export 'src/components.dart';
+export 'src/empty_state.dart';
+export 'src/focus_ring.dart';
 export 'src/theme.dart';
 export 'src/typography.dart';
