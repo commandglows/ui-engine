@@ -446,7 +446,7 @@ class S3BlobStore implements BlobStore {
           query: {
             'list-type': '2',
             'prefix': prefix,
-            if (page != null) 'continuation-token': page,
+            'continuation-token': ?page,
           },
         );
         return parseSafeXml(await _expectOk(response));

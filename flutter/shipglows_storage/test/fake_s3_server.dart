@@ -78,13 +78,13 @@ class FakeS3Server {
               '<UploadId>$id</UploadId></InitiateMultipartUploadResult>');
         case 'PUT' when query.containsKey('partNumber'):
           final parts = uploads[query['uploadId']];
-          if (parts == null) return _error(response, 404, 'NoSuchUpload');
+          if (parts == null) return await _error(response, 404, 'NoSuchUpload');
           parts[int.parse(query['partNumber']!)] = body;
           response.headers.set('etag', _etagOf(body));
           await response.close();
         case 'POST' when query.containsKey('uploadId'):
           final parts = uploads.remove(query['uploadId']);
-          if (parts == null) return _error(response, 404, 'NoSuchUpload');
+          if (parts == null) return await _error(response, 404, 'NoSuchUpload');
           final whole = BytesBuilder();
           for (final number in parts.keys.toList()..sort()) {
             whole.add(parts[number]!);
@@ -103,7 +103,7 @@ class FakeS3Server {
           final ifMatch = request.headers.value('if-match');
           if ((ifNoneMatch == '*' && current != null) ||
               (ifMatch != null && current?.etag != ifMatch)) {
-            return _error(response, 412, 'PreconditionFailed');
+            return await _error(response, 412, 'PreconditionFailed');
           }
           response.headers.set('etag', _store(key, body));
           await response.close();
@@ -120,10 +120,10 @@ class FakeS3Server {
           ].join()}<IsTruncated>false</IsTruncated></ListBucketResult>');
         case 'GET' || 'HEAD':
           final object = objects[key];
-          if (object == null) return _error(response, 404, 'NoSuchKey');
+          if (object == null) return await _error(response, 404, 'NoSuchKey');
           final ifMatch = request.headers.value('if-match');
           if (ifMatch != null && ifMatch != object.etag) {
-            return _error(response, 412, 'PreconditionFailed');
+            return await _error(response, 412, 'PreconditionFailed');
           }
           var bytes = object.bytes;
           final range = request.headers.value('range');
@@ -132,7 +132,7 @@ class FakeS3Server {
               RegExp(r'^bytes=(\d+)-$').firstMatch(range)!.group(1)!,
             );
             if (start >= bytes.length) {
-              return _error(response, 416, 'InvalidRange');
+              return await _error(response, 416, 'InvalidRange');
             }
             bytes = bytes.sublist(start);
             response.statusCode = 206;
@@ -146,7 +146,7 @@ class FakeS3Server {
           response.statusCode = 204;
           await response.close();
         default:
-          return _error(response, 400, 'NotImplemented');
+          return await _error(response, 400, 'NotImplemented');
       }
     } on Object {
       // The client hung up (a cancelled transfer): nothing to answer.

@@ -5,9 +5,7 @@ import 'package:shipglows_storage/signed_upload.dart';
 
 /// A backend and a bucket in memory speaking the signed upload protocol.
 class _FakeBackend {
-  _FakeBackend({this.partBytes = 4});
-
-  final int partBytes;
+  final int partBytes = 4;
   final calls = <String>[];
   final puts = <int>[];
   final stored = <int, Uint8List>{};
