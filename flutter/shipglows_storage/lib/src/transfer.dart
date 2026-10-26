@@ -1,14 +1,14 @@
-/// What every store shares to move a file: follow it ([TransferControl]),
-/// stop it, and try again after a network hiccup ([RetryPolicy]).
+/// What every transfer shares: follow it ([TransferControl]), stop it, and
+/// try again after a network hiccup ([RetryPolicy]). Free of `dart:io`.
 library;
 
 import 'dart:async';
 import 'dart:math';
 
-import 'blob_store.dart';
+import 'blob_errors.dart';
 
-/// Follows and stops one transfer: pass it to [BlobStore.putFile],
-/// [BlobStore.download], [BlobStore.putBytes] or [BlobStore.getBytes].
+/// Follows and stops one transfer: pass it to `BlobStore.putFile`,
+/// `download`, `putBytes`, `getBytes` or a signed upload.
 ///
 /// One control per transfer: once cancelled it stays cancelled.
 class TransferControl {

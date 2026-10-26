@@ -1004,8 +1004,24 @@ another S3-compatible bucket is an endpoint change.
   the run on a real bucket needs `SHIPGLOWS_S3_ENDPOINT`, `_BUCKET`,
   `_REGION`, `_KEY_ID`, `_SECRET` and is skipped without them.
 
-Not yet: a local cache, background transfers, and the backend-signed
-uploader (presigned parts) used by ContentGlows.
+- Backend-signed uploads, extracted from ContentGlows: the backend keeps
+  the storage keys and signs one part at a time. `import
+  'package:shipglows_storage/signed_upload.dart'` is the web-safe entry (no
+  `dart:io`). The ShipGlows protocol under a base path: `POST <base>`
+  (`clientKey`, `fileName`, `mimeType`, `byteSize`, `checksumSha256`) opens
+  `{uploadId, parts}` or answers `{result}`; `POST
+  <base>/<id>/parts/<n>/sign` answers `{uploadUrl, headers}`; `POST
+  <base>/<id>/complete` with the receipts; `DELETE <base>/<id>` abandons.
+  `SignedUploadClient(call:, put:, journal:).upload(...)` runs it all;
+  `uploadSignedParts(parts:, source:, sign:, put:)` is the part loop alone,
+  for a backend with its own open and complete routes. The app brings
+  `call` (its JSON client with base URL and auth) and `put` (a raw PUT),
+  and says which failures are transient (`BlobTransientFailure(cause:)`).
+  A transiently failed part is signed and sent again; a sign answer that
+  names a bucket or provider key is refused; with a journal a resend skips
+  the parts already stored.
+
+Not yet: a local cache and background transfers.
 
 ## `flutter/shipglows_xml`
 
