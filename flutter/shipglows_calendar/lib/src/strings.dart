@@ -39,6 +39,11 @@ class CalendarStrings {
     required this.inWeek,
     required this.inMonth,
     required this.inHours,
+    required this.wheelDay,
+    required this.wheelMonth,
+    required this.wheelYear,
+    required this.wheelHour,
+    required this.wheelMinute,
   });
 
   /// `fr` writes « lundi 26 octobre », `en` « Monday, October 26 ».
@@ -104,6 +109,13 @@ class CalendarStrings {
 
   /// Quick pick of a date and time field: `{count}` hours from now.
   final String inHours;
+
+  /// Wheels of a date field, read by screen readers.
+  final String wheelDay;
+  final String wheelMonth;
+  final String wheelYear;
+  final String wheelHour;
+  final String wheelMinute;
 
   static const en = CalendarStrings(
     languageCode: 'en',
@@ -171,6 +183,11 @@ class CalendarStrings {
     inWeek: 'In a week',
     inMonth: 'In a month',
     inHours: 'In {count} h',
+    wheelDay: 'Day',
+    wheelMonth: 'Month',
+    wheelYear: 'Year',
+    wheelHour: 'Hour',
+    wheelMinute: 'Minute',
   );
 
   static const fr = CalendarStrings(
@@ -243,6 +260,11 @@ class CalendarStrings {
     inWeek: 'Dans une semaine',
     inMonth: 'Dans un mois',
     inHours: 'Dans {count} h',
+    wheelDay: 'Jour',
+    wheelMonth: 'Mois',
+    wheelYear: 'Année',
+    wheelHour: 'Heure',
+    wheelMinute: 'Minute',
   );
 
   /// French for a French [locale], English otherwise.
@@ -408,6 +430,11 @@ class CalendarStrings {
     String? inWeek,
     String? inMonth,
     String? inHours,
+    String? wheelDay,
+    String? wheelMonth,
+    String? wheelYear,
+    String? wheelHour,
+    String? wheelMinute,
   }) => CalendarStrings(
     languageCode: languageCode ?? this.languageCode,
     weekdays: weekdays ?? this.weekdays,
@@ -440,6 +467,11 @@ class CalendarStrings {
     inWeek: inWeek ?? this.inWeek,
     inMonth: inMonth ?? this.inMonth,
     inHours: inHours ?? this.inHours,
+    wheelDay: wheelDay ?? this.wheelDay,
+    wheelMonth: wheelMonth ?? this.wheelMonth,
+    wheelYear: wheelYear ?? this.wheelYear,
+    wheelHour: wheelHour ?? this.wheelHour,
+    wheelMinute: wheelMinute ?? this.wheelMinute,
   );
 
   /// The label of [view] in the view switch.
