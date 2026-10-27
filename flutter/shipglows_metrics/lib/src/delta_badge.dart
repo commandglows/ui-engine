@@ -54,7 +54,11 @@ class MetricDeltaBadge extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(ShipglowsIcons.of(context, iconName), size: 14, color: color),
+              Icon(
+                ShipglowsIcons.of(context, iconName),
+                size: 14,
+                color: color,
+              ),
               SizedBox(width: theme.spaceXs),
               Text(
                 text,

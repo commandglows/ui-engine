@@ -7,8 +7,10 @@ void main() {
     expect(const MetricDelta(0.12).isFavorable, isTrue);
     expect(const MetricDelta(-0.12).isFavorable, isFalse);
     expect(
-      const MetricDelta(0.12, polarity: MetricPolarity.lowerIsBetter)
-          .isFavorable,
+      const MetricDelta(
+        0.12,
+        polarity: MetricPolarity.lowerIsBetter,
+      ).isFavorable,
       isFalse,
     );
     expect(const MetricDelta(0.001).direction, MetricDirection.flat);
@@ -17,14 +19,8 @@ void main() {
 
   test('a default percentage is signed and localized', () {
     expect(MetricStrings.en.formatDelta(const MetricDelta(0.12)), '+12%');
-    expect(
-      MetricStrings.fr.formatDelta(const MetricDelta(-0.04)),
-      '−4 %',
-    );
-    expect(
-      MetricStrings.fr.formatDelta(const MetricDelta(-0.025)),
-      '−2,5 %',
-    );
+    expect(MetricStrings.fr.formatDelta(const MetricDelta(-0.04)), '−4 %');
+    expect(MetricStrings.fr.formatDelta(const MetricDelta(-0.025)), '−2,5 %');
     expect(
       MetricStrings.en.formatDelta(const MetricDelta(0.5, label: '+340')),
       '+340',

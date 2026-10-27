@@ -9,32 +9,45 @@ import 'strings.dart';
 
 enum _TileState { ready, loading, empty, error }
 
-/// One metric on a raised card: its label, its value, its change badge, a
-/// caption and its sparkline. Read as one sentence: « Revenue, 1 240 €, up
+/// One metric on a raised card: an optional [icon] before its label, its
+/// value, its change badge, a caption and its sparkline. Read as one sentence: « Revenue, 1 240 €, up
 /// 12 %, vs. last week ».
 ///
 /// [MetricTile.loading], [MetricTile.empty] and [MetricTile.error] keep the
 /// label and the same height, so a dashboard does not jump when its data
 /// arrives.
 class MetricTile extends StatelessWidget {
-  const MetricTile(Metric this.metric, {super.key, this.onTap, this.strings})
-    : _state = _TileState.ready,
-      label = null,
-      message = null,
-      onRetry = null;
+  const MetricTile(
+    Metric this.metric, {
+    super.key,
+    this.icon,
+    this.iconColor,
+    this.onTap,
+    this.strings,
+  }) : _state = _TileState.ready,
+       label = null,
+       message = null,
+       onRetry = null;
 
-  const MetricTile.loading({super.key, required String this.label, this.strings})
-    : _state = _TileState.loading,
-      metric = null,
-      message = null,
-      onTap = null,
-      onRetry = null;
+  const MetricTile.loading({
+    super.key,
+    required String this.label,
+    this.icon,
+    this.iconColor,
+    this.strings,
+  }) : _state = _TileState.loading,
+       metric = null,
+       message = null,
+       onTap = null,
+       onRetry = null;
 
   /// No value yet; [message] defaults to [MetricStrings.noData].
   const MetricTile.empty({
     super.key,
     required String this.label,
     this.message,
+    this.icon,
+    this.iconColor,
     this.strings,
   }) : _state = _TileState.empty,
        metric = null,
@@ -47,6 +60,8 @@ class MetricTile extends StatelessWidget {
     required String this.label,
     required String this.message,
     this.onRetry,
+    this.icon,
+    this.iconColor,
     this.strings,
   }) : _state = _TileState.error,
        metric = null,
@@ -56,6 +71,13 @@ class MetricTile extends StatelessWidget {
   final Metric? metric;
   final String? label;
   final String? message;
+
+  /// Before the label, decorative: the label says what is measured.
+  final IconData? icon;
+
+  /// Defaults to [ShipglowsTheme.icon]; an app may keep one color per
+  /// metric, the value itself stays in [ShipglowsTheme.text].
+  final Color? iconColor;
 
   /// Opens the metric's details; the whole tile is the button.
   final VoidCallback? onTap;
@@ -89,10 +111,22 @@ class MetricTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            title,
-            maxLines: 2,
-            style: textTheme.labelLarge?.copyWith(color: theme.textMuted),
+          Row(
+            children: [
+              if (icon != null) ...[
+                ExcludeSemantics(
+                  child: Icon(icon, size: 18, color: iconColor ?? theme.icon),
+                ),
+                SizedBox(width: theme.spaceSm),
+              ],
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  style: textTheme.labelLarge?.copyWith(color: theme.textMuted),
+                ),
+              ),
+            ],
           ),
           SizedBox(height: theme.spaceSm),
           body,
@@ -108,9 +142,7 @@ class MetricTile extends StatelessWidget {
         side: BorderSide(color: theme.border, width: theme.lineWidth),
       ),
       clipBehavior: Clip.antiAlias,
-      child: onTap == null
-          ? content
-          : InkWell(onTap: onTap, child: content),
+      child: onTap == null ? content : InkWell(onTap: onTap, child: content),
     );
 
     return switch (_state) {
@@ -127,10 +159,8 @@ class MetricTile extends StatelessWidget {
         excludeSemantics: true,
         child: card,
       ),
-      _TileState.empty || _TileState.error => Semantics(
-        container: true,
-        child: card,
-      ),
+      _TileState.empty ||
+      _TileState.error => Semantics(container: true, child: card),
     };
   }
 
@@ -273,7 +303,11 @@ class MetricTile extends StatelessWidget {
           child: Row(
             children: [
               ExcludeSemantics(
-                child: Icon(ShipglowsIcons.error, size: 20, color: theme.danger),
+                child: Icon(
+                  ShipglowsIcons.error,
+                  size: 20,
+                  color: theme.danger,
+                ),
               ),
               SizedBox(width: theme.spaceSm),
               Expanded(

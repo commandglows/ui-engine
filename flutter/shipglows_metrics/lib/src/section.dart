@@ -24,9 +24,8 @@ class MetricSection extends StatelessWidget {
       header: true,
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: theme.text,
-        ),
+        style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(color: theme.text),
       ),
     );
     final trailing = this.trailing;

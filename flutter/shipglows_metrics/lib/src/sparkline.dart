@@ -71,8 +71,9 @@ class _SparklinePainter extends CustomPainter {
     final usable = size.height - strokeWidth;
     final step = size.width / (values.length - 1);
     // A flat series sits in the middle.
-    double yOf(double value) =>
-        span == 0 ? size.height / 2 : inset + usable * (1 - (value - low) / span);
+    double yOf(double value) => span == 0
+        ? size.height / 2
+        : inset + usable * (1 - (value - low) / span);
 
     final line = Path()..moveTo(0, yOf(values.first));
     for (var i = 1; i < values.length; i++) {

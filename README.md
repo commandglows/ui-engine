@@ -1322,7 +1322,10 @@ locale) and hands them over. Depends on `shipglows_theme` and
   a `border` outline. Read as one sentence (« Revenue, 1 240 €, up 12 %,
   vs. last week »). `MetricTile.loading(label:)`, `.empty(label:, message:)`
   and `.error(label:, message:, onRetry:)` keep the label and the value
-  line's height, so the dashboard does not jump when data arrives.
+  line's height, so the dashboard does not jump when data arrives. Every
+  state takes an optional `icon:` before the label (decorative, in `icon`
+  or the app's own `iconColor:`; the value stays in `text`). ContentGlows'
+  Search Console cards use it.
 - `MetricDeltaBadge(delta)`: arrow and signed text in a pill, `success` when
   good, `danger` when bad, `textMuted` when neither, so the trend never
   rests on color alone. New base icons `trendUp`, `trendDown`, `trendFlat`.
