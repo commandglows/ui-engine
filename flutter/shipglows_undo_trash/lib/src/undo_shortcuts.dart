@@ -19,7 +19,11 @@ bool get _usesMeta => switch (defaultTargetPlatform) {
 ///
 /// A command bar running the same action calls the handler directly: its own
 /// search field is focused, which this widget would skip.
-class UndoShortcuts extends StatelessWidget {
+///
+/// While nothing is focused inside the route that holds it (a window that got
+/// the keyboard back, a focused widget that went away), the keys still reach
+/// it instead of being lost on an enclosing scope.
+class UndoShortcuts extends StatefulWidget {
   const UndoShortcuts({
     super.key,
     required this.child,
@@ -60,22 +64,59 @@ class UndoShortcuts extends StatelessWidget {
       const SingleActivator(LogicalKeyboardKey.keyY, control: true),
   ];
 
+  @override
+  State<UndoShortcuts> createState() => _UndoShortcutsState();
+}
+
+class _UndoShortcutsState extends State<UndoShortcuts> {
+  final FocusNode _node = FocusNode(debugLabel: 'UndoShortcuts');
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onUnfocusedKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onUnfocusedKey);
+    _node.dispose();
+    super.dispose();
+  }
+
+  /// Keys that would land on a scope enclosing this widget, with nothing
+  /// focused below it: the focus tree would never pass them down.
+  bool _onUnfocusedKey(KeyEvent event) {
+    final primary = FocusManager.instance.primaryFocus;
+    if (!mounted ||
+        primary is! FocusScopeNode ||
+        !_node.ancestors.contains(primary) ||
+        !(ModalRoute.of(context)?.isCurrent ?? true)) {
+      return false;
+    }
+    return _onKeyEvent(_node, event) == KeyEventResult.handled;
+  }
+
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent || isTextInputFocused()) {
       return KeyEventResult.ignored;
     }
     final keyboard = HardwareKeyboard.instance;
-    final undo = onUndo;
+    final undo = widget.onUndo;
     if (undo != null &&
-        canUndo &&
-        undoActivators.any((key) => key.accepts(event, keyboard))) {
+        widget.canUndo &&
+        UndoShortcuts.undoActivators.any(
+          (key) => key.accepts(event, keyboard),
+        )) {
       undo();
       return KeyEventResult.handled;
     }
-    final redo = onRedo;
+    final redo = widget.onRedo;
     if (redo != null &&
-        canRedo &&
-        redoActivators.any((key) => key.accepts(event, keyboard))) {
+        widget.canRedo &&
+        UndoShortcuts.redoActivators.any(
+          (key) => key.accepts(event, keyboard),
+        )) {
       redo();
       return KeyEventResult.handled;
     }
@@ -84,9 +125,10 @@ class UndoShortcuts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Focus(
-    autofocus: autofocus,
+    focusNode: _node,
+    autofocus: widget.autofocus,
     skipTraversal: true,
     onKeyEvent: _onKeyEvent,
-    child: child,
+    child: widget.child,
   );
 }
