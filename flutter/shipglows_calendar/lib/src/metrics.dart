@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 @immutable
 class CalendarMetrics {
   const CalendarMetrics({
-    this.agendaBreakpoint = 700,
+    this.agendaBreakpoint = 460,
     this.hourHeight = 58,
     this.timeGutter = 60,
-    this.dayWidth = 110,
+    this.dayWidth = 56,
     this.viewportHeight = 580,
     this.monthCellHeight = 130,
     this.compactCellHeight = 44,

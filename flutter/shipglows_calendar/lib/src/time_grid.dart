@@ -82,6 +82,9 @@ class _ColumnTitle extends StatelessWidget {
   final String fullLabel;
   final TextStyle? style;
 
+  /// Space kept around a title, so neighbouring days never touch.
+  static const double _breathingRoom = 8;
+
   @override
   Widget build(BuildContext context) {
     final effective = DefaultTextStyle.of(context).style.merge(style);
@@ -95,7 +98,7 @@ class _ColumnTitle extends StatelessWidget {
             final label = labels.firstWhere(
               (label) =>
                   _width(label, effective, direction, scaler) <=
-                  constraints.maxWidth,
+                  constraints.maxWidth - _breathingRoom,
               orElse: () => labels.last,
             );
             return Center(
