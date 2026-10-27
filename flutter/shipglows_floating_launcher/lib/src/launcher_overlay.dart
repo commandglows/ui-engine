@@ -275,9 +275,10 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   // Whether the fan should be open; it may still be animating.
   bool _open = false;
   String? _hovered;
-  // Action whose tooltip the window's shape makes room for, and the one
-  // whose room is in place: its tooltip only shows then.
-  String? _tooltipRoom;
+  // Actions whose tooltip the window's shape has room for, kept until the
+  // fan folds; and the hovered one whose room is in place: its tooltip only
+  // shows then.
+  final List<String> _tooltipRooms = <String>[];
   String? _tooltipReady;
   // Size of the view at the last layout; the window's own size before any.
   Size? _viewSize;
@@ -320,7 +321,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
       _collapseTimer = null;
       _open = false;
       _hovered = null;
-      _tooltipRoom = null;
+      _tooltipRooms.clear();
       _tooltipReady = null;
       _dragPlacements = null;
       _fan.value = 0;
@@ -342,7 +343,10 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     if (!mounted) return;
     // Folded: the window shrinks back to the bubble only now, so the actions
     // are never clipped on their way in.
-    if (status == AnimationStatus.dismissed) unawaited(_syncShape());
+    if (status == AnimationStatus.dismissed) {
+      _tooltipRooms.clear();
+      unawaited(_syncShape());
+    }
     // The tooltip shows only once the fan is fully open.
     setState(() {});
   }
@@ -360,7 +364,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   Future<void> _unfold(FloatingLauncherLayout layout) async {
     // The window grows before the actions leave the bubble, so none is
     // clipped.
-    await _controller.setShape(layout.expandedShape(null));
+    await _controller.setShape(layout.expandedShape(_roomIndexes()));
     if (!mounted || !_open) return;
     _fan.forward();
   }
@@ -390,7 +394,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     _collapseTimer = null;
     _open = false;
     _hovered = null;
-    _tooltipRoom = null;
+    _tooltipRooms.clear();
     _tooltipReady = null;
     _fan.value = 0;
     unawaited(_syncShape());
@@ -400,23 +404,28 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     if (_hovered == id) return;
     // The tooltip shown goes with this frame.
     setState(() => _hovered = id);
-    unawaited(_moveTooltipRoom(id));
+    if (id != null) unawaited(_makeTooltipRoom(id));
   }
 
-  // The native shape and Flutter's frames are not in step: a tooltip drawn
-  // before the shape has room for it, or still on screen when its room is
-  // dropped, flashes clipped. So the room of the tooltip left goes only once
-  // a frame without it is out, and the hovered one shows only once the
-  // shape holds its room.
-  Future<void> _moveTooltipRoom(String? id) async {
-    if (_tooltipRoom != null && _tooltipRoom != id) {
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted || _hovered != id) return;
-    }
-    _tooltipRoom = id;
+  // The native shape and Flutter's frames are not in step, and each new
+  // shape repaints the window: a tooltip drawn before the shape has room for
+  // it, or still on screen when its room goes, flashes clipped. So the
+  // hovered tooltip shows only once the shape holds its room, and the rooms
+  // stay until the fan folds: moving between actions reshapes the window at
+  // most once per action.
+  Future<void> _makeTooltipRoom(String id) async {
+    if (!_tooltipRooms.contains(id)) _tooltipRooms.add(id);
     await _syncShape();
-    if (!mounted || _hovered != id || id == null) return;
+    if (!mounted || _hovered != id) return;
     setState(() => _tooltipReady = id);
+  }
+
+  // Indexes of the actions in [_tooltipRooms], in the order they were added.
+  List<int> _roomIndexes() {
+    final items = _controller.items;
+    return [
+      for (final id in _tooltipRooms) items.indexWhere((item) => item.id == id),
+    ];
   }
 
   // The arc for the controller's state now (actions, geometry, work area),
@@ -435,14 +444,8 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   Future<void> _syncShape() {
     final layout = _currentLayout();
     final open = _open || _fan.status != AnimationStatus.dismissed;
-    final room = _tooltipRoom;
-    final index = room == null
-        ? -1
-        : _controller.items.indexWhere((item) => item.id == room);
     return _controller.setShape(
-      open
-          ? layout.expandedShape(index < 0 ? null : index)
-          : layout.collapsedShape,
+      open ? layout.expandedShape(_roomIndexes()) : layout.collapsedShape,
     );
   }
 

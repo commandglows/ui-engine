@@ -282,19 +282,20 @@ class FloatingLauncherLayout {
 
   /// Window shape while unfolded: a disc around the bubble that holds every
   /// action, so moving from the bubble to an action never leaves the window,
-  /// plus the tooltip of [hovered] (an action index).
-  List<RRect> expandedShape(int? hovered) {
+  /// plus the tooltips of [tooltips] (action indexes, in the given order).
+  List<RRect> expandedShape([Iterable<int> tooltips = const <int>[]]) {
     final disc = radius + geometry.actionSize / 2 + geometry.shadowExtent;
     return [
       RRect.fromRectAndRadius(
         Rect.fromCircle(center: center, radius: disc),
         Radius.circular(disc),
       ),
-      if (hovered != null && hovered >= 0 && hovered < count)
-        RRect.fromRectAndRadius(
-          tooltipSlot(hovered).inflate(geometry.shadowExtent),
-          Radius.circular(geometry.shadowExtent),
-        ),
+      for (final index in tooltips)
+        if (index >= 0 && index < count)
+          RRect.fromRectAndRadius(
+            tooltipSlot(index).inflate(geometry.shadowExtent),
+            Radius.circular(geometry.shadowExtent),
+          ),
     ];
   }
 
