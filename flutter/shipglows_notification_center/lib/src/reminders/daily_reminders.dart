@@ -53,7 +53,8 @@ class DailyReminders extends ChangeNotifier {
     if (!isSupported) return;
     _plan = await load();
     notifyListeners();
-    await _schedule();
+    // Off, the last update already cancelled them.
+    if (_plan.enabled) await _schedule();
   }
 
   /// Applies [next] at once, then saves and plans it. Turning reminders on

@@ -1529,7 +1529,8 @@ Scaffold(
 ### Daily reminders
 
 System notifications (a Windows toast, an Android notification) at the
-times the person chose, even while the app is closed. Off by default.
+times the person chose, even while the app is closed. Off by default. Used by
+DreamGlows (settings « Rappels »).
 
 - `DailyReminderPlan(enabled:, times:)`: one to three `ReminderTime`s a
   day, sorted, the same every day; `withTime`, `withoutTime`, `replacing`;
