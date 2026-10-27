@@ -247,6 +247,7 @@ class CommandBarScope extends StatefulWidget {
     this.recents,
     this.queryHistory,
     this.hotkey = CommandBarHotkey.standard,
+    this.inAppHotkeys = const <CommandBarHotkey>[],
     this.onError,
     this.refresh,
     this.resizable = true,
@@ -289,6 +290,11 @@ class CommandBarScope extends StatefulWidget {
   /// system-wide hotkey itself (a Windows floating bar): the scope then
   /// leaves the keys alone, so the two never run together.
   final CommandBarHotkey? hotkey;
+
+  /// Further combinations that open and close the bar while the app has the
+  /// keyboard (Ctrl+K), never registered system-wide. They work beside
+  /// [hotkey], even when it is null.
+  final List<CommandBarHotkey> inAppHotkeys;
 
   /// Receives a command or recents failure. Reported to [FlutterError] when
   /// null.
@@ -447,7 +453,10 @@ class _CommandBarScopeState extends State<CommandBarScope>
       unawaited(showShortcuts());
       return true;
     }
-    if (!(widget.hotkey?.matches(event) ?? false)) return false;
+    if (!(widget.hotkey?.matches(event) ?? false) &&
+        !widget.inAppHotkeys.any((hotkey) => hotkey.matches(event))) {
+      return false;
+    }
     if (isOpen) {
       close();
       return true;
