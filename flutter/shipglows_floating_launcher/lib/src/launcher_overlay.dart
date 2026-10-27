@@ -275,6 +275,10 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   // Whether the fan should be open; it may still be animating.
   bool _open = false;
   String? _hovered;
+  // Action whose tooltip the window's shape makes room for, and the one
+  // whose room is in place: its tooltip only shows then.
+  String? _tooltipRoom;
+  String? _tooltipReady;
   // Size of the view at the last layout; the window's own size before any.
   Size? _viewSize;
   // Whether the pointer is inside the window's shape.
@@ -316,6 +320,8 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
       _collapseTimer = null;
       _open = false;
       _hovered = null;
+      _tooltipRoom = null;
+      _tooltipReady = null;
       _dragPlacements = null;
       _fan.value = 0;
       return;
@@ -336,7 +342,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     if (!mounted) return;
     // Folded: the window shrinks back to the bubble only now, so the actions
     // are never clipped on their way in.
-    if (status == AnimationStatus.dismissed) _syncShape();
+    if (status == AnimationStatus.dismissed) unawaited(_syncShape());
     // The tooltip shows only once the fan is fully open.
     setState(() {});
   }
@@ -372,7 +378,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     _setHovered(null);
     if (_fan.status == AnimationStatus.dismissed) {
       // Unfolding had not started yet.
-      _syncShape();
+      unawaited(_syncShape());
     } else {
       _fan.reverse();
     }
@@ -384,14 +390,33 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     _collapseTimer = null;
     _open = false;
     _hovered = null;
+    _tooltipRoom = null;
+    _tooltipReady = null;
     _fan.value = 0;
-    _syncShape();
+    unawaited(_syncShape());
   }
 
   void _setHovered(String? id) {
     if (_hovered == id) return;
+    // The tooltip shown goes with this frame.
     setState(() => _hovered = id);
-    _syncShape();
+    unawaited(_moveTooltipRoom(id));
+  }
+
+  // The native shape and Flutter's frames are not in step: a tooltip drawn
+  // before the shape has room for it, or still on screen when its room is
+  // dropped, flashes clipped. So the room of the tooltip left goes only once
+  // a frame without it is out, and the hovered one shows only once the
+  // shape holds its room.
+  Future<void> _moveTooltipRoom(String? id) async {
+    if (_tooltipRoom != null && _tooltipRoom != id) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || _hovered != id) return;
+    }
+    _tooltipRoom = id;
+    await _syncShape();
+    if (!mounted || _hovered != id || id == null) return;
+    setState(() => _tooltipReady = id);
   }
 
   // The arc for the controller's state now (actions, geometry, work area),
@@ -407,19 +432,17 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     );
   }
 
-  void _syncShape() {
+  Future<void> _syncShape() {
     final layout = _currentLayout();
     final open = _open || _fan.status != AnimationStatus.dismissed;
-    final hovered = _hovered;
-    final index = hovered == null
+    final room = _tooltipRoom;
+    final index = room == null
         ? -1
-        : _controller.items.indexWhere((item) => item.id == hovered);
-    unawaited(
-      _controller.setShape(
-        open
-            ? layout.expandedShape(index < 0 ? null : index)
-            : layout.collapsedShape,
-      ),
+        : _controller.items.indexWhere((item) => item.id == room);
+    return _controller.setShape(
+      open
+          ? layout.expandedShape(index < 0 ? null : index)
+          : layout.collapsedShape,
     );
   }
 
@@ -454,7 +477,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
           // A new layout (actions, screen side) reshapes the window; an
           // unchanged one costs nothing.
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _syncShape();
+            if (mounted) unawaited(_syncShape());
           });
           final bubble = Positioned.fromRect(
             rect: layout.bubbleRect,
@@ -552,7 +575,8 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     final index = hovered == null
         ? -1
         : items.indexWhere((item) => item.id == hovered);
-    final shown = index >= 0 && _open && _fan.isCompleted;
+    final shown =
+        index >= 0 && _open && _fan.isCompleted && _tooltipReady == hovered;
     final cards = <Widget>[];
     if (shown) {
       final item = items[index];
