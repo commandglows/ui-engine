@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "shipglows.backend.v1",
+  "provider": "none",
+  "mode": "none",
+  "reason": "Exemple du package shipglows_reviews : les avis sont reçus par un ReviewSink en mémoire affiché à l'écran ; aucun compte, aucun serveur.",
+  "command": null,
+  "dependencies": [],
+  "readiness": null
+}

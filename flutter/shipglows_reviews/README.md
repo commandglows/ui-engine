@@ -1,28 +1,44 @@
 # shipglows_reviews
 
-Customer reviews for ShipGlows Flutter apps, the same on every app:
+Customer reviews for ShipGlows Flutter apps, the same on Android, iOS,
+macOS, Windows and the web:
 
-1. **The store's rating prompt, at the right moment.** Google Play In-App
-   Review on Android, `SKStoreReviewController` on iOS and macOS. The prompt
-   is asked for only when someone has used the app for a while, just
-   succeeded at something, saw no error lately, and was not asked recently.
+1. **Asking at the right moment.** The store's own rating prompt where the
+   install has one (Google Play In-App Review, `SKStoreReviewController`).
+   Everywhere else (Windows, the web, sideloaded APKs) the app shows its own
+   invitation at the same moments: « Donner mon avis », « Noter sur {page} »,
+   « Plus tard », « Ne plus me demander ».
 2. **The app's own review form.** Stars, a topic, a message, an optional
-   address so the team can answer, and consent to publish it as a
-   testimonial. Reviews go to the app's backend and wait on the device while
-   offline.
-3. **The settings rows.** « Donner mon avis » and « Noter {app} » (the store
-   page, where the app has one).
+   address so the team can answer, consent to publish it as a testimonial.
+   Reviews go to the app's backend and wait on the device while offline.
+3. **The public rating page.** The store page (Google Play, App Store,
+   Microsoft Store), or else a review site (`ReviewSite`: Trustpilot, Google
+   reviews…) for apps without a store page: the WinSparkle Windows builds and
+   the web apps.
+4. **The settings rows.** « Donner mon avis » and « Noter {app} ».
 
-## Store rules
+## Platforms
 
-The package follows the store rules. Google Play and Apple forbid
-*review gating*: asking how someone feels, then sending only happy people to
-the store. So:
+| | Asking | Public page | Device state |
+| --- | --- | --- | --- |
+| Android, Google Play install | Play prompt | Play page | app support folder |
+| Android, APK (`shipglows_updater`) | invitation | Play page if `playStoreListed`, else `reviewSite` | app support folder |
+| iOS / macOS, App Store | App Store prompt | App Store page (`appStoreId`) | app support folder |
+| Windows | invitation | Microsoft Store page (`microsoftStoreId`), else `reviewSite` | `%APPDATA%\<company>\<app>\shipglows.reviews.json` |
+| Web | invitation | `reviewSite` | `localStorage` key `shipglows.reviews` |
 
-- the automatic prompt never asks a question first;
-- the form and the store page are offered to everyone, whatever the rating;
-- the app never learns whether the person rated (the stores do not say),
-  and they decide whether a prompt shows at all (Apple allows three a year).
+The form works everywhere. Debug and profile builds never ask by themselves
+(`promptInDebug: true` to try it).
+
+## Store and review-site rules
+
+Google Play, Apple, Trustpilot and Google reviews forbid *review gating*:
+asking how someone feels, then sending only happy people to rate. So:
+
+- nothing is asked before the prompt or the invitation;
+- the form and the public page are offered to everyone, whatever the rating;
+- the app never learns whether the person rated on a store, and the stores
+  decide whether their prompt shows (Apple: three times a year at most).
 
 ## Setup
 
@@ -32,9 +48,12 @@ final reviews = await ShipglowsReviews.open(
     appId: 'commandglows',
     appStoreId: '',            // App Store id, iOS/macOS
     microsoftStoreId: '',      // Microsoft Store product id, Windows
-    playStoreListed: false,    // on Google Play: sideloaded copies can rate there
+    playStoreListed: false,    // on Google Play: APK copies can rate there
+    reviewSite: ReviewSite(    // where there is no store page
+      name: 'Trustpilot',
+      url: 'https://www.trustpilot.com/evaluate/commandglows.com',
+    ),
   ),
-  storage: FileSettingsStorage(supportDir, prefix: 'shipglows.'),
   sink: CallbackReviewSink(
     (review) => convex.mutation('reviews:submit', review.toJson()),
   ),
@@ -42,9 +61,9 @@ final reviews = await ShipglowsReviews.open(
 reviews.accountId = clerk.session.value?.userId; // optional, on account change
 ```
 
-- `storage` is any `SettingsStorage` from `shipglows_settings`: the app's
-  existing one is fine (the state lives in its own `reviews` bucket). Use a
-  `CallbackSettingsStorage` on the web.
+- `storage` is optional: the app support folder on native platforms,
+  `localStorage` on the web. Any `SettingsStorage` from `shipglows_settings`
+  works too (the state lives in its `reviews` bucket).
 - `followFeedback` (on by default): every success message of
   `shipglows_feedback` counts as a positive moment, every error as a
   problem. Turn it off and call `recordPositiveMoment()` /
@@ -53,7 +72,7 @@ reviews.accountId = clerk.session.value?.userId; // optional, on account change
   never in the middle of one):
 
   ```dart
-  unawaited(reviews.maybeAskForStoreReview());
+  unawaited(reviews.maybeAskForReview(context, appName: 'CommandGlows'));
   ```
 
 - Anywhere (menu « Donner mon avis », help, an error screen with
@@ -64,10 +83,14 @@ reviews.accountId = clerk.session.value?.userId; // optional, on account change
   ```
 
 - In the settings: `ShipglowsReviewSettings(reviews: reviews, appName: 'CommandGlows')`.
+- `showShipglowsReviewInvitation(context, …)` shows the invitation on demand;
+  `inviteWithoutStorePrompt: false` turns the automatic one off.
+- Ctrl+Enter (Cmd+Enter) sends the form, from any field.
 
-## When the prompt is asked for
+## When to ask
 
-`ReviewPolicy`, every rule adjustable:
+`ReviewPolicy`, the same for the store prompt and the invitation, every rule
+adjustable:
 
 | Rule | Default |
 | --- | --- |
@@ -79,12 +102,9 @@ reviews.accountId = clerk.session.value?.userId; // optional, on account change
 | Between two prompts | 120 days |
 | Prompts per year | 3 |
 | Once per app version | yes |
-| After « Noter sur le Store » | never again |
+| After « Noter sur … » | never again |
+| After « Ne plus me demander » | never again |
 
-Never in debug or profile builds (`promptInDebug: true` to try it, with
-Google Play internal app sharing or TestFlight; a debug build from
-`flutter run` has no Play install, so Play shows nothing). Never where the
-install cannot show it: sideloaded APKs, WinSparkle installs, web.
 `reviews.eligibility` says why it waits (`ReviewNotYet(ReviewWait.…)`).
 
 ## What the backend receives
@@ -102,7 +122,7 @@ install cannot show it: sideloaded APKs, WinSparkle installs, web.
 | `publishConsent` | bool | may be published as a testimonial |
 | `publicName` | string? | only with consent; absent = anonymous |
 | `accountId` | string? | when the app sets `reviews.accountId` |
-| `appId`, `platform`, `appVersion`, `buildNumber`, `locale`, `installSource` | string | the context |
+| `appId`, `platform`, `appVersion`, `buildNumber`, `locale`, `installSource` | string | the context (`platform`: `android`, `ios`, `macos`, `windows`, `linux`, `web`) |
 
 Nothing else: no device id, no IP. A failed `send` is retried (30 s doubling
 to 5 min, on resume, at the next launch); throw `ReviewRejectedException` to
@@ -145,12 +165,26 @@ export const submit = mutation({
 });
 ```
 
-The mutation may be public (signed out users can write a review): limit the
+The mutation may be public (signed-out people can write a review): limit the
 comment length and the rate on the server too.
 
 ## Store ids
 
 - Android: nothing to declare; `in_app_review` brings the Play library.
 - iOS / macOS: `appStoreId` for the store page; the prompt needs nothing.
-- Windows: `microsoftStoreId` (Partner Center → Product identity → Store ID).
-  Without it, Windows offers the form only.
+- Windows: `microsoftStoreId` (Partner Center → Product identity → Store ID)
+  for apps on the Microsoft Store; otherwise `reviewSite`.
+
+## Example
+
+`example/` is a playground for Windows and the web (invitation, form,
+settings rows, offline sending), with an in-memory sink and a policy that
+asks after one success:
+
+```powershell
+s start -ProjectPath flutter\shipglows_reviews\example -FlutterDevice windows
+s start -ProjectPath flutter\shipglows_reviews\example -FlutterDevice web-server
+```
+
+Flutter apps only: the Vue/Tauri apps (CommunityGlows, ToolGlows) need their
+own client for the same backend contract.

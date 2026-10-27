@@ -103,7 +103,30 @@ class _ShipglowsReviewFormState extends State<ShipglowsReviewForm> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  /// Ctrl+Enter (Cmd+Enter on macOS) sends, from any field. Read before the
+  /// focused text field, which keeps the key to itself on the web.
+  bool _onKey(KeyEvent event) {
+    final keyboard = HardwareKeyboard.instance;
+    final isSend =
+        event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter) &&
+        (keyboard.isControlPressed || keyboard.isMetaPressed);
+    if (!isSend || !mounted || ModalRoute.of(context)?.isCurrent == false) {
+      return false;
+    }
+    if (_result == null && !_sending) unawaited(_send());
+    return true;
+  }
+
+  @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
     _comment.dispose();
     _email.dispose();
     _publicName.dispose();
@@ -143,36 +166,18 @@ class _ShipglowsReviewFormState extends State<ShipglowsReviewForm> {
   @override
   Widget build(BuildContext context) {
     final theme = ShipglowsTheme.of(context);
-    return Shortcuts(
-      shortcuts: <ShortcutActivator, Intent>{
-        const SingleActivator(LogicalKeyboardKey.enter, control: true):
-            const _SendIntent(),
-        const SingleActivator(LogicalKeyboardKey.enter, meta: true):
-            const _SendIntent(),
-      },
-      child: Actions(
-        actions: {
-          _SendIntent: CallbackAction<_SendIntent>(
-            onInvoke: (_) {
-              if (_result == null && !_sending) unawaited(_send());
-              return null;
-            },
-          ),
-        },
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            theme.spaceXl,
-            theme.spaceLg,
-            theme.spaceXl,
-            theme.spaceXl,
-          ),
-          child: AnimatedSwitcher(
-            duration: theme.motionNormal,
-            child: _result == null
-                ? _editing(context, theme)
-                : _thanks(context, theme, _result!),
-          ),
-        ),
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        theme.spaceXl,
+        theme.spaceLg,
+        theme.spaceXl,
+        theme.spaceXl,
+      ),
+      child: AnimatedSwitcher(
+        duration: theme.motionNormal,
+        child: _result == null
+            ? _editing(context, theme)
+            : _thanks(context, theme, _result!),
       ),
     );
   }
@@ -419,8 +424,4 @@ class _ShipglowsReviewFormState extends State<ShipglowsReviewForm> {
     ReviewTopic.problem => ShipglowsIcons.bug,
     ReviewTopic.other => ShipglowsIcons.feedback,
   };
-}
-
-class _SendIntent extends Intent {
-  const _SendIntent();
 }

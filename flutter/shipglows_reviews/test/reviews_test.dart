@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shipglows_feedback/shipglows_feedback.dart';
 import 'package:shipglows_reviews/shipglows_reviews.dart';
@@ -354,6 +355,23 @@ void main() {
       reviews.dispose();
     });
 
+    testWidgets('« Give feedback » in the invitation opens the form', (
+      tester,
+    ) async {
+      final context = await screen(tester);
+      final reviews = await settled(FakeStore(canPrompt: false, listing: null));
+      final asked = reviews.maybeAskForReview(context, appName: 'TestGlows');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Give feedback'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your feedback on TestGlows'), findsOneWidget);
+      await tester.ensureVisible(find.text('Cancel'));
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(await asked, isTrue);
+      reviews.dispose();
+    });
+
     testWidgets('« Don’t ask again » stops the invitation', (tester) async {
       final context = await screen(tester);
       final reviews = await settled(FakeStore(canPrompt: false, listing: null));
@@ -530,6 +548,18 @@ void main() {
       await tester.pump();
       expect(find.text('Pick a rating or write a message.'), findsOneWidget);
       expect(sink.received, isEmpty);
+      reviews.dispose();
+    });
+
+    testWidgets('Ctrl+Enter sends from the message field', (tester) async {
+      final sink = MemoryReviewSink();
+      final reviews = await pump(tester, sink);
+      await tester.enterText(find.byType(TextField).first, 'Great app');
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(sink.received.single.comment, 'Great app');
       reviews.dispose();
     });
 
