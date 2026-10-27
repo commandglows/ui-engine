@@ -14,6 +14,19 @@ String? normalizeFolderName(
   return name.isEmpty ? null : name;
 }
 
+/// For apps whose items store a folder name rather than an id: the distinct
+/// names (ignoring case, first spelling kept), sorted.
+List<String> distinctFolderNames(Iterable<String?> names) {
+  final byKey = <String, String>{};
+  for (final name in names) {
+    if (name != null) {
+      byKey.putIfAbsent(name.toLowerCase(), () => name);
+    }
+  }
+  return byKey.values.toList()
+    ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+}
+
 /// A folder as the app stores it. [parentId] `null` is the root; apps with
 /// flat folders never set it.
 class Folder {

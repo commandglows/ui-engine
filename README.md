@@ -1181,12 +1181,14 @@ tag list. Status and due dates are not here (separate packages later).
   `subtreeIds` (filter or cascading delete), and checks `checkName` (unique
   among siblings, ignoring case) and `checkMove` (no cycle) as a
   `FolderProblem`. Missing parents and stored cycles show at the root.
+  Apps that store a folder name instead (CommandGlows snippets) use
+  `normalizeFolderName` and `distinctFolderNames`.
 - Search: `OrganizeQuery.parse` (`#term` prefixes a tag, other terms search
   the given fields or prefix a tag); `OrganizeFilter` (folders, tags with
   `TagMatch.all` or `.any`).
 
-Not yet: manual folder order, tag colours, UI widgets, CommandGlows wired to
-the package.
+Used by CommandGlows (snippets). Not yet: manual folder order, tag colours,
+UI widgets.
 
 ## `flutter/shipglows_settings`
 
