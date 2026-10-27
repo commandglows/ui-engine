@@ -7,5 +7,7 @@
 library;
 
 export 'src/folders.dart';
+export 'src/labels.dart';
 export 'src/search.dart';
+export 'src/sort.dart';
 export 'src/tags.dart';

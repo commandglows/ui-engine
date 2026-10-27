@@ -1200,9 +1200,14 @@ tag list. Status and due dates are not here (separate packages later).
 - Search: `OrganizeQuery.parse` (`#term` prefixes a tag, other terms search
   the given fields or prefix a tag); `OrganizeFilter` (folders, tags with
   `TagMatch.all` or `.any`).
+- Labels: `normalizeLabels` for free comma lists (keywords, topics) that keep
+  their case and inner spaces, without duplicates (ignoring case).
+- Sort: `sortedBy(items, key, direction: SortDirection.descending)`, stable,
+  items with a `null` key last (dates, names, counts).
 
-Used by CommandGlows (snippets). Not yet: manual folder order, tag colours,
-UI widgets.
+Used by CommandGlows (snippets) and ContentGlows (History search with
+`#tag` and date sort, keyword and topic lists). Not yet: manual folder
+order, tag colours, UI widgets.
 
 ## `flutter/shipglows_settings`
 
