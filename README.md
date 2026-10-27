@@ -1167,6 +1167,27 @@ plain `DOCTYPE`, so entities are never expanded; `SafeXmlLimits` bounds size,
 depth, node count and text. Used by `shipglows_storage` for S3 answers and by
 BeatGlows for MusicXML and Guitar Pro.
 
+## `flutter/shipglows_organize`
+
+Folders, tags and search for business items, started from the CommandGlows
+snippets. Storage stays in each app: an item only exposes a folder id and a
+tag list. Status and due dates are not here (separate packages later).
+
+- Tags: `normalizeTags` (string or list, `#` removed, lower case, no
+  duplicate, `TagRules` limits), `normalizeTag`, `distinctTags`, `tagCounts`,
+  `renameTag` (merges into an existing tag), `removeTag`.
+- Folders: `Folder(id, name, parentId)`, flat or nested. `FolderTree` gives
+  `children`, `path`, `label` (`Parent / Child`), `descendants`,
+  `subtreeIds` (filter or cascading delete), and checks `checkName` (unique
+  among siblings, ignoring case) and `checkMove` (no cycle) as a
+  `FolderProblem`. Missing parents and stored cycles show at the root.
+- Search: `OrganizeQuery.parse` (`#term` prefixes a tag, other terms search
+  the given fields or prefix a tag); `OrganizeFilter` (folders, tags with
+  `TagMatch.all` or `.any`).
+
+Not yet: manual folder order, tag colours, UI widgets, CommandGlows wired to
+the package.
+
 ## `flutter/shipglows_settings`
 
 User settings (not business data), merged from CommandGlows (sync engine),
