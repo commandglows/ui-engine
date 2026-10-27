@@ -1217,8 +1217,8 @@ tag list. Status and due dates are not here (separate packages later).
 Used by CommandGlows (snippets), ContentGlows (History search with
 `#tag` and date sort, keyword and topic lists), BeatGlows (library search
 and sort, playlist names, artist and song merge after a sync) and the
-ShipGlows app (command palette ranking, GitHub repository picker). Not yet: manual folder
-order, tag colours, UI widgets.
+ShipGlows app (command palette ranking, GitHub repository picker). Not
+yet: manual folder order, tag colours, UI widgets.
 
 ## `flutter/shipglows_settings`
 
