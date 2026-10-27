@@ -2,13 +2,18 @@
 /// ShipGlows app: case and accents are ignored, every typed word must match.
 
 /// Lower-case, accent-free form of [value], used on both sides of a match.
+/// Ligatures become two letters (`Œuvre` → `oeuvre`).
 String searchKey(String value) {
-  const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';
-  const to = 'aaaaaaceeeeiiiinooooouuuuyyoa';
+  const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿ';
+  const to = 'aaaaaaceeeeiiiinooooouuuuyy';
   final buffer = StringBuffer();
   for (final char in value.toLowerCase().split('')) {
     final index = from.indexOf(char);
-    buffer.write(index < 0 ? char : to[index]);
+    buffer.write(switch (char) {
+      'œ' => 'oe',
+      'æ' => 'ae',
+      _ => index < 0 ? char : to[index],
+    });
   }
   return buffer.toString();
 }

@@ -1204,7 +1204,7 @@ tag list. Status and due dates are not here (separate packages later).
   their case and inner spaces, without duplicates (ignoring case).
 - Sort: `sortedBy(items, key, direction: SortDirection.descending)`, stable,
   items with a `null` key last (dates, names, counts).
-- Text search: `searchKey` (lower case, no accents), `searchWords`,
+- Text search: `searchKey` (lower case, no accents, `œ`/`æ` as `oe`/`ae`), `searchWords`,
   `matchesSearch(query, fields)` (every word in some field) and
   `rankBySearch(items, query, label:, fields:)` (label starting with the
   query, then label holding every word, then a match in the fields).
