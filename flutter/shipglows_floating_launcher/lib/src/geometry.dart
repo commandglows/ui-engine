@@ -169,6 +169,7 @@ class FloatingLauncherLayout {
     required this.direction,
     required this.actionCenters,
     required this.tooltipOnLeft,
+    required this.workArea,
   });
 
   /// Lays [count] actions out around a bubble at [center]. [workArea] is the
@@ -206,6 +207,7 @@ class FloatingLauncherLayout {
         for (final point in centers)
           _tooltipOnLeft(geometry, center, point, workArea),
       ],
+      workArea: workArea,
     );
   }
 
@@ -226,6 +228,9 @@ class FloatingLauncherLayout {
   /// Whether the tooltip of each action opens on its left.
   final List<bool> tooltipOnLeft;
 
+  /// Screen the window can draw on, in window coordinates; null if unknown.
+  final Rect? workArea;
+
   int get count => actionCenters.length;
 
   /// Bounds of the bubble.
@@ -239,19 +244,22 @@ class FloatingLauncherLayout {
   );
 
   /// Room for the tooltip of action [index]; the card is narrower when its
-  /// text is short, against the action's side of this slot.
+  /// text is short, against the action's side of this slot. Centered on the
+  /// action, moved up or down just enough to stay on screen next to an
+  /// action close to the top or bottom edge.
   Rect tooltipSlot(int index) {
     final action = actionCenters[index];
     final half = geometry.actionSize / 2;
+    final height = geometry.tooltipHeight;
     final left = tooltipOnLeft[index]
         ? action.dx - half - geometry.tooltipGap - geometry.tooltipWidth
         : action.dx + half + geometry.tooltipGap;
-    return Rect.fromLTWH(
-      left,
-      action.dy - geometry.tooltipHeight / 2,
-      geometry.tooltipWidth,
-      geometry.tooltipHeight,
-    );
+    var top = action.dy - height / 2;
+    final area = workArea;
+    if (area != null && area.height >= height) {
+      top = top.clamp(area.top, area.bottom - height);
+    }
+    return Rect.fromLTWH(left, top, geometry.tooltipWidth, height);
   }
 
   /// Window shape while folded: the bubble and its shadow.

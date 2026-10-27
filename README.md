@@ -407,7 +407,10 @@ own Flutter engine in its own window.
 - `ShipglowsOverlayHost.workArea`: the monitor's work area in logical pixels
   relative to the window, set before `onShow` and updated after a move, a DPI
   change or a display change (listeners notified), so an overlay can open
-  its content toward the free side of the screen.
+  its content toward the free side of the screen. `placements` counts those
+  reports (listeners notified at each, even unchanged): one always follows
+  a `startDrag`, so an overlay can wait for its new place after a drag. With
+  a `clampRect`, a DPI change keeps that part's center where it was.
 - Alt+F4 and a plain Escape ask the overlay to close (`onRequestClose`,
   default: hide), whichever window holds the keyboard; `closeOnEscape = false`
   for an overlay with its own Escape handling. A dialog or menu above the
@@ -586,14 +589,16 @@ false`, `clampRect`, window shape).
   the window in front. No taskbar button, no Alt+Tab entry, invisible in
   screenshots and recordings (`excludeFromCapture`, on by default).
 - Colors from `ShipglowsTheme` (surface raised, icon, border, accent, on
-  accent, text, text muted), light or dark from the snapshot; sizes from
+  accent, text, text muted), light or dark from the snapshot (the system's,
+  followed live, when it gives none); sizes from
   `ShipglowsScale`. Each action carries its label (and shortcut as hint) for
   screen readers.
 - App engine: `ShipglowsFloatingLauncher` publishes a
   `ShipglowsFloatingLauncherSnapshot` (`items` as
   `ShipglowsFloatingLauncherItem`: id, label, icon, shortcut text, enabled;
   `bubbleLabel`, `brightness`, `data`), shows and hides the launcher and
-  updates it in place while shown.
+  updates it in place while shown or still appearing. `appFolder` (on the
+  constructor or `defaultOptions`) keeps the bubble's place across launches.
 - Launcher engine: `runShipglowsFloatingLauncherOverlay` from the app's
   `@pragma('vm:entry-point')` function, with the `logo` widget, the icon
   table (code point → constant `IconData`), an optional `ringGradient` and
@@ -614,7 +619,7 @@ dependencies:
 // App engine
 final launcher = ShipglowsFloatingLauncher(
   entrypoint: 'launcherMain',
-  options: ShipglowsFloatingLauncher.defaultOptions(appFolder: 'MyApp'),
+  appFolder: 'MyApp',
 );
 launcher.selections.listen(runCommand); // item id
 launcher.bubbleTaps.listen((_) => showMainWindow());
@@ -644,8 +649,8 @@ void launcherMain() => runShipglowsFloatingLauncherOverlay(
 ```
 
 The launcher's engine registers no plugin unless the logo needs one. A custom
-geometry goes to both `ShipglowsFloatingLauncher(geometry:)` and
-`defaultOptions(geometry:)`.
+geometry goes to `ShipglowsFloatingLauncher(geometry:)`, and to
+`defaultOptions(geometry:)` when custom options are passed (asserted).
 
 ## `flutter/shipglows_menu`
 

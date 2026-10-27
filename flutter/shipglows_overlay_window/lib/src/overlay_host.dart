@@ -69,6 +69,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   bool _listeningKeys = false;
   int? _previousForeground;
   Rect? _workArea;
+  int _placements = 0;
 
   /// Id of the overlay, once [ready] completed.
   String? get id => _id;
@@ -101,6 +102,13 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   /// a move, a DPI change or a display change (listeners are notified). Null
   /// before the first opening.
   Rect? get workArea => _workArea;
+
+  /// Number of placement reports received: one when a move ends (also a
+  /// [startDrag] that could not start), after a DPI change and after a
+  /// display or taskbar change. Listeners are notified at each, even when
+  /// [workArea] stays the same, so an overlay can wait for the report that
+  /// follows its drag before laying out for the new place.
+  int get placements => _placements;
 
   /// Messages sent with [ShipglowsOverlayWindow.send].
   Stream<ShipglowsOverlayMessage> get messages => _messages.stream;
@@ -219,7 +227,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
         _previousForeground = previous is int && previous != 0
             ? previous
             : null;
-        _setWorkArea(arguments['workArea']);
+        if (_updateWorkArea(arguments['workArea'])) notifyListeners();
         await onShow?.call(arguments['data']);
         _setVisible(true);
         // The window appears only after a frame with this data was drawn.
@@ -243,29 +251,34 @@ class ShipglowsOverlayHost extends ChangeNotifier {
           notifyListeners();
         }
       case 'placement':
-        _setWorkArea(arguments);
+        _placements++;
+        _updateWorkArea(arguments);
+        notifyListeners();
       case 'requestClose':
         await requestClose();
     }
     return null;
   }
 
-  void _setWorkArea(Object? value) {
-    if (value is! Map) return;
+  // Whether the work area changed.
+  bool _updateWorkArea(Object? value) {
+    if (value is! Map) return false;
     final left = value['left'];
     final top = value['top'];
     final right = value['right'];
     final bottom = value['bottom'];
-    if (left is! num || top is! num || right is! num || bottom is! num) return;
+    if (left is! num || top is! num || right is! num || bottom is! num) {
+      return false;
+    }
     final area = Rect.fromLTRB(
       left.toDouble(),
       top.toDouble(),
       right.toDouble(),
       bottom.toDouble(),
     );
-    if (area == _workArea) return;
+    if (area == _workArea) return false;
     _workArea = area;
-    notifyListeners();
+    return true;
   }
 
   // A preloaded overlay's view is hidden, so Flutter reports the app hidden

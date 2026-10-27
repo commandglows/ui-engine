@@ -107,6 +107,18 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
       _snapshot?.brightness ??
       ui.PlatformDispatcher.instance.platformBrightness;
 
+  /// Theme mode of the snapshot; the system's (followed live) when the app
+  /// gave no brightness.
+  ThemeMode get themeMode => switch (_snapshot?.brightness) {
+    Brightness.dark => ThemeMode.dark,
+    Brightness.light => ThemeMode.light,
+    null => ThemeMode.system,
+  };
+
+  /// Placement reports received ([ShipglowsOverlayHost.placements]): one
+  /// follows each drag.
+  int get placements => host.placements;
+
   /// Clips the window to [shape] (see [ShipglowsOverlayHost.setShape]),
   /// unless it already has it.
   Future<void> setShape(List<RRect> shape) async {
@@ -225,9 +237,7 @@ class ShipglowsFloatingLauncherOverlayApp extends StatelessWidget {
         color: const Color(0x00000000),
         theme: theme ?? ThemeData(brightness: Brightness.light),
         darkTheme: darkTheme ?? ThemeData(brightness: Brightness.dark),
-        themeMode: controller.brightness == Brightness.dark
-            ? ThemeMode.dark
-            : ThemeMode.light,
+        themeMode: controller.themeMode,
         home: _LauncherSurface(
           controller: controller,
           logo: logo,
@@ -266,6 +276,11 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   bool _open = false;
   String? _hovered;
   FloatingLauncherLayout? _layout;
+  // Whether the pointer is inside the window's shape.
+  bool _pointerInside = false;
+  // Placement count when a drag started: until the report that follows it
+  // arrives, the layout is for the old place and the fan stays folded.
+  int? _dragPlacements;
 
   ShipglowsFloatingLauncherOverlayController get _controller =>
       widget.controller;
@@ -293,14 +308,23 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     super.dispose();
   }
 
-  // Hidden: the next opening starts folded.
   void _onControllerChanged() {
-    if (_controller.visible) return;
-    _collapseTimer?.cancel();
-    _collapseTimer = null;
-    _open = false;
-    _hovered = null;
-    _fan.value = 0;
+    if (!_controller.visible) {
+      // Hidden: the next opening starts folded.
+      _collapseTimer?.cancel();
+      _collapseTimer = null;
+      _open = false;
+      _hovered = null;
+      _dragPlacements = null;
+      _fan.value = 0;
+      return;
+    }
+    final dragged = _dragPlacements;
+    if (dragged != null && _controller.placements != dragged) {
+      // The drag ended and the layout now follows the new place.
+      _dragPlacements = null;
+      if (_pointerInside) _expand();
+    }
   }
 
   void _onFanStatus(AnimationStatus status) {
@@ -316,7 +340,12 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     _collapseTimer?.cancel();
     _collapseTimer = null;
     final layout = _layout;
-    if (_open || layout == null || layout.count == 0) return;
+    if (_open ||
+        _dragPlacements != null ||
+        layout == null ||
+        layout.count == 0) {
+      return;
+    }
     _open = true;
     unawaited(_unfold(layout));
   }
@@ -389,6 +418,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
 
   void _startDrag() {
     _collapseNow();
+    _dragPlacements = _controller.placements;
     unawaited(_controller.startDrag());
   }
 
@@ -434,8 +464,14 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
             // The window's shape bounds the zone: anywhere inside it keeps
             // the fan open, leaving it folds the fan after a short delay.
             hitTestBehavior: HitTestBehavior.opaque,
-            onEnter: (_) => _expand(),
-            onExit: (_) => _scheduleCollapse(),
+            onEnter: (_) {
+              _pointerInside = true;
+              _expand();
+            },
+            onExit: (_) {
+              _pointerInside = false;
+              _scheduleCollapse();
+            },
             child: AnimatedBuilder(
               animation: _fan,
               child: bubble,
@@ -510,30 +546,46 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
         ? -1
         : items.indexWhere((item) => item.id == hovered);
     final shown = index >= 0 && _open && _fan.isCompleted;
-    final Widget card;
+    final cards = <Widget>[];
     if (shown) {
+      final item = items[index];
       final slot = layout.tooltipSlot(index);
-      card = Positioned.fromRect(
-        key: ValueKey<String>(items[index].id),
-        rect: slot,
-        child: Align(
-          alignment: layout.tooltipOnLeft[index]
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
-          child: _TooltipCard(item: items[index], maxSize: slot.size),
+      final action = layout.actionCenters[index];
+      final vertical = slot.height <= 0
+          ? 0.0
+          : ((action.dy - slot.center.dy) / (slot.height / 2)).clamp(
+              -1.0,
+              1.0,
+            );
+      // Fades in for each action. It goes at once when the action is left:
+      // the window's shape drops its room at the same moment.
+      cards.add(
+        Positioned.fromRect(
+          key: ValueKey<String>(item.id),
+          rect: slot,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: motion,
+            curve: ShipglowsScale.curveStandard,
+            builder: (context, opacity, card) =>
+                Opacity(opacity: opacity, child: card),
+            child: Align(
+              // Level with the action, unless the slot was moved to stay on
+              // screen.
+              alignment: Alignment(
+                layout.tooltipOnLeft[index] ? 1 : -1,
+                vertical,
+              ),
+              child: _TooltipCard(item: item, maxSize: slot.size),
+            ),
+          ),
         ),
       );
-    } else {
-      card = const Positioned(left: 0, top: 0, child: SizedBox.shrink());
     }
     // Read by screen readers from the action itself.
     return IgnorePointer(
       child: ExcludeSemantics(
-        child: AnimatedOpacity(
-          opacity: shown ? 1 : 0,
-          duration: motion,
-          child: Stack(clipBehavior: Clip.none, children: [card]),
-        ),
+        child: Stack(clipBehavior: Clip.none, children: cards),
       ),
     );
   }

@@ -643,19 +643,24 @@ void OverlayWindowImpl::StartCapturedDrag() {
   if (captured_drag_) return;
   // Released meanwhile: nothing to drag.
   const int button = GetSystemMetrics(SM_SWAPBUTTON) ? VK_RBUTTON : VK_LBUTTON;
-  if ((GetAsyncKeyState(button) & 0x8000) == 0) return;
   RECT bounds{};
   POINT cursor{};
-  if (!GetWindowRect(window_, &bounds) || !GetCursorPos(&cursor)) return;
-  StopAnimation();
-  const double dpi = DpiOf(window_);
-  captured_drag_ = CapturedDrag{(cursor.x - bounds.left) * 96.0 / dpi,
-                                (cursor.y - bounds.top) * 96.0 / dpi};
-  // Taken from the view, which captured the button press: its pointer ends
-  // as with the system move loop. Mouse messages now come to this window
-  // until the button is up, wherever the cursor goes.
-  SetCapture(window_);
-  if (GetCapture() != window_) captured_drag_.reset();
+  if ((GetAsyncKeyState(button) & 0x8000) != 0 &&
+      GetWindowRect(window_, &bounds) && GetCursorPos(&cursor)) {
+    StopAnimation();
+    const double dpi = DpiOf(window_);
+    captured_drag_ = CapturedDrag{(cursor.x - bounds.left) * 96.0 / dpi,
+                                  (cursor.y - bounds.top) * 96.0 / dpi};
+    // Taken from the view, which captured the button press: its pointer
+    // ends as with the system move loop. Mouse messages now come to this
+    // window until the button is up, wherever the cursor goes.
+    SetCapture(window_);
+    if (GetCapture() == window_) return;
+    captured_drag_.reset();
+  }
+  // No drag: the placement report a drag ends with still comes, for an
+  // overlay that waits for it.
+  NotifyPlacement();
 }
 
 void OverlayWindowImpl::StepCapturedDrag() {
@@ -1414,10 +1419,53 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
     }
     case WM_DPICHANGED: {
       const auto* suggested = reinterpret_cast<RECT*>(lparam);
+      // With a clamp rect (and no drag, which places the window itself),
+      // that part keeps its center on screen: the suggested rect scales the
+      // window around another point. Where it sits in the window, as a
+      // fraction of the window, does not depend on the DPI.
+      std::optional<POINT> core_center;
+      double fraction_x = 0.5;
+      double fraction_y = 0.5;
+      RECT before{};
+      if (config_.clamp_rect && !captured_drag_ &&
+          GetWindowRect(hwnd, &before)) {
+        const UINT new_dpi = LOWORD(wparam) ? LOWORD(wparam) : 96;
+        const double logical_width =
+            (suggested->right - suggested->left) * 96.0 / new_dpi;
+        const double logical_height =
+            (suggested->bottom - suggested->top) * 96.0 / new_dpi;
+        const RECT& core = *config_.clamp_rect;
+        if (logical_width > 0 && logical_height > 0) {
+          fraction_x = (core.left + core.right) / 2.0 / logical_width;
+          fraction_y = (core.top + core.bottom) / 2.0 / logical_height;
+          core_center = POINT{
+              before.left + static_cast<LONG>(std::lround(
+                                fraction_x * (before.right - before.left))),
+              before.top + static_cast<LONG>(std::lround(
+                               fraction_y * (before.bottom - before.top)))};
+        }
+      }
       SetWindowPos(hwnd, nullptr, suggested->left, suggested->top,
                    suggested->right - suggested->left,
                    suggested->bottom - suggested->top,
                    SWP_NOZORDER | SWP_NOACTIVATE);
+      RECT after{};
+      if (core_center && GetWindowRect(hwnd, &after)) {
+        const LONG width = after.right - after.left;
+        const LONG height = after.bottom - after.top;
+        const LONG left = core_center->x -
+                          static_cast<LONG>(std::lround(fraction_x * width));
+        const LONG top = core_center->y -
+                         static_cast<LONG>(std::lround(fraction_y * height));
+        const RECT clamped =
+            ClampedBounds(RECT{left, top, left + width, top + height}, width,
+                          height);
+        // Not saved: a DPI change is no choice of the user.
+        if (clamped.left != after.left || clamped.top != after.top) {
+          SetWindowPos(hwnd, nullptr, clamped.left, clamped.top, 0, 0,
+                       SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+      }
       NotifyPlacement();
       return 0;
     }

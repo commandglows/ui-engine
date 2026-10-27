@@ -19,19 +19,32 @@ import 'snapshot.dart';
 ///
 /// The app publishes the actions ([publish]) and shows the launcher
 /// ([show]); the user drags the bubble where they want it, and it comes
-/// back there at the next launch (with an `appFolder` in [defaultOptions]).
+/// back there at the next launch (with an `appFolder`).
 ///
 /// Windows only; elsewhere [show] returns false and nothing is shown.
 class ShipglowsFloatingLauncher {
+  /// [appFolder] (usually the app's name) keeps the bubble's place across
+  /// launches, under `%APPDATA%`. Custom [options] replace
+  /// [defaultOptions]; build them from it with the same [geometry], since
+  /// the window's size and kept-on-screen part must match it.
   ShipglowsFloatingLauncher({
     required String entrypoint,
     String id = 'shipglows_floating_launcher',
+    String? appFolder,
     this.geometry = const ShipglowsFloatingLauncherGeometry(),
     ShipglowsOverlayOptions? options,
-  }) : overlay = ShipglowsOverlayWindow(
+  }) : assert(
+         options == null ||
+             (options.size == geometry.windowSize &&
+                 options.clampRect == geometry.bubbleRect),
+         'options must come from defaultOptions(geometry:) with this geometry',
+       ),
+       overlay = ShipglowsOverlayWindow(
          id: id,
          entrypoint: entrypoint,
-         options: options ?? defaultOptions(geometry: geometry),
+         options:
+             options ??
+             defaultOptions(appFolder: appFolder, geometry: geometry),
        ) {
     _subscription = overlay.messages.listen(_onMessage);
   }
@@ -85,6 +98,9 @@ class ShipglowsFloatingLauncher {
   final _bubbleTaps = StreamController<void>.broadcast();
   late final StreamSubscription<ShipglowsOverlayMessage> _subscription;
   ShipglowsFloatingLauncherSnapshot? _snapshot;
+  // show() was called and hide() not since: the launcher is on screen or
+  // about to be.
+  bool _shown = false;
 
   /// Ids of the actions clicked in the launcher. Run them here, in the
   /// app's engine; the fan has already folded back.
@@ -101,22 +117,32 @@ class ShipglowsFloatingLauncher {
   ShipglowsFloatingLauncherSnapshot? get snapshot => _snapshot;
 
   /// Keeps [snapshot] for the next [show], and updates the launcher in place
-  /// while it is on screen. Merging a burst of changes into one publish is
-  /// up to the app.
+  /// while it is on screen, or about to appear. Merging a burst of changes
+  /// into one publish is up to the app.
   Future<void> publish(ShipglowsFloatingLauncherSnapshot snapshot) async {
     _snapshot = snapshot;
     if (overlay.visible.value) {
       await overlay.send(snapshotMessage, _payload());
+    } else if (_shown) {
+      // Still appearing (its engine starting): the pending opening takes
+      // the new snapshot instead of the one show() carried.
+      await overlay.show(data: _payload(), activate: false);
     }
   }
 
   /// Shows the launcher, folded, on the last snapshot (only the bubble
   /// before any), without taking the keyboard. Returns false when it could
   /// not be shown.
-  Future<bool> show() => overlay.show(data: _payload(), activate: false);
+  Future<bool> show() {
+    _shown = true;
+    return overlay.show(data: _payload(), activate: false);
+  }
 
   /// Hides the launcher; the keyboard stays where it is.
-  Future<void> hide() => overlay.hide(focus: OverlayHideFocus.none);
+  Future<void> hide() {
+    _shown = false;
+    return overlay.hide(focus: OverlayHideFocus.none);
+  }
 
   /// Closes the window and stops the launcher's engine.
   Future<void> dispose() async {
