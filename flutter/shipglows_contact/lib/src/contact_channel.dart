@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 
 /// The kinds of contact channel. Each has its own default label and icon.
@@ -102,6 +104,37 @@ class ContactChannel {
     );
   }
 
+  /// Email to the app's support [address], tagged so the support inbox
+  /// (the email engine's « Service client ») sorts it by app: the subject
+  /// starts with `[appName version] ` (the trailing space leaves the cursor
+  /// ready when [subject] is not given) and the body ends with a signature
+  /// line naming the app, version, [platform] and [locale] (detected when
+  /// not given). No device id, no account.
+  factory ContactChannel.supportEmail(
+    String address, {
+    required String appName,
+    String? version,
+    String? subject,
+    String? body,
+    String? platform,
+    String? locale,
+  }) {
+    final app = [
+      appName,
+      ?version,
+    ].map((part) => part.trim()).where((part) => part.isNotEmpty).join(' ');
+    final footer = [
+      app,
+      platform ?? _platformName(),
+      locale ?? ui.PlatformDispatcher.instance.locale.toLanguageTag(),
+    ].join(' · ');
+    return ContactChannel.email(
+      address,
+      subject: '[$app] ${subject ?? ''}',
+      body: '${body ?? ''}\n\n-- \n$footer',
+    );
+  }
+
   /// Phone call to [number]; spaces are removed, a leading `+` is kept.
   factory ContactChannel.phone(String number) {
     final dialed = number.trim();
@@ -168,6 +201,19 @@ class ContactChannel {
           '${entry.key}=${Uri.encodeComponent(entry.value!)}',
     ];
     return pairs.isEmpty ? null : pairs.join('&');
+  }
+
+  /// The running platform, as the support signature names it.
+  static String _platformName() {
+    if (kIsWeb) return 'Web';
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => 'Android',
+      TargetPlatform.iOS => 'iOS',
+      TargetPlatform.macOS => 'macOS',
+      TargetPlatform.windows => 'Windows',
+      TargetPlatform.linux => 'Linux',
+      TargetPlatform.fuchsia => 'Fuchsia',
+    };
   }
 
   /// [username] without surrounding spaces and a leading `@`; from a pasted

@@ -1983,6 +1983,12 @@ value and says so through `shipglows_feedback`, which needs a
   pasted profile link reduced to its handle), `displayValue` is the
   address, number or handle shown under the label. WhatsApp needs an
   international number (`+33…` or `0033…`; asserted in debug).
+- `ContactChannel.supportEmail(address, appName:, version:)`: the email
+  for the app's support alias, meant to reach the email engine's « Service
+  client » once the alias routes there (Mutant Mail → Gmail). The subject
+  starts with `[App 1.4.2] ` and the body ends with a `-- ` signature
+  followed by a line naming app, version, platform and language, so the
+  support inbox can sort mail by app. No device id.
 - `ShipglowsContactConfig(channels:, title:, intro:)`: the channels in
   display order.
 - `ShipglowsContactButton(config:, extended:)`: a floating button for
@@ -1999,7 +2005,11 @@ ShipglowsContactButton(
   config: ShipglowsContactConfig(
     channels: [
       ContactChannel.whatsApp('+33 6 12 34 56 78'),
-      ContactChannel.email('hello@example.com', subject: 'Support'),
+      ContactChannel.supportEmail(
+        'support-commandglows@example.com',
+        appName: 'CommandGlows',
+        version: '1.4.2', // PackageInfo.fromPlatform() in the app
+      ),
     ],
   ),
 );

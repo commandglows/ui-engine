@@ -55,6 +55,36 @@ void main() {
       expect(channel.uri.toString().contains('+'), isFalse);
     });
 
+    test('support email tags the subject and signs the body', () {
+      final channel = ContactChannel.supportEmail(
+        'support@shipglows.com',
+        appName: 'CommandGlows',
+        version: '1.4.2',
+        platform: 'Windows',
+        locale: 'fr-FR',
+      );
+      expect(channel.kind, ContactChannelKind.email);
+      expect(channel.displayValue, 'support@shipglows.com');
+      expect(
+        channel.uri.toString(),
+        'mailto:support@shipglows.com'
+        '?subject=%5BCommandGlows%201.4.2%5D%20'
+        '&body=%0A%0A--%20%0ACommandGlows%201.4.2%20%C2%B7%20Windows'
+        '%20%C2%B7%20fr-FR',
+      );
+    });
+
+    test('support email without a version keeps the app name alone', () {
+      final uri = ContactChannel.supportEmail(
+        'support@shipglows.com',
+        appName: 'BeatGlows',
+        subject: 'Bug',
+        platform: 'Android',
+        locale: 'en',
+      ).uri;
+      expect(uri.queryParameters['subject'], '[BeatGlows] Bug');
+    });
+
     test('Instagram and Telegram strip one leading @', () {
       final instagram = ContactChannel.instagram('@shipglows');
       expect(instagram.uri.toString(), 'https://ig.me/m/shipglows');

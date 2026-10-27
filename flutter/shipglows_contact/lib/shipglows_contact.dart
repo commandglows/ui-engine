@@ -3,8 +3,8 @@
 /// No inbox, no CRM, no network call.
 ///
 /// - [ContactChannel]: one channel and its deeplink (`whatsApp`, `messenger`,
-///   `instagram`, `telegram`, `email`, `phone`, `sms`, `link`), with
-///   [ContactChannel.displayValue] shown under its label.
+///   `instagram`, `telegram`, `email`, `supportEmail`, `phone`, `sms`,
+///   `link`), with [ContactChannel.displayValue] shown under its label.
 /// - [ShipglowsContactConfig]: the channels in display order, an optional
 ///   title and intro.
 /// - [ShipglowsContactButton]: a floating button opening the sheet
