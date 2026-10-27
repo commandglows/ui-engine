@@ -11,3 +11,4 @@ export 'src/labels.dart';
 export 'src/search.dart';
 export 'src/sort.dart';
 export 'src/tags.dart';
+export 'src/text_search.dart';
