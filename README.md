@@ -1002,7 +1002,13 @@ another S3-compatible bucket is an endpoint change.
 - Tests: one contract suite run on every store, including a local fake S3
   bucket (`test/fake_s3_server.dart`) that also proves retries and resumes;
   the run on a real bucket needs `SHIPGLOWS_S3_ENDPOINT`, `_BUCKET`,
-  `_REGION`, `_KEY_ID`, `_SECRET` and is skipped without them.
+  `_REGION`, `_KEY_ID`, `_SECRET` and is skipped without them. Proven on
+  Cloudflare R2 on 2026-10-27 (bucket `shipglows-storage-tests`, EU
+  jurisdiction, keys limited to it in Doppler `dotfiles`/`dev`):
+
+  ```bash
+  SHIPGLOWS_S3_ENDPOINT=https://b805cca6c486d78d68e7a4498292be56.eu.r2.cloudflarestorage.com SHIPGLOWS_S3_BUCKET=shipglows-storage-tests SHIPGLOWS_S3_REGION=auto doppler run --project dotfiles --config dev -- flutter test test/blob_stores_test.dart
+  ```
 
 - Backend-signed uploads, extracted from ContentGlows: the backend keeps
   the storage keys and signs one part at a time. `import

@@ -48,8 +48,13 @@ class S3BlobStore implements BlobStore {
   })  : _client = client ??
             (HttpClient()..connectionTimeout = const Duration(seconds: 15)),
         _clock = clock ?? DateTime.now,
+        // Keys never hold spaces: a pasted key often ends with a newline,
+        // which would fail every signature as « Clé secrète refusée ».
         _signer = SigV4Signer(
-          credentials: config.credentials,
+          credentials: (
+            accessKeyId: config.credentials.accessKeyId.trim(),
+            secretAccessKey: config.credentials.secretAccessKey.trim(),
+          ),
           region: config.region,
         );
 
