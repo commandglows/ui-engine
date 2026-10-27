@@ -34,6 +34,9 @@ enum class Placement {
   kCursorMonitorUpper,
   // Centered on the monitor of the window that was in front.
   kForegroundMonitorCenter,
+  // Against the right edge of the cursor's monitor, vertically centered
+  // (docked launchers). With |clamp_rect|, that part touches the edge.
+  kCursorMonitorRight,
 };
 
 // What a click outside the overlay (another window becoming active) does.
@@ -66,6 +69,12 @@ struct OverlayConfig {
   int min_height = 120;
   // Space kept between the overlay and the monitor's work area edges.
   int margin = 16;
+  // Part of the window, in logical pixels from its top-left corner, kept
+  // inside the monitor's work area (with |margin|) when the overlay opens, is
+  // dragged or the displays change; the rest of the window may leave the
+  // screen (a launcher bubble at the center of a larger transparent window).
+  // None: the whole window is kept inside.
+  std::optional<RECT> clamp_rect;
   // Fallback window region radius where DWM cannot round corners (Windows 10).
   int corner_radius = 12;
 
@@ -76,6 +85,12 @@ struct OverlayConfig {
   OutsideClick outside_click = OutsideClick::kBackground;
   // Invisible in screenshots and screen recordings.
   bool exclude_from_capture = false;
+  // False: a click never activates the overlay (WS_EX_NOACTIVATE), so the
+  // window in front keeps the keyboard; hover and clicks still reach the
+  // view. StartDrag then moves the window itself, without the system move
+  // loop (which activates the window and only drags an outline of a
+  // non-activating one).
+  bool activate_on_click = true;
   // The edges can be dragged (startResize) and resetSize restores the size.
   bool resizable = true;
   // A double-click on the drag area maximizes, or restores.

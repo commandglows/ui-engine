@@ -1,0 +1,21 @@
+name: shipglows_floating_launcher
+description: A persistent floating launcher for ShipGlows Flutter apps, a bubble in its own always-on-top window (own Flutter engine, never focused) whose actions fan out on hover.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_overlay_window:
+    path: ../shipglows_overlay_window
+  shipglows_theme:
+    path: ../shipglows_theme
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

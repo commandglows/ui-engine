@@ -1,4 +1,4 @@
-import 'dart:ui' show Color, Size;
+import 'dart:ui' show Color, Rect, Size;
 
 import 'package:flutter/foundation.dart';
 
@@ -25,6 +25,11 @@ enum OverlayPlacement {
 
   /// Centered on the monitor of the window that was in front.
   foregroundMonitorCenter,
+
+  /// Against the right edge of the cursor's monitor, vertically centered
+  /// (docked launchers). With [ShipglowsOverlayOptions.clampRect], that part
+  /// of the window touches the edge.
+  cursorMonitorRight,
 }
 
 /// What a click outside an overlay (another window becoming active) does.
@@ -67,12 +72,14 @@ class ShipglowsOverlayOptions {
     this.showInTaskbar = false,
     this.outsideClick = OverlayOutsideClick.background,
     this.excludeFromCapture = false,
+    this.activateOnClick = true,
     this.resizable = true,
     this.doubleClickMaximizes = true,
     this.sizeMemory = OverlaySizeMemory.persistent,
     this.rememberPosition = true,
     this.placement = OverlayPlacement.cursorMonitorCenter,
     this.margin = 16,
+    this.clampRect,
     this.cornerRadius = 12,
     this.darkFrame = true,
     this.transparent = false,
@@ -106,6 +113,12 @@ class ShipglowsOverlayOptions {
   /// Invisible in screenshots and screen recordings.
   final bool excludeFromCapture;
 
+  /// Whether a click activates the overlay. False: the window in front keeps
+  /// the keyboard while the overlay is hovered, clicked and dragged (a
+  /// floating launcher); the overlay never takes focus by itself, and
+  /// [ShipglowsOverlayHost.startDrag] moves it without the system move loop.
+  final bool activateOnClick;
+
   /// The edges can be dragged; a double-click on an edge restores [size].
   final bool resizable;
 
@@ -124,6 +137,13 @@ class ShipglowsOverlayOptions {
 
   /// Logical space kept between the overlay and the screen edges.
   final double margin;
+
+  /// Part of the window, in logical pixels from its top-left corner, kept
+  /// inside the monitor's work area (with [margin]) when the overlay opens,
+  /// is dragged or the displays change; the rest of the window may leave the
+  /// screen, as the transparent room around a launcher bubble. Null: the
+  /// whole window is kept inside.
+  final Rect? clampRect;
 
   /// Corner radius on Windows 10, where the system does not round windows.
   final double cornerRadius;
@@ -155,12 +175,20 @@ class ShipglowsOverlayOptions {
     'showInTaskbar': showInTaskbar,
     'outsideClick': outsideClick.name,
     'excludeFromCapture': excludeFromCapture,
+    'activateOnClick': activateOnClick,
     'resizable': resizable,
     'doubleClickMaximizes': doubleClickMaximizes,
     'sizeMemory': sizeMemory.name,
     'rememberPosition': rememberPosition,
     'placement': placement.name,
     'margin': margin.round(),
+    if (clampRect case final rect?)
+      'clampRect': [
+        rect.left.round(),
+        rect.top.round(),
+        rect.right.round(),
+        rect.bottom.round(),
+      ],
     'cornerRadius': cornerRadius.round(),
     'darkFrame': darkFrame,
     'transparent': transparent,

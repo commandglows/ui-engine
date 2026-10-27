@@ -68,6 +68,21 @@ std::optional<int64_t> IntOf(const flutter::EncodableValue* value) {
 
 int Scale(int logical, UINT dpi) { return MulDiv(logical, dpi, 96); }
 
+// DPI of |window|, 96 when it has none (destroyed).
+UINT DpiOf(HWND window) {
+  const UINT dpi = window ? GetDpiForWindow(window) : 0;
+  return dpi ? dpi : 96;
+}
+
+std::optional<double> DoubleOf(const flutter::EncodableValue& value) {
+  if (const auto* v = std::get_if<double>(&value)) return *v;
+  if (const auto* v = std::get_if<int32_t>(&value)) return *v;
+  if (const auto* v = std::get_if<int64_t>(&value)) {
+    return static_cast<double>(*v);
+  }
+  return std::nullopt;
+}
+
 COLORREF ColorFromArgb(int64_t argb) {
   const auto value = static_cast<uint32_t>(argb);
   return RGB((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF);
@@ -146,7 +161,8 @@ bool OverlayWindowImpl::CreateOverlay() {
 
   const DWORD ex_style =
       (config_.show_in_taskbar ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW) |
-      (config_.always_on_top ? WS_EX_TOPMOST : 0);
+      (config_.always_on_top ? WS_EX_TOPMOST : 0) |
+      (config_.activate_on_click ? 0 : WS_EX_NOACTIVATE);
   // The caption and frame styles let DWM draw rounded corners, the border
   // and the shadow; WM_NCCALCSIZE keeps the window borderless.
   DWORD style = WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_CLIPCHILDREN |
@@ -275,6 +291,8 @@ void OverlayWindowImpl::SetFrameStyle(const flutter::EncodableValue* arguments) 
 
 void OverlayWindowImpl::DestroyOverlay() {
   StopAnimation();
+  // DestroyWindow releases the mouse capture of a drag in progress.
+  captured_drag_.reset();
   ready_ = false;
   frame_ready_ = false;
   visible_ = false;
@@ -334,6 +352,11 @@ void OverlayWindowImpl::HandleHostCall(
     SetFrameStyle(call.arguments());
     return;
   }
+  if (method == "setShape") {
+    result->Success();
+    SetShape(call.arguments());
+    return;
+  }
   if (method == "startDrag") {
     // Reply before the native move loop, which runs until the button is up.
     result->Success();
@@ -388,14 +411,7 @@ bool OverlayWindowImpl::ShowFrom(const flutter::EncodableValue& data,
     if (previous_foreground) previous_foreground_ = previous_foreground;
     // Already on screen: hand over the new data, no new reveal.
     ++generation_;
-    InvokeHost("show", std::make_unique<flutter::EncodableValue>(
-                           flutter::EncodableMap{
-                               {flutter::EncodableValue("generation"),
-                                flutter::EncodableValue(generation_)},
-                               {flutter::EncodableValue("data"), data},
-                               {flutter::EncodableValue("previousForeground"),
-                                HandleValue(previous_foreground_)},
-                           }));
+    InvokeHost("show", ShowArguments(data));
     return !activate || Activate();
   }
   pending_data_ = data;
@@ -417,14 +433,21 @@ bool OverlayWindowImpl::ShowFrom(const flutter::EncodableValue& data,
 
 void OverlayWindowImpl::StartPresentation() {
   ++generation_;
-  InvokeHost("show", std::make_unique<flutter::EncodableValue>(
-                         flutter::EncodableMap{
-                             {flutter::EncodableValue("generation"),
-                              flutter::EncodableValue(generation_)},
-                             {flutter::EncodableValue("data"), pending_data_},
-                             {flutter::EncodableValue("previousForeground"),
-                              HandleValue(previous_foreground_)},
-                         }));
+  InvokeHost("show", ShowArguments(pending_data_));
+}
+
+std::unique_ptr<flutter::EncodableValue> OverlayWindowImpl::ShowArguments(
+    const flutter::EncodableValue& data) {
+  return std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+      {flutter::EncodableValue("generation"),
+       flutter::EncodableValue(generation_)},
+      {flutter::EncodableValue("data"), data},
+      {flutter::EncodableValue("previousForeground"),
+       HandleValue(previous_foreground_)},
+      // The window is already placed: the overlay lays out its first frame
+      // for the screen it is on.
+      {flutter::EncodableValue("workArea"), WorkAreaValue()},
+  });
 }
 
 void OverlayWindowImpl::Reveal(int64_t generation) {
@@ -505,6 +528,7 @@ void OverlayWindowImpl::SendBehindForeground() {
 
 void OverlayWindowImpl::HideWindow(FocusReturn focus) {
   if (!window_) return;
+  EndCapturedDrag();
   if (!visible_ && !reveal_pending_ && !IsWindowVisible(window_)) return;
   const bool was_visible = visible_;
   StopAnimation();
@@ -597,6 +621,10 @@ bool OverlayWindowImpl::Activate() {
 
 void OverlayWindowImpl::StartDrag() {
   if (!window_) return;
+  if (!config_.activate_on_click) {
+    StartCapturedDrag();
+    return;
+  }
   ReleaseCapture();
   if (restore_bounds_) {
     // Resized from inside the engine's own channel call, the view cannot
@@ -609,6 +637,55 @@ void OverlayWindowImpl::StartDrag() {
   GetCursorPos(&cursor);
   SendMessageW(window_, WM_NCLBUTTONDOWN, HTCAPTION,
                MAKELPARAM(cursor.x, cursor.y));
+}
+
+void OverlayWindowImpl::StartCapturedDrag() {
+  if (captured_drag_) return;
+  // Released meanwhile: nothing to drag.
+  const int button = GetSystemMetrics(SM_SWAPBUTTON) ? VK_RBUTTON : VK_LBUTTON;
+  if ((GetAsyncKeyState(button) & 0x8000) == 0) return;
+  RECT bounds{};
+  POINT cursor{};
+  if (!GetWindowRect(window_, &bounds) || !GetCursorPos(&cursor)) return;
+  StopAnimation();
+  const double dpi = DpiOf(window_);
+  captured_drag_ = CapturedDrag{(cursor.x - bounds.left) * 96.0 / dpi,
+                                (cursor.y - bounds.top) * 96.0 / dpi};
+  // Taken from the view, which captured the button press: its pointer ends
+  // as with the system move loop. Mouse messages now come to this window
+  // until the button is up, wherever the cursor goes.
+  SetCapture(window_);
+  if (GetCapture() != window_) captured_drag_.reset();
+}
+
+void OverlayWindowImpl::StepCapturedDrag() {
+  if (!captured_drag_ || !window_) return;
+  POINT cursor{};
+  RECT bounds{};
+  if (!GetCursorPos(&cursor) || !GetWindowRect(window_, &bounds)) return;
+  const double dpi = DpiOf(window_);
+  const LONG width = bounds.right - bounds.left;
+  const LONG height = bounds.bottom - bounds.top;
+  const LONG left = cursor.x - static_cast<LONG>(std::lround(
+                                   captured_drag_->offset_x * dpi / 96.0));
+  const LONG top = cursor.y - static_cast<LONG>(std::lround(
+                                  captured_drag_->offset_y * dpi / 96.0));
+  RECT target{left, top, left + width, top + height};
+  // With a clamp rect, that part stays on screen while dragged; otherwise
+  // the window moves freely, as in the system move loop.
+  if (config_.clamp_rect) target = ClampedBounds(target, width, height);
+  if (target.left == bounds.left && target.top == bounds.top) return;
+  SetWindowPos(window_, nullptr, target.left, target.top, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void OverlayWindowImpl::EndCapturedDrag() {
+  if (!captured_drag_) return;
+  // Reset first: releasing the capture sends WM_CAPTURECHANGED back here.
+  captured_drag_.reset();
+  if (window_ && GetCapture() == window_) ReleaseCapture();
+  SaveBounds(false);
+  NotifyPlacement();
 }
 
 void OverlayWindowImpl::DragRestored() {
@@ -794,11 +871,20 @@ void OverlayWindowImpl::Place(int width, int height) {
     const UINT dpi = GetDpiForWindow(window_);
     const int physical_width = Scale(size.cx, dpi);
     const int physical_height = Scale(size.cy, dpi);
-    const int left = work.left + (work.right - work.left - physical_width) / 2;
-    const int top =
-        config_.placement == Placement::kCursorMonitorUpper
-            ? work.top + (work.bottom - work.top) / 5
-            : work.top + (work.bottom - work.top - physical_height) / 2;
+    LONG left = work.left + (work.right - work.left - physical_width) / 2;
+    LONG top = config_.placement == Placement::kCursorMonitorUpper
+                   ? work.top + (work.bottom - work.top) / 5
+                   : work.top + (work.bottom - work.top - physical_height) / 2;
+    if (config_.placement == Placement::kCursorMonitorRight) {
+      // The part kept on screen (the whole window without a clamp rect)
+      // against the right edge, vertically centered; ClampedBounds then
+      // adds the margin.
+      const RECT core =
+          CoreBounds(RECT{0, 0, physical_width, physical_height});
+      left = work.right - core.right;
+      top = work.top + (work.bottom - work.top) / 2 -
+            (core.top + core.bottom) / 2;
+    }
     anchor = {left, top, left + physical_width, top + physical_height};
   }
   const UINT dpi = GetDpiForWindow(window_);
@@ -809,6 +895,7 @@ void OverlayWindowImpl::Place(int width, int height) {
                bounds.bottom - bounds.top,
                SWP_NOACTIVATE | (config_.always_on_top ? 0 : SWP_NOZORDER));
   UpdateRegion();
+  NotifyPlacement();
 }
 
 RECT OverlayWindowImpl::BoundsAround(int width, int height) {
@@ -820,6 +907,36 @@ RECT OverlayWindowImpl::BoundsAround(int width, int height) {
 
 RECT OverlayWindowImpl::ClampedBounds(const RECT& anchor, int width,
                                       int height) const {
+  if (config_.clamp_rect) {
+    // Only the clamp rect has to stay inside: the window keeps its size and
+    // moves just enough, on the monitor of that part.
+    const LONG x = anchor.left + (anchor.right - anchor.left - width) / 2;
+    const LONG y = anchor.top + (anchor.bottom - anchor.top - height) / 2;
+    const RECT window{x, y, x + width, y + height};
+    const RECT core = CoreBounds(window);
+    MONITORINFO info{sizeof(info)};
+    if (!GetMonitorInfoW(MonitorFromRect(&core, MONITOR_DEFAULTTONEAREST),
+                         &info)) {
+      return window;
+    }
+    const RECT& work = info.rcWork;
+    const LONG margin = Scale(config_.margin, DpiOf(window_));
+    // The margin shrinks where the space is short; a part larger than the
+    // work area keeps its left or top edge inside.
+    const auto shift = [margin](LONG low, LONG high, LONG lower,
+                                LONG upper) -> LONG {
+      const LONG inset = std::clamp<LONG>(
+          margin, 0, std::max<LONG>(0, (upper - lower - (high - low)) / 2));
+      if (low < lower + inset) return lower + inset - low;
+      if (high > upper - inset) {
+        return std::max<LONG>(upper - inset - high, lower - low);
+      }
+      return 0;
+    };
+    const LONG dx = shift(core.left, core.right, work.left, work.right);
+    const LONG dy = shift(core.top, core.bottom, work.top, work.bottom);
+    return {x + dx, y + dy, x + dx + width, y + dy + height};
+  }
   // Keeps the anchor's center, moving only as much as needed to stay inside
   // the work area of the monitor it is on (or nearest to, when unplugged).
   MONITORINFO info{sizeof(info)};
@@ -845,6 +962,91 @@ RECT OverlayWindowImpl::ClampedBounds(const RECT& anchor, int width,
       static_cast<int>(work.top) + inset_y,
       static_cast<int>(work.bottom) - inset_y - height);
   return {x, y, x + width, y + height};
+}
+
+RECT OverlayWindowImpl::CoreBounds(const RECT& bounds) const {
+  if (!config_.clamp_rect) return bounds;
+  const UINT dpi = DpiOf(window_);
+  const RECT& core = *config_.clamp_rect;
+  return {bounds.left + Scale(core.left, dpi),
+          bounds.top + Scale(core.top, dpi),
+          bounds.left + Scale(core.right, dpi),
+          bounds.top + Scale(core.bottom, dpi)};
+}
+
+void OverlayWindowImpl::Reclamp() {
+  if (!window_ || !config_.clamp_rect || captured_drag_ ||
+      !IsWindowVisible(window_)) {
+    return;
+  }
+  RECT bounds{};
+  if (!GetWindowRect(window_, &bounds)) return;
+  const RECT clamped = ClampedBounds(bounds, bounds.right - bounds.left,
+                                     bounds.bottom - bounds.top);
+  if (clamped.left == bounds.left && clamped.top == bounds.top) return;
+  // Not saved: the remembered place comes back with its monitor.
+  SetWindowPos(window_, nullptr, clamped.left, clamped.top, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+flutter::EncodableValue OverlayWindowImpl::WorkAreaValue() const {
+  RECT bounds{};
+  if (!window_ || !GetWindowRect(window_, &bounds)) {
+    return flutter::EncodableValue();
+  }
+  const RECT core = CoreBounds(bounds);
+  MONITORINFO info{sizeof(info)};
+  if (!GetMonitorInfoW(MonitorFromRect(&core, MONITOR_DEFAULTTONEAREST),
+                       &info)) {
+    return flutter::EncodableValue();
+  }
+  const double dpi = DpiOf(window_);
+  const auto logical = [dpi](LONG value) {
+    return flutter::EncodableValue(value * 96.0 / dpi);
+  };
+  const RECT& work = info.rcWork;
+  return flutter::EncodableValue(flutter::EncodableMap{
+      {flutter::EncodableValue("left"), logical(work.left - bounds.left)},
+      {flutter::EncodableValue("top"), logical(work.top - bounds.top)},
+      {flutter::EncodableValue("right"), logical(work.right - bounds.left)},
+      {flutter::EncodableValue("bottom"), logical(work.bottom - bounds.top)},
+  });
+}
+
+void OverlayWindowImpl::NotifyPlacement() {
+  // Before "ready" the host has no handler yet; "show" carries the work
+  // area of the first opening.
+  if (!ready_) return;
+  InvokeHost("placement",
+             std::make_unique<flutter::EncodableValue>(WorkAreaValue()));
+}
+
+void OverlayWindowImpl::SetShape(const flutter::EncodableValue* arguments) {
+  const auto* list =
+      arguments ? std::get_if<flutter::EncodableList>(arguments) : nullptr;
+  if (list == nullptr) {
+    shape_.reset();
+  } else {
+    std::vector<ShapeRect> rects;
+    rects.reserve(list->size());
+    for (const auto& item : *list) {
+      const auto* values = std::get_if<flutter::EncodableList>(&item);
+      if (values == nullptr || values->size() != 5) continue;
+      double edges[5] = {};
+      bool valid = true;
+      for (size_t i = 0; i < 5 && valid; ++i) {
+        const auto number = DoubleOf((*values)[i]);
+        valid = number && std::isfinite(*number);
+        if (valid) edges[i] = *number;
+      }
+      if (valid && edges[2] > edges[0] && edges[3] > edges[1]) {
+        rects.push_back({edges[0], edges[1], edges[2], edges[3],
+                         std::max(0.0, edges[4])});
+      }
+    }
+    shape_ = std::move(rects);
+  }
+  UpdateRegion();
 }
 
 void OverlayWindowImpl::FitViewToClient() {
@@ -876,6 +1078,33 @@ void OverlayWindowImpl::FitView(int width, int height) {
 
 void OverlayWindowImpl::UpdateRegion() {
   if (!window_ || !frame_ready_) return;
+  if (shape_) {
+    // The overlay's own shape: pixels outside are neither drawn nor hit, so
+    // clicks there reach the window below. Region edges are not smoothed:
+    // the shape keeps a little transparent margin around what it draws.
+    const double scale = DpiOf(window_) / 96.0;
+    HRGN region = CreateRectRgn(0, 0, 0, 0);
+    if (region == nullptr) return;
+    for (const ShapeRect& rect : *shape_) {
+      const int left = static_cast<int>(std::floor(rect.left * scale));
+      const int top = static_cast<int>(std::floor(rect.top * scale));
+      const int right = static_cast<int>(std::ceil(rect.right * scale));
+      const int bottom = static_cast<int>(std::ceil(rect.bottom * scale));
+      const int diameter =
+          std::min(static_cast<int>(std::lround(rect.radius * 2 * scale)),
+                   std::min(right - left, bottom - top));
+      const HRGN part =
+          diameter > 1 ? CreateRoundRectRgn(left, top, right + 1, bottom + 1,
+                                            diameter, diameter)
+                       : CreateRectRgn(left, top, right, bottom);
+      if (part == nullptr) continue;
+      CombineRgn(region, region, part, RGN_OR);
+      DeleteObject(part);
+    }
+    // Windows owns the region only after a successful assignment.
+    if (!SetWindowRgn(window_, region, TRUE)) DeleteObject(region);
+    return;
+  }
   // DWM already rounds the corners on Windows 11: no region at all.
   if (native_corners_ || IsZoomed(window_)) {
     const HRGN probe = CreateRectRgn(0, 0, 0, 0);
@@ -1104,6 +1333,27 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
     SendBehindForeground();
     return 0;
   }
+  if (captured_drag_) {
+    switch (message) {
+      case WM_MOUSEMOVE:
+        StepCapturedDrag();
+        return 0;
+      case WM_LBUTTONUP:
+      case WM_RBUTTONUP:
+      case WM_MBUTTONUP:
+        EndCapturedDrag();
+        return 0;
+      case WM_XBUTTONUP:
+        EndCapturedDrag();
+        return TRUE;
+      case WM_CAPTURECHANGED:
+      case WM_CANCELMODE:
+        // Another window took the mouse (a menu, Alt+Tab): the drag stops
+        // where it is.
+        EndCapturedDrag();
+        break;
+    }
+  }
   if (config_.message_hook) {
     if (const auto handled =
             config_.message_hook(hwnd, message, wparam, lparam)) {
@@ -1113,6 +1363,22 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
   switch (message) {
     case WM_NCLBUTTONDBLCLK:
       if (!config_.double_click_maximizes) return 0;
+      break;
+    case WM_MOUSEACTIVATE:
+      // Also asked by the view (its DefWindowProc forwards the question to
+      // this window first): the click goes through, the activation does not.
+      if (!config_.activate_on_click) return MA_NOACTIVATE;
+      break;
+    case WM_DISPLAYCHANGE:
+      Reclamp();
+      NotifyPlacement();
+      break;
+    case WM_SETTINGCHANGE:
+      // The taskbar moved or changed size.
+      if (wparam == SPI_SETWORKAREA) {
+        Reclamp();
+        NotifyPlacement();
+      }
       break;
     case WM_GETMINMAXINFO:
       if (config_.resizable) {
@@ -1143,6 +1409,7 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
       GetWindowRect(hwnd, &bounds);
       SaveBounds(bounds.right - bounds.left != size_before_move_.cx ||
                  bounds.bottom - bounds.top != size_before_move_.cy);
+      NotifyPlacement();
       break;
     }
     case WM_DPICHANGED: {
@@ -1151,6 +1418,7 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
                    suggested->right - suggested->left,
                    suggested->bottom - suggested->top,
                    SWP_NOZORDER | SWP_NOACTIVATE);
+      NotifyPlacement();
       return 0;
     }
     case WM_SIZE:

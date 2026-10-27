@@ -68,6 +68,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   bool _visible = false;
   bool _listeningKeys = false;
   int? _previousForeground;
+  Rect? _workArea;
 
   /// Id of the overlay, once [ready] completed.
   String? get id => _id;
@@ -93,6 +94,13 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   /// Handle (HWND) of the window that was in front before the overlay
   /// opened, set before [onShow] runs. Null when there was none.
   int? get previousForeground => _previousForeground;
+
+  /// Work area of the overlay's monitor (the screen without the taskbar),
+  /// in logical pixels relative to the window's top-left corner: where the
+  /// window can draw on screen. Set before [onShow] runs, then updated after
+  /// a move, a DPI change or a display change (listeners are notified). Null
+  /// before the first opening.
+  Rect? get workArea => _workArea;
 
   /// Messages sent with [ShipglowsOverlayWindow.send].
   Stream<ShipglowsOverlayMessage> get messages => _messages.stream;
@@ -131,6 +139,23 @@ class ShipglowsOverlayHost extends ChangeNotifier {
     if (backgroundColor case final color?)
       'backgroundColor': color.toARGB32(),
   });
+
+  /// Clips the window to [shape], rounded rectangles in logical pixels from
+  /// the window's top-left corner (each with the top-left corner's radius):
+  /// pixels outside are neither drawn nor clicked, so clicks there reach the
+  /// window below. For a [ShipglowsOverlayOptions.transparent] overlay that
+  /// draws less than its window, such as a bubble that unfolds. The edge is
+  /// not smoothed: keep a few transparent pixels around what is drawn. Null
+  /// gives the whole window back.
+  Future<void> setShape(List<RRect>? shape) => _call<void>(
+    'setShape',
+    shape == null
+        ? null
+        : [
+            for (final rect in shape)
+              [rect.left, rect.top, rect.right, rect.bottom, rect.tlRadiusX],
+          ],
+  );
 
   /// Closes as Alt+F4 does: [onRequestClose] decides, else [hide].
   Future<void> requestClose() async {
@@ -194,6 +219,7 @@ class ShipglowsOverlayHost extends ChangeNotifier {
         _previousForeground = previous is int && previous != 0
             ? previous
             : null;
+        _setWorkArea(arguments['workArea']);
         await onShow?.call(arguments['data']);
         _setVisible(true);
         // The window appears only after a frame with this data was drawn.
@@ -216,10 +242,30 @@ class ShipglowsOverlayHost extends ChangeNotifier {
           _maximized = arguments;
           notifyListeners();
         }
+      case 'placement':
+        _setWorkArea(arguments);
       case 'requestClose':
         await requestClose();
     }
     return null;
+  }
+
+  void _setWorkArea(Object? value) {
+    if (value is! Map) return;
+    final left = value['left'];
+    final top = value['top'];
+    final right = value['right'];
+    final bottom = value['bottom'];
+    if (left is! num || top is! num || right is! num || bottom is! num) return;
+    final area = Rect.fromLTRB(
+      left.toDouble(),
+      top.toDouble(),
+      right.toDouble(),
+      bottom.toDouble(),
+    );
+    if (area == _workArea) return;
+    _workArea = area;
+    notifyListeners();
   }
 
   // A preloaded overlay's view is hidden, so Flutter reports the app hidden

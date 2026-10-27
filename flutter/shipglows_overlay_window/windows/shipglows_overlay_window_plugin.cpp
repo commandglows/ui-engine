@@ -94,6 +94,29 @@ OverlayConfig ConfigFrom(const flutter::EncodableValue* arguments) {
   ReadBool(options, "rememberPosition", &config.remember_position);
   ReadBool(options, "darkFrame", &config.dark_frame);
   ReadBool(options, "transparent", &config.transparent);
+  ReadBool(options, "activateOnClick", &config.activate_on_click);
+  // [left, top, right, bottom] in logical pixels.
+  const auto* clamp = Field(options, "clampRect");
+  if (const auto* edges =
+          clamp ? std::get_if<flutter::EncodableList>(clamp) : nullptr;
+      edges && edges->size() == 4) {
+    LONG values[4] = {};
+    bool valid = true;
+    for (size_t i = 0; i < 4 && valid; ++i) {
+      const auto& edge = (*edges)[i];
+      if (const auto* v = std::get_if<int32_t>(&edge)) {
+        values[i] = *v;
+      } else if (const auto* v64 = std::get_if<int64_t>(&edge)) {
+        valid = *v64 >= -1000000 && *v64 <= 1000000;
+        values[i] = static_cast<LONG>(*v64);
+      } else {
+        valid = false;
+      }
+    }
+    if (valid && values[2] > values[0] && values[3] > values[1]) {
+      config.clamp_rect = RECT{values[0], values[1], values[2], values[3]};
+    }
+  }
   const std::string memory = StringField(options, "sizeMemory");
   if (memory == "none") config.size_memory = SizeMemory::kNone;
   if (memory == "session") config.size_memory = SizeMemory::kSession;
@@ -113,6 +136,8 @@ OverlayConfig ConfigFrom(const flutter::EncodableValue* arguments) {
     config.placement = Placement::kCursorMonitorUpper;
   } else if (placement == "foregroundMonitorCenter") {
     config.placement = Placement::kForegroundMonitorCenter;
+  } else if (placement == "cursorMonitorRight") {
+    config.placement = Placement::kCursorMonitorRight;
   }
   if (const auto argb = IntField(options, "borderColor")) {
     const auto value = static_cast<uint32_t>(*argb);

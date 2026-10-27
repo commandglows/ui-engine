@@ -389,6 +389,25 @@ own Flutter engine in its own window.
   transparent background). The overlay draws its whole shape and paints no
   background of its own (`ShipglowsOverlayHost.transparent`); its transparent
   margin still moves and resizes the window but does not pass clicks through.
+- Window shape: `ShipglowsOverlayHost.setShape(List<RRect>?)` clips a
+  transparent overlay to rounded rectangles (logical pixels from the window's
+  top-left corner). Pixels outside are neither drawn nor hit, so clicks there
+  reach the window below; the edge is not smoothed, so keep a few transparent
+  pixels around what is drawn. `null` gives the whole window back.
+- `activateOnClick: false`: clicks, hover and drags never activate the
+  overlay (`WS_EX_NOACTIVATE`), so the window in front keeps the keyboard.
+  `startDrag` then moves the window itself while it holds the mouse capture
+  (the system move loop would activate it), and saves the position when the
+  button is up.
+- `clampRect`: only that part of the window (logical, from its top-left
+  corner) is kept inside the work area, when the overlay opens, while it is
+  dragged and when displays or the taskbar change; the rest may leave the
+  screen. `OverlayPlacement.cursorMonitorRight` docks that part against the
+  right edge of the cursor's monitor, vertically centered.
+- `ShipglowsOverlayHost.workArea`: the monitor's work area in logical pixels
+  relative to the window, set before `onShow` and updated after a move, a DPI
+  change or a display change (listeners notified), so an overlay can open
+  its content toward the free side of the screen.
 - Alt+F4 and a plain Escape ask the overlay to close (`onRequestClose`,
   default: hide), whichever window holds the keyboard; `closeOnEscape = false`
   for an overlay with its own Escape handling. A dialog or menu above the
@@ -539,6 +558,94 @@ void commandBarMain() => runShipglowsCommandBarOverlay(
 
 The bar's engine registers no plugin and needs none. Icons travel as code
 points: `iconFor` must know every icon the app's entries use.
+
+## `flutter/shipglows_floating_launcher`
+
+A persistent floating launcher, next to the command bar: a round bubble with
+the app's logo, always on top, whose actions fan out on hover. Built on
+`shipglows_overlay_window` (own engine, transparent window, `activateOnClick:
+false`, `clampRect`, window shape).
+
+- Folded: one bubble (logo on the theme's raised surface, a thin ring, a soft
+  shadow). The window is larger than the bubble but shaped to it, so clicks
+  around the bubble reach the windows below.
+- Hover: the actions (round buttons, one icon each) fan out on an arc toward
+  the free side of the screen (bubble near the right edge: the arc opens
+  left; near a corner: toward the screen), the bubble never moves. Hovering
+  an action fills it with the accent and shows a tooltip card (bold label,
+  shortcut line). Leaving the zone folds the fan after a short delay,
+  animated; reduce-motion makes it instant.
+- Click an action: the fan folds and the app receives its id
+  (`selections`). Click the bubble: `bubbleTaps`, for the app's primary
+  action. Disabled actions are dimmed and keep their tooltip.
+- Drag the bubble to move it; only the bubble is kept inside the work area
+  (`margin` from the edges), also after a display or taskbar change. Its
+  place is remembered (across launches with `appFolder`). The first opening
+  docks it against the right edge of the cursor's monitor.
+- Never activated: hovering, clicking or dragging it leaves the keyboard in
+  the window in front. No taskbar button, no Alt+Tab entry, invisible in
+  screenshots and recordings (`excludeFromCapture`, on by default).
+- Colors from `ShipglowsTheme` (surface raised, icon, border, accent, on
+  accent, text, text muted), light or dark from the snapshot; sizes from
+  `ShipglowsScale`. Each action carries its label (and shortcut as hint) for
+  screen readers.
+- App engine: `ShipglowsFloatingLauncher` publishes a
+  `ShipglowsFloatingLauncherSnapshot` (`items` as
+  `ShipglowsFloatingLauncherItem`: id, label, icon, shortcut text, enabled;
+  `bubbleLabel`, `brightness`, `data`), shows and hides the launcher and
+  updates it in place while shown.
+- Launcher engine: `runShipglowsFloatingLauncherOverlay` from the app's
+  `@pragma('vm:entry-point')` function, with the `logo` widget, the icon
+  table (code point → constant `IconData`), an optional `ringGradient` and
+  the themes. `ShipglowsFloatingLauncherOverlayController` and
+  `ShipglowsFloatingLauncherOverlayApp` for an app that calls `runApp`
+  itself.
+- Sizes: `ShipglowsFloatingLauncherGeometry` (bubble, actions, arc radius
+  and angles, tooltip room). The app engine sizes the window from it and
+  sends it with each snapshot; about a dozen actions fit with the defaults.
+
+```yaml
+dependencies:
+  shipglows_floating_launcher:
+    path: ../../shipglows-ui-engine/flutter/shipglows_floating_launcher
+```
+
+```dart
+// App engine
+final launcher = ShipglowsFloatingLauncher(
+  entrypoint: 'launcherMain',
+  options: ShipglowsFloatingLauncher.defaultOptions(appFolder: 'MyApp'),
+);
+launcher.selections.listen(runCommand); // item id
+launcher.bubbleTaps.listen((_) => showMainWindow());
+await launcher.publish(ShipglowsFloatingLauncherSnapshot(
+  items: [
+    ShipglowsFloatingLauncherItem(
+      id: 'capture.region',
+      label: 'Capture a region',
+      icon: Icons.crop,
+      shortcut: 'Ctrl+Shift+R',
+    ),
+  ],
+  bubbleLabel: 'MyApp',
+  brightness: Brightness.dark,
+));
+await launcher.show();
+
+// Launcher engine (same Dart program, own entry point)
+@pragma('vm:entry-point')
+void launcherMain() => runShipglowsFloatingLauncherOverlay(
+  logo: Image.asset('assets/logo.png'),
+  iconFor: (codePoint) => myIcons[codePoint],
+  ringGradient: const SweepGradient(colors: [orange, green, orange]),
+  theme: lightTheme,
+  darkTheme: darkTheme,
+);
+```
+
+The launcher's engine registers no plugin unless the logo needs one. A custom
+geometry goes to both `ShipglowsFloatingLauncher(geometry:)` and
+`defaultOptions(geometry:)`.
 
 ## `flutter/shipglows_menu`
 

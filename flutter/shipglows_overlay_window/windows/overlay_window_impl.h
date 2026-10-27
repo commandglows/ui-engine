@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "include/shipglows_overlay_window/overlay_window.h"
 
@@ -86,7 +87,29 @@ class OverlayWindowImpl : public OverlayWindow {
   // Logical size of the next opening: remembered, else |width| x |height|.
   SIZE OpeningSize(int width, int height) const;
   std::optional<POINT> LoadPosition() const;
+  // |anchor| resized to |width| x |height| around its center, moved inside
+  // the work area: the whole window, or only |OverlayConfig::clamp_rect|.
   RECT ClampedBounds(const RECT& anchor, int width, int height) const;
+  // Screen bounds of |OverlayConfig::clamp_rect| for a window at |bounds|;
+  // |bounds| itself without one.
+  RECT CoreBounds(const RECT& bounds) const;
+  // Moves the window back so its clamp rect is on screen (displays or work
+  // area changed). Only with |OverlayConfig::clamp_rect|.
+  void Reclamp();
+  // Work area of the overlay's monitor in logical pixels, relative to the
+  // window's top-left corner: {left, top, right, bottom}. Null if unknown.
+  flutter::EncodableValue WorkAreaValue() const;
+  // Tells the overlay's Dart side the work area changed (moved, DPI,
+  // displays), once it is ready.
+  void NotifyPlacement();
+  // Host "setShape": a list of [left, top, right, bottom, radius] logical
+  // rounded rectangles, or null to drop the shape.
+  void SetShape(const flutter::EncodableValue* arguments);
+  // Drag of an overlay that does not activate on click: the window follows
+  // the cursor while it holds the mouse capture.
+  void StartCapturedDrag();
+  void StepCapturedDrag();
+  void EndCapturedDrag();
   void FitViewToClient();
   // Sizes the view; blocks until the engine drew a frame of that size.
   void FitView(int width, int height);
@@ -97,6 +120,10 @@ class OverlayWindowImpl : public OverlayWindow {
   void UpdateRegion();
   void StartPresentation();
   void Reveal(int64_t generation);
+  // "show" arguments for the host: generation, data, previous foreground
+  // window and work area.
+  std::unique_ptr<flutter::EncodableValue> ShowArguments(
+      const flutter::EncodableValue& data);
   void HideWindow(FocusReturn focus);
   // Dark frame and border color (DWM) from |config_|.
   void ApplyFrameStyle();
@@ -168,6 +195,24 @@ class OverlayWindowImpl : public OverlayWindow {
     std::chrono::steady_clock::time_point start;
   };
   std::optional<Animation> animation_;
+  // Window shape set by the overlay (host "setShape"), logical pixels from
+  // the window's top-left corner. Replaces the default region while set.
+  struct ShapeRect {
+    double left;
+    double top;
+    double right;
+    double bottom;
+    double radius;
+  };
+  std::optional<std::vector<ShapeRect>> shape_;
+  // Drag in progress without the system move loop: where the cursor holds
+  // the window, in logical pixels from its top-left corner (kept across a
+  // DPI change between monitors).
+  struct CapturedDrag {
+    double offset_x;
+    double offset_y;
+  };
+  std::optional<CapturedDrag> captured_drag_;
   // Last opening size requested, used by resetSize.
   int default_width_ = 0;
   int default_height_ = 0;
