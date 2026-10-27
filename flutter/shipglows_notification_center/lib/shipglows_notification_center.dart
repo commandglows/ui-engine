@@ -14,6 +14,10 @@
 /// - [NotificationBadge] and [NotificationBellButton]: the unread count.
 /// - [FeedbackHistory]: the in-app messages already shown, as a store.
 /// - [NotificationStrings] and [NotificationStringsScope]: the app's texts.
+/// - [DailyReminders]: system notifications at the times the person chose
+///   ([DailyReminderPlan]), planned by a [ReminderScheduler]
+///   ([LocalReminderScheduler] on Windows and Android), set in
+///   [DailyReminderSettings].
 library;
 
 export 'src/feedback_history.dart';
@@ -22,4 +26,9 @@ export 'src/notification_center_view.dart';
 export 'src/notification_controller.dart';
 export 'src/notification_item.dart';
 export 'src/notification_store.dart';
+export 'src/reminders/daily_reminder_plan.dart';
+export 'src/reminders/daily_reminder_settings.dart';
+export 'src/reminders/daily_reminders.dart';
+export 'src/reminders/local_reminder_scheduler.dart';
+export 'src/reminders/reminder_scheduler.dart';
 export 'src/strings.dart';

@@ -1,5 +1,5 @@
 name: shipglows_notification_center
-description: Shared notification center (latest notifications, read state, mark all read, delete) for ShipGlows Flutter apps, over a store the app plugs in.
+description: Shared notification center (latest notifications, read state, mark all read, delete) and daily system reminders (Windows, Android) for ShipGlows Flutter apps.
 version: 0.1.0
 publish_to: "none"
 
@@ -10,12 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_local_notifications: ^22.3.0
   shipglows_feedback:
     path: ../shipglows_feedback
   shipglows_icons:
     path: ../shipglows_icons
   shipglows_theme:
     path: ../shipglows_theme
+  timezone: ^0.11.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

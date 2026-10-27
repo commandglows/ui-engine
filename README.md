@@ -1450,7 +1450,8 @@ MetricSection(
 The notification center: the latest lasting notifications (a new replay, a
 comment, a reminder), read or unread, distinct from the passing messages of
 `shipglows_feedback`. Depends on `shipglows_feedback`, `shipglows_icons`
-and `shipglows_theme`; stores nothing itself.
+and `shipglows_theme`, plus `flutter_local_notifications` and `timezone`
+for the daily reminders; stores nothing itself.
 
 - `NotificationStore` is the port the app plugs in, like the settings
   storage: `watch()` (newest first, again on every change), `refresh()`
@@ -1523,6 +1524,57 @@ Scaffold(
     onOpen: (item) => open(item.payload! as Row),
   ),
 );
+```
+
+### Daily reminders
+
+System notifications (a Windows toast, an Android notification) at the
+times the person chose, even while the app is closed. Off by default.
+
+- `DailyReminderPlan(enabled:, times:)`: one to three `ReminderTime`s a
+  day, sorted, the same every day; `withTime`, `withoutTime`, `replacing`;
+  `toJson` / `fromJson` for the app's settings. No streak and no catching
+  up: a missed reminder is gone. `upcoming(from, days:)` lists the next
+  ones in local time, computed per calendar day (daylight saving never
+  shifts them).
+- `ReminderScheduler`: `isSupported`, `requestPermission()`,
+  `replaceAll(reminders)`. `LocalReminderScheduler(LocalReminderConfig(…))`
+  over `flutter_local_notifications` on Windows and Android (elsewhere
+  unsupported); `MemoryReminderScheduler` for tests. Windows cannot repeat
+  a notification, so each one is planned on its own over the next days
+  (7 by default) and planned again at every launch. It owns ids `firstId`
+  to `firstId + maxReminders - 1` only. On Android the alarms are inexact
+  (no exact-alarm permission): a reminder may come a few minutes late.
+- `DailyReminders(scheduler:, load:, save:, content:)`: `start()` once the
+  app runs, `update(plan)` from the settings. Turning reminders on asks
+  the system first (Android 13+); a refusal leaves them off with
+  `permissionDenied`. `content(time)` gives title, body and payload.
+- `DailyReminderSettings(reminders:, strings: ReminderStrings.fr)`: a
+  switch, the times as chips (tap to change with the time picker, × to
+  remove the extra ones), « Add a time » while under three.
+- The app declares, once: for Windows, an `appUserModelId` and a GUID of
+  its own (registered for the current user, no MSIX needed); for Android,
+  core library desugaring in `build.gradle.kts`
+  (`isCoreLibraryDesugaringEnabled = true`, `coreLibraryDesugaring(
+  "com.android.tools:desugar_jdk_libs:2.1.5")`) and, in the manifest,
+  `RECEIVE_BOOT_COMPLETED` with the plugin's `ScheduledNotificationReceiver`
+  and `ScheduledNotificationBootReceiver` (see the plugin's README).
+
+```dart
+final reminders = DailyReminders(
+  scheduler: LocalReminderScheduler(const LocalReminderConfig(
+    appName: 'DreamGlows',
+    windowsAppUserModelId: 'ShipGlows.DreamGlows',
+    windowsGuid: '…',
+    androidChannelId: 'dreamglows_reminders',
+    androidChannelName: 'Rappels',
+  )),
+  load: settings.loadReminders,
+  save: settings.saveReminders,
+  content: (time) => (title: 'DreamGlows', body: 'Ton prochain pas ?', payload: null),
+)..start();
+
+DailyReminderSettings(reminders: reminders, strings: ReminderStrings.fr);
 ```
 
 ## `flutter/shipglows_undo_trash`
