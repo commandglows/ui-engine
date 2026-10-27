@@ -13,12 +13,13 @@ namespace {
 // Timer ids on the app window; distinct from the runner's own timers.
 constexpr UINT_PTR kSettleTimer = 0x5B60;
 constexpr UINT_PTR kRestoreTimer = 0x5B61;
-// Quiet time after the last size change before the surface is rebuilt, so
-// the snap animation and a drag resize are over.
-constexpr UINT kSettleDelayMs = 300;
-// Time left to the engine to present the shrunk frame before the view gets
-// its real size back.
-constexpr UINT kRestoreDelayMs = 250;
+// Quiet time after the last size change before the surface is rebuilt: the
+// sizes of one snap arrive closer together, a drag resize sends more.
+constexpr UINT kSettleDelayMs = 100;
+// Extra time left to the engine to present the shrunk frame, beyond the
+// 100 ms it already waits inside the resize, before the view gets its real
+// size back.
+constexpr UINT kRestoreDelayMs = 80;
 
 // The Windows engine resizes its render surface only for a frame of the
 // size it is waiting for. When two sizes arrive back to back (a Win + arrow

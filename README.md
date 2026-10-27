@@ -260,7 +260,7 @@ Hides the native title bar (Windows, Linux, macOS) and draws a themeable one
 on top of [`window_manager`](https://pub.dev/packages/window_manager).
 
 - Native move loop: edge snapping, Windows 11 snap bar, `Win` + arrows.
-- Windows: once a size change settles (300 ms), the Flutter view is shrunk by
+- Windows: once a size change settles (100 ms), the Flutter view is shrunk by
   one pixel then restored. Two sizes back to back (a `Win` + arrow snap,
   quarter to half especially) can otherwise leave the engine's render
   surface at the old size, every frame stretched and cropped into it until
