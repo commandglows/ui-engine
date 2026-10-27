@@ -1204,14 +1204,20 @@ tag list. Status and due dates are not here (separate packages later).
   their case and inner spaces, without duplicates (ignoring case).
 - Sort: `sortedBy(items, key, direction: SortDirection.descending)`, stable,
   items with a `null` key last (dates, names, counts).
+- Names: `nameKey` (`searchKey`, trimmed and single-spaced: one name
+  whatever its case, accents or spaces), `compareNames` to sort by it,
+  `checkNameAmong` for flat collections stored by name (playlists: empty or
+  taken, as `FolderProblem`), `duplicateAliases` mapping the ids of items
+  created twice under one name (two devices) to the smallest id kept.
 - Text search: `searchKey` (lower case, no accents, `œ`/`æ` as `oe`/`ae`), `searchWords`,
   `matchesSearch(query, fields)` (every word in some field) and
   `rankBySearch(items, query, label:, fields:)` (label starting with the
   query, then label holding every word, then a match in the fields).
 
 Used by CommandGlows (snippets), ContentGlows (History search with
-`#tag` and date sort, keyword and topic lists) and the ShipGlows app
-(command palette ranking, GitHub repository picker). Not yet: manual folder
+`#tag` and date sort, keyword and topic lists), BeatGlows (library search
+and sort, playlist names, artist and song merge after a sync) and the
+ShipGlows app (command palette ranking, GitHub repository picker). Not yet: manual folder
 order, tag colours, UI widgets.
 
 ## `flutter/shipglows_settings`
