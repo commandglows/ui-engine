@@ -76,16 +76,42 @@ class CalendarToolbar extends StatelessWidget {
         ),
       ),
       if (views.length > 1 && onViewChanged != null)
-        SegmentedButton<CalendarView>(
-          showSelectedIcon: false,
-          selected: {view},
-          segments: [
-            for (final value in views)
-              ButtonSegment(value: value, label: Text(strings.view(value))),
-          ],
-          onSelectionChanged: (values) => onViewChanged!(values.single),
+        // Too narrow for every name on one line: icons, named by tooltips.
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final iconsOnly =
+                constraints.maxWidth < views.length * _labelledSegmentWidth;
+            return SegmentedButton<CalendarView>(
+              showSelectedIcon: false,
+              selected: {view},
+              segments: [
+                for (final value in views)
+                  iconsOnly
+                      ? ButtonSegment(
+                          value: value,
+                          icon: Icon(_viewIcons[value]),
+                          tooltip: strings.view(value),
+                        )
+                      : ButtonSegment(
+                          value: value,
+                          label: Text(strings.view(value)),
+                        ),
+              ],
+              onSelectionChanged: (values) => onViewChanged!(values.single),
+            );
+          },
         ),
       ...actions,
     ],
   );
 }
+
+/// Width a named view segment needs to keep its name on one line.
+const double _labelledSegmentWidth = 88;
+
+const Map<CalendarView, IconData> _viewIcons = {
+  CalendarView.day: Icons.view_day_outlined,
+  CalendarView.week: Icons.view_week_outlined,
+  CalendarView.month: Icons.calendar_month_outlined,
+  CalendarView.agenda: Icons.view_agenda_outlined,
+};
