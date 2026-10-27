@@ -1403,9 +1403,11 @@ and `shipglows_theme`; stores nothing itself.
 - `NotificationStore` is the port the app plugs in, like the settings
   storage: `watch()` (newest first, again on every change), `refresh()`
   after an error, `markRead`, `markAllRead(ids)`, `delete`, `deleteAll(ids)`
-  with `canDelete` / `canDeleteAll`. `CallbackNotificationStore` wraps an
-  existing client (without `delete` the delete buttons and « Delete all »
-  are hidden; without `deleteAll` it deletes one by one);
+  with `canDelete` / `canDeleteAll`, and `hasMore` / `loadMore()` for older
+  pages (the longer list comes back through `watch()`).
+  `CallbackNotificationStore` wraps an existing client (without `delete`
+  the delete buttons and « Delete all » are hidden; without `deleteAll` it
+  deletes one by one; without `loadMore` the list is one page);
   `MemoryNotificationStore` for tests, demos and device-only logs.
 - `NotificationItem(id, title, body, createdAt, read, icon, kind,
   source, count, payload)`: the app maps its own record to it and gets it
@@ -1416,7 +1418,9 @@ and `shipglows_theme`; stores nothing itself.
   `unreadCount`; read and delete show at once and come back when the store
   fails; `retry()`. Filters `unreadOnly` and `source` (`sources` lists
   them); `unreadCount` ignores the filters (the badge), the global actions
-  work on the `items` shown. One per screen or panel, disposed with it.
+  work on the `items` shown. `hasMore`, `loadingMore` and `loadMore()`
+  (one page at a time, until the store's next list). One per screen or
+  panel, disposed with it.
 - `NotificationCenterView(controller:, onOpen:, leadingBuilder:)`: the
   body: rows with the type's icon in a tinted circle (or the app's
   thumbnail through `leadingBuilder`, given the icon as fallback), the
@@ -1428,7 +1432,10 @@ and `shipglows_theme`; stores nothing itself.
   error over a list already shown). `showToolbar: true` puts the summary
   and the actions over the list, for a panel without an app bar;
   `showFilters` (on by default) adds « Unread only » and, with several
-  sources, one chip per source (from the CommunityGlows center).
+  sources, one chip per source (from the CommunityGlows center). While
+  the store `hasMore`, the list ends with a loader (`loadingMore` text)
+  that asks for the next page once scrolled into view; a failure reaches
+  `onError:` as `NotificationOperation.loadMore`.
 - `NotificationCenterActions(controller:)`: « Mark all as read » and, when
   the store can, « Delete all » in a menu, confirmed (`confirm:` for the
   app's own dialog). Failed actions show an error message with « Copy
