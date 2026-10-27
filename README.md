@@ -1966,6 +1966,45 @@ unawaited(reviews.maybeAskForReview(context, appName: 'CommandGlows'));
 showShipglowsReviewForm(context, reviews: reviews, appName: 'CommandGlows');
 ```
 
+## `flutter/shipglows_contact`
+
+« Contact us » without a backend: one button opening a list of channels
+(WhatsApp, Messenger, Instagram, Telegram, email, phone, SMS, any link), each
+launched through its deeplink. No inbox, no CRM, no network call. A channel
+with no handler on the device (`tel:` or `sms:` on a desktop, say) copies its
+value and says so through `shipglows_feedback`, which needs a
+`ScaffoldMessenger`. Depends on `url_launcher`, `shipglows_feedback`,
+`shipglows_icons` and `shipglows_theme`.
+
+- `ContactChannel.whatsApp(phone, message:)`, `.messenger(page)`,
+  `.instagram(username)`, `.telegram(username)`, `.email(address, subject:,
+  body:)`, `.phone(number)`, `.sms(number, body:)`, `.link(url, label:)`:
+  the `uri` is computed (`%20` for spaces, `@` stripped from handles, a
+  pasted profile link reduced to its handle), `displayValue` is the
+  address, number or handle shown under the label. WhatsApp needs an
+  international number (`+33…` or `0033…`; asserted in debug).
+- `ShipglowsContactConfig(channels:, title:, intro:)`: the channels in
+  display order.
+- `ShipglowsContactButton(config:, extended:)`: a floating button for
+  `Scaffold.floatingActionButton`; opens `showShipglowsContactSheet(context,
+  config:)` (a bottom sheet on compact windows, a dialog otherwise).
+- `ShipglowsContactList(config:, onSelected:)`: the rows alone, for a settings
+  or about page.
+- `openContactChannel(context, channel, launcher:)`: external application by
+  default (`ContactLauncher`, injectable). Never throws.
+- `ShipglowsContactStrings.fr` / `.en`, `ShipglowsContactStringsScope`.
+
+```dart
+ShipglowsContactButton(
+  config: ShipglowsContactConfig(
+    channels: [
+      ContactChannel.whatsApp('+33 6 12 34 56 78'),
+      ContactChannel.email('hello@example.com', subject: 'Support'),
+    ],
+  ),
+);
+```
+
 ## `flutter/shipglows_demo`
 
 The demo-mode surfaces every app shows the same way. Each app keeps its own
