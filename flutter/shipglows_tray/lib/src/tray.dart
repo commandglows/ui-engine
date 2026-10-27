@@ -72,7 +72,8 @@ class ShipglowsTray {
 
   /// Whether Windows launches the app when the user signs in: its entry
   /// exists for this executable and is not turned off in Task Manager.
-  /// Read by [start].
+  /// Read by [start], which also rewrites a stale entry of this executable
+  /// (see [setLaunchAtStartup]).
   ValueListenable<bool> get launchAtStartup => _launchAtStartup;
 
   /// How the main window starts after a launch at sign-in: the user's saved
@@ -162,6 +163,12 @@ class ShipglowsTray {
   /// Turns the launch at Windows sign-in on or off for the current user,
   /// under the app's name (one entry per app: the last copy that turned it
   /// on wins). Returns false when it could not be written.
+  ///
+  /// A dev build (run from `<project>\build\windows\…\runner\Debug` or
+  /// `Profile`) registers the managed dev session
+  /// (`shipglows-dev start -ProjectPath <project> -FlutterDevice windows`),
+  /// not its own exe, which only holds the last full compile; any other
+  /// copy registers its own executable.
   Future<bool> setLaunchAtStartup(bool enabled) async {
     final config = _config;
     if (!isSupported || config == null) return false;

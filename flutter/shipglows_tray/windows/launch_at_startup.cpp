@@ -3,6 +3,8 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include <filesystem>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -30,7 +32,68 @@ std::wstring ExecutablePath() {
   }
 }
 
+bool NameIs(const std::filesystem::path& path, const wchar_t* name) {
+  return _wcsicmp(path.filename().c_str(), name) == 0;
+}
+
+// The Flutter project of a dev build, run from
+// <project>\build\windows\<arch>\runner\{Debug,Profile}\<app>.exe. Empty for
+// an installed or release copy.
+std::wstring DevProjectPath() {
+  const std::filesystem::path configuration =
+      std::filesystem::path(ExecutablePath()).parent_path();
+  const std::filesystem::path runner = configuration.parent_path();
+  const std::filesystem::path build =
+      runner.parent_path().parent_path().parent_path();
+  if ((!NameIs(configuration, L"Debug") &&
+       !NameIs(configuration, L"Profile")) ||
+      !NameIs(runner, L"runner") || !NameIs(build, L"build")) {
+    return {};
+  }
+  const std::filesystem::path project = build.parent_path();
+  std::error_code error;
+  if (!std::filesystem::is_regular_file(project / L"pubspec.yaml", error)) {
+    return {};
+  }
+  return project.wstring();
+}
+
+// The ShipGlows dev server CLI (shipglows-dev, alias s): its installed copy,
+// else the one on PATH. Empty when missing.
+std::wstring DevServerCli() {
+  constexpr wchar_t kCli[] = L"shipglows-dev.exe";
+  std::wstring home(MAX_PATH, L'\0');
+  const DWORD length = GetEnvironmentVariableW(
+      L"USERPROFILE", home.data(), static_cast<DWORD>(home.size()));
+  if (length > 0 && length < home.size()) {
+    home.resize(length);
+    const std::filesystem::path installed =
+        std::filesystem::path(home) / L".shipglows" / L"runtime" / L"bin" /
+        kCli;
+    std::error_code error;
+    if (std::filesystem::is_regular_file(installed, error)) {
+      return installed.wstring();
+    }
+  }
+  std::wstring found(MAX_PATH, L'\0');
+  const DWORD size = SearchPathW(nullptr, kCli, nullptr,
+                                 static_cast<DWORD>(found.size()),
+                                 found.data(), nullptr);
+  if (size == 0 || size >= found.size()) return {};
+  found.resize(size);
+  return found;
+}
+
+// A dev build's exe only holds its last full compile (hot reloads live in
+// the `flutter run` session), so sign-in starts the managed dev session
+// instead, which compiles the current sources. Elsewhere, this executable.
 std::wstring Command() {
+  const std::wstring project = DevProjectPath();
+  const std::wstring cli = project.empty() ? L"" : DevServerCli();
+  if (!cli.empty()) {
+    return L"\"" + cli + L"\" start -ProjectPath \"" + project +
+           L"\" -FlutterDevice windows";
+  }
   return L"\"" + ExecutablePath() + L"\" " + kLaunchedAtStartupArgument;
 }
 
@@ -61,6 +124,14 @@ bool ReadString(const wchar_t* key, const std::wstring& name,
   return true;
 }
 
+bool WriteString(const wchar_t* key, const std::wstring& name,
+                 const std::wstring& value) {
+  return RegSetKeyValueW(HKEY_CURRENT_USER, key, name.c_str(), REG_SZ,
+                         value.c_str(),
+                         static_cast<DWORD>((value.size() + 1) *
+                                            sizeof(wchar_t))) == ERROR_SUCCESS;
+}
+
 bool DeleteValue(const wchar_t* key, const std::wstring& name) {
   const LSTATUS status =
       RegDeleteKeyValueW(HKEY_CURRENT_USER, key, name.c_str());
@@ -85,11 +156,19 @@ LaunchAtStartupState ReadLaunchAtStartup(const std::wstring& name) {
   LaunchAtStartupState state;
   if (name.empty()) return state;
   std::wstring command;
-  // Another copy of the app (a dev build, an older install) does not count.
+  if (!ReadString(kRunKey, name, &command)) return state;
+  const std::wstring current = Command();
+  // Another copy of the app (another checkout, an older install) does not
+  // count.
   state.registered =
-      ReadString(kRunKey, name, &command) &&
+      _wcsicmp(command.c_str(), current.c_str()) == 0 ||
       _wcsicmp(CommandExecutable(command).c_str(), ExecutablePath().c_str()) ==
           0;
+  // An entry of this executable written before (a dev build's own exe, other
+  // arguments) now runs the current command; Task Manager's switch stays.
+  if (state.registered && _wcsicmp(command.c_str(), current.c_str()) != 0) {
+    WriteString(kRunKey, name, current);
+  }
   BYTE approval[12] = {};
   DWORD size = sizeof(approval);
   if (RegGetValueW(HKEY_CURRENT_USER, kApprovedKey, name.c_str(),
@@ -106,14 +185,8 @@ bool WriteLaunchAtStartup(const std::wstring& name, bool enabled) {
   if (!enabled) {
     return DeleteValue(kRunKey, name) && DeleteValue(kApprovedKey, name);
   }
-  const std::wstring command = Command();
-  if (RegSetKeyValueW(HKEY_CURRENT_USER, kRunKey, name.c_str(), REG_SZ,
-                      command.c_str(),
-                      static_cast<DWORD>((command.size() + 1) *
-                                         sizeof(wchar_t))) != ERROR_SUCCESS) {
-    return false;
-  }
-  return DeleteValue(kApprovedKey, name);
+  return WriteString(kRunKey, name, Command()) &&
+         DeleteValue(kApprovedKey, name);
 }
 
 }  // namespace shipglows_tray
