@@ -48,4 +48,22 @@ void main() {
       findsOneWidget,
     );
   });
+
+  test('between is the change as a fraction of the previous value', () {
+    expect(MetricDelta.between(120, 100).ratio, closeTo(0.2, 1e-9));
+    expect(MetricDelta.between(0, 0).ratio, 0);
+    expect(MetricDelta.between(5, 0).ratio, 1);
+    expect(MetricDelta.between(-5, 0).ratio, -1);
+  });
+
+  test('between keeps the polarity it is given', () {
+    final delta = MetricDelta.between(
+      5,
+      10,
+      polarity: MetricPolarity.lowerIsBetter,
+    );
+    expect(delta.ratio, closeTo(-0.5, 1e-9));
+    expect(delta.polarity, MetricPolarity.lowerIsBetter);
+    expect(delta.isFavorable, isTrue);
+  });
 }

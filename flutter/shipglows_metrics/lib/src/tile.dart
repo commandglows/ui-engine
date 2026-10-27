@@ -9,13 +9,18 @@ import 'strings.dart';
 
 enum _TileState { ready, loading, empty, error }
 
+/// How much room a [MetricTile] takes. [regular] suits a dashboard's main
+/// figures; [compact] fits a dense grid of smaller ones, with a shorter value
+/// line, a smaller value, no caption and a shorter sparkline.
+enum MetricTileDensity { regular, compact }
+
 /// One metric on a raised card: an optional [icon] before its label, its
-/// value, its change badge, a caption and its sparkline. Read as one sentence: « Revenue, 1 240 €, up
-/// 12 %, vs. last week ».
+/// value, its change badge, a caption and its sparkline. Read as one sentence:
+/// « Revenue, 1 240 €, up 12 %, vs. last week ».
 ///
 /// [MetricTile.loading], [MetricTile.empty] and [MetricTile.error] keep the
 /// label and the same height, so a dashboard does not jump when its data
-/// arrives.
+/// arrives. Each [MetricTileDensity] keeps that promise on its own.
 class MetricTile extends StatelessWidget {
   const MetricTile(
     Metric this.metric, {
@@ -24,6 +29,7 @@ class MetricTile extends StatelessWidget {
     this.iconColor,
     this.onTap,
     this.strings,
+    this.density = MetricTileDensity.regular,
   }) : _state = _TileState.ready,
        label = null,
        message = null,
@@ -35,6 +41,7 @@ class MetricTile extends StatelessWidget {
     this.icon,
     this.iconColor,
     this.strings,
+    this.density = MetricTileDensity.regular,
   }) : _state = _TileState.loading,
        metric = null,
        message = null,
@@ -49,6 +56,7 @@ class MetricTile extends StatelessWidget {
     this.icon,
     this.iconColor,
     this.strings,
+    this.density = MetricTileDensity.regular,
   }) : _state = _TileState.empty,
        metric = null,
        onTap = null,
@@ -63,6 +71,7 @@ class MetricTile extends StatelessWidget {
     this.icon,
     this.iconColor,
     this.strings,
+    this.density = MetricTileDensity.regular,
   }) : _state = _TileState.error,
        metric = null,
        onTap = null;
@@ -87,8 +96,33 @@ class MetricTile extends StatelessWidget {
   /// Defaults to [MetricStrings.of] the context.
   final MetricStrings? strings;
 
-  /// Height of the value line, kept by every state.
-  static const _valueHeight = 36.0;
+  /// How much room the tile takes. The value line keeps the height of its
+  /// density in every state.
+  final MetricTileDensity density;
+
+  /// Height of the value line, kept by every state of the same density.
+  double get _valueHeight => switch (density) {
+    MetricTileDensity.regular => 36.0,
+    MetricTileDensity.compact => 28.0,
+  };
+
+  /// Height of the sparkline under the value.
+  double get _sparklineHeight => switch (density) {
+    MetricTileDensity.regular => 32.0,
+    MetricTileDensity.compact => 20.0,
+  };
+
+  /// Space inside the card.
+  double _padding(ShipglowsTheme theme) => switch (density) {
+    MetricTileDensity.regular => theme.spaceLg,
+    MetricTileDensity.compact => theme.spaceMd,
+  };
+
+  /// Style of the value: the display headline, or a title size when compact.
+  TextStyle? _valueStyle(TextTheme textTheme) => switch (density) {
+    MetricTileDensity.regular => textTheme.headlineSmall,
+    MetricTileDensity.compact => textTheme.titleLarge,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +140,7 @@ class MetricTile extends StatelessWidget {
     };
 
     final content = Padding(
-      padding: EdgeInsets.all(theme.spaceLg),
+      padding: EdgeInsets.all(_padding(theme)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -203,7 +237,7 @@ class MetricTile extends StatelessWidget {
                   metric.value,
                   maxLines: 1,
                   softWrap: false,
-                  style: textTheme.headlineSmall?.copyWith(
+                  style: _valueStyle(textTheme)?.copyWith(
                     color: theme.text,
                     fontFamily: theme.fontDisplay,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -217,16 +251,28 @@ class MetricTile extends StatelessWidget {
             ],
           ),
         ),
-        if (caption != null) ...[
+        // A compact tile leaves the caption to its spoken label.
+        if (caption != null && density == MetricTileDensity.regular) ...[
           SizedBox(height: theme.spaceXs),
           Text(
             caption,
             style: textTheme.bodySmall?.copyWith(color: theme.textMuted),
           ),
         ],
-        if (metric.series.length >= 2) ...[
+        if (metric.points.isNotEmpty) ...[
           SizedBox(height: theme.spaceMd),
-          MetricSparkline(metric.series, color: trendColor),
+          MetricSparkline.points(
+            metric.points,
+            color: trendColor,
+            height: _sparklineHeight,
+          ),
+        ] else if (metric.series.length >= 2) ...[
+          SizedBox(height: theme.spaceMd),
+          MetricSparkline(
+            metric.series,
+            color: trendColor,
+            height: _sparklineHeight,
+          ),
         ],
       ],
     );
@@ -238,7 +284,7 @@ class MetricTile extends StatelessWidget {
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          color: theme.line,
+          color: theme.border,
           borderRadius: BorderRadius.circular(theme.radiusSm),
         ),
       ),
@@ -272,7 +318,7 @@ class MetricTile extends StatelessWidget {
               child: ExcludeSemantics(
                 child: Text(
                   '—',
-                  style: textTheme.headlineSmall?.copyWith(
+                  style: _valueStyle(textTheme)?.copyWith(
                     color: theme.textMuted,
                     fontFamily: theme.fontDisplay,
                   ),

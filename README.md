@@ -1364,6 +1364,28 @@ locale) and hands them over. Depends on `shipglows_theme` and
 - `MetricPeriodSelector(periods: [MetricPeriod(value, '7 j'), …], selected:,
   onChanged:)`: the periods as a segmented button, `highlight` on the
   selected one.
+- `MetricDelta.between(current, previous)`: the change computed, never
+  NaN; from 0 it reads +100 % (or −100 %, or 0 when both are 0).
+- `Metric(points: [MetricPoint(day, value), …])`: dated values drawn by
+  `MetricSparkline.points`, spaced by date; a null value is a gap that
+  breaks the line. Hover or touch shows the nearest point (`describe:` for
+  its text). Takes precedence over `series`.
+- `MetricTile(…, density: MetricTileDensity.compact)`: smaller padding,
+  value and sparkline, no caption on screen (still read).
+- `MetricBarList(items: [MetricBarItem(label:, value:, valueLabel:)], …)`:
+  labelled horizontal bars (a funnel, content by type, top pages);
+  `labelWidth:` puts labels in a column from 480 wide, `sort:`, `maxItems:`,
+  `maxValue:`; rows with `onTap` are buttons. Tracks in `border`.
+- `MetricProgressBar(target: MetricTarget(value: 3, target: 5))` and
+  `MetricProgressTile(label:, target:, caption:)`: « 3 of 5 », the fill turns
+  `success` once reached.
+- `MetricSection(subtitle:, freshness: MetricFreshness(source:, updatedAt:,
+  stale:, partial:))`: a muted line « Google Search Console · Updated 2 h
+  ago » with « Stale » and « Partial data » badges (`MetricFreshnessLine`
+  alone elsewhere).
+- `MetricFormat.of(context)`: `integer` (« 1 240 »), `decimal`, `compact`
+  (« 1.2k », « 2,5M »), `percent(signed:)` and `duration` (« 2 min 5 s »),
+  with the separators, minus sign and units of `MetricStrings`.
 - `MetricStrings.en`, `.fr` (picked from the app locale) or the app's own;
   `MetricStringsScope` in `MaterialApp.builder` for the whole app.
 

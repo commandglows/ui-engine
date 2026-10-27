@@ -3,8 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'metric.dart';
 
 /// Texts of the metrics: the states of a tile, the words a screen reader
-/// says for a change (the arrow and color say it on screen) and how a
-/// default percentage is written. The app picks the language: [en], [fr], or
+/// says for a change (the arrow and color say it on screen), how numbers,
+/// percentages and durations are written, and how fresh the data is. The app picks the language: [en], [fr], or
 /// its own values, once for the app with [MetricStringsScope].
 @immutable
 class MetricStrings {
@@ -16,7 +16,20 @@ class MetricStrings {
     required this.noData,
     required this.retry,
     this.decimalSeparator = '.',
+    this.groupSeparator = ',',
     this.percentSuffix = '%',
+    this.thousandSuffix = 'k',
+    this.millionSuffix = 'M',
+    this.billionSuffix = 'B',
+    this.secondShort = 's',
+    this.minuteShort = 'min',
+    this.hourShort = 'h',
+    this.dayShort = 'd',
+    this.stale = 'Stale',
+    this.partial = 'Partial data',
+    this.updatedJustNow = 'Updated just now',
+    this.updatedAgo = 'Updated {time} ago',
+    this.ofTarget = '{value} of {target}',
   });
 
   /// Spoken before a change: « up 12 % ».
@@ -35,9 +48,38 @@ class MetricStrings {
 
   final String decimalSeparator;
 
+  /// Between groups of three digits: « 1,240 », « 1 240 » (narrow no-break
+  /// space in French).
+  final String groupSeparator;
+
   /// After the number of a default percentage: « % » in English, a narrow
   /// no-break space and « % » in French.
   final String percentSuffix;
+
+  /// Compact numbers: « 1.2k », « 3.4M », « 2B » (« 2 Md » in French).
+  final String thousandSuffix;
+  final String millionSuffix;
+  final String billionSuffix;
+
+  /// Duration units: « 45 s », « 12 min », « 3 h », « 2 d ».
+  final String secondShort;
+  final String minuteShort;
+  final String hourShort;
+  final String dayShort;
+
+  /// Badge of data that was not refreshed on time.
+  final String stale;
+
+  /// Badge of data known to be incomplete (the last days still arriving).
+  final String partial;
+
+  final String updatedJustNow;
+
+  /// « {time} » is replaced by a duration (« 2 h »).
+  final String updatedAgo;
+
+  /// Progress toward a target; « {value} » and « {target} » are replaced.
+  final String ofTarget;
 
   static const en = MetricStrings(
     up: 'up',
@@ -56,7 +98,15 @@ class MetricStrings {
     noData: 'Pas encore de données',
     retry: 'Réessayer',
     decimalSeparator: ',',
+    groupSeparator: ' ',
     percentSuffix: ' %',
+    billionSuffix: ' Md',
+    dayShort: 'j',
+    stale: 'Données anciennes',
+    partial: 'Données partielles',
+    updatedJustNow: 'Mis à jour à l’instant',
+    updatedAgo: 'Mis à jour il y a {time}',
+    ofTarget: '{value} sur {target}',
   );
 
   /// The [MetricStringsScope] above [context]; without one, [fr] when the
@@ -101,7 +151,20 @@ class MetricStrings {
     String? noData,
     String? retry,
     String? decimalSeparator,
+    String? groupSeparator,
     String? percentSuffix,
+    String? thousandSuffix,
+    String? millionSuffix,
+    String? billionSuffix,
+    String? secondShort,
+    String? minuteShort,
+    String? hourShort,
+    String? dayShort,
+    String? stale,
+    String? partial,
+    String? updatedJustNow,
+    String? updatedAgo,
+    String? ofTarget,
   }) => MetricStrings(
     up: up ?? this.up,
     down: down ?? this.down,
@@ -110,7 +173,20 @@ class MetricStrings {
     noData: noData ?? this.noData,
     retry: retry ?? this.retry,
     decimalSeparator: decimalSeparator ?? this.decimalSeparator,
+    groupSeparator: groupSeparator ?? this.groupSeparator,
     percentSuffix: percentSuffix ?? this.percentSuffix,
+    thousandSuffix: thousandSuffix ?? this.thousandSuffix,
+    millionSuffix: millionSuffix ?? this.millionSuffix,
+    billionSuffix: billionSuffix ?? this.billionSuffix,
+    secondShort: secondShort ?? this.secondShort,
+    minuteShort: minuteShort ?? this.minuteShort,
+    hourShort: hourShort ?? this.hourShort,
+    dayShort: dayShort ?? this.dayShort,
+    stale: stale ?? this.stale,
+    partial: partial ?? this.partial,
+    updatedJustNow: updatedJustNow ?? this.updatedJustNow,
+    updatedAgo: updatedAgo ?? this.updatedAgo,
+    ofTarget: ofTarget ?? this.ofTarget,
   );
 }
 
