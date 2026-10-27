@@ -13,7 +13,8 @@
 ///   against their SHA-256, least recently used dropped above a size.
 /// - [TransferControl]: progress and cancellation of one transfer;
 ///   [RetryPolicy]: tries again after a network hiccup, with growing waits;
-///   [TransferJournal] ([FileTransferJournal], [MemoryTransferJournal]):
+///   [TransferJournal] ([FileTransferJournal], [BrowserTransferJournal],
+///   [KeyValueTransferJournal], [MemoryTransferJournal]):
 ///   lets [S3BlobStore] resume an interrupted upload or download.
 /// - [SignedUploadClient] and [uploadSignedParts]: uploads through parts a
 ///   backend signs (ContentGlows lab); `signed_upload.dart` is the web-safe
@@ -24,10 +25,12 @@ library;
 export 'src/blob_cache.dart';
 export 'src/blob_store.dart';
 export 'src/blob_store_probe.dart';
+export 'src/browser_transfer_journal.dart';
 export 'src/file_hash.dart';
 export 'src/file_transfer_journal.dart';
 export 'src/folder_blob_store.dart';
 export 'src/s3_blob_store.dart';
+export 'src/key_value_transfer_journal.dart';
 export 'src/s3_endpoint.dart';
 export 'src/signed_upload.dart';
 export 'src/sigv4.dart';

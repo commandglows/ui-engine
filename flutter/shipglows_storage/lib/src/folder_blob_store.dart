@@ -202,8 +202,9 @@ class FolderBlobStore implements BlobStore {
     // A missing root is an unmounted drive, not a folder to create: creating
     // it would fill the local disk behind the sync client's back.
     if (!await root.exists()) {
-      throw BlobTransientFailure(
-        'Dossier « ${root.path} » introuvable : le lecteur est-il monté ?',
+      throw BlobTransientFailure.because(
+        BlobTransientReason.folderMissing,
+        detail: root.path,
       );
     }
   }
@@ -262,8 +263,11 @@ class FolderBlobStore implements BlobStore {
 
   static BlobStoreException _failure(FileSystemException error) =>
       error.osError?.errorCode == 5 || error.osError?.errorCode == 13
-          ? const BlobAccessDenied('Écriture refusée dans le dossier.')
-          : BlobTransientFailure('Dossier inaccessible : ${error.message}.');
+          ? const BlobAccessDenied(BlobAccessReason.folderNotWritable)
+          : BlobTransientFailure.because(
+              BlobTransientReason.folderUnreachable,
+              detail: error.message,
+            );
 }
 
 /// Keeps what it is given, to read a chunked hash.

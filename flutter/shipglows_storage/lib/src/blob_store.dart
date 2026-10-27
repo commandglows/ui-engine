@@ -18,6 +18,7 @@ import 'blob_errors.dart';
 import 'transfer.dart';
 
 export 'blob_errors.dart';
+export 'blob_strings.dart';
 
 /// What a stored object is: its key, its size in bytes and its version tag.
 ///

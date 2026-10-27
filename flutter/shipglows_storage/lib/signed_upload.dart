@@ -5,6 +5,8 @@
 library;
 
 export 'src/blob_errors.dart';
+export 'src/browser_transfer_journal.dart';
+export 'src/key_value_transfer_journal.dart';
 export 'src/signed_upload.dart';
 export 'src/transfer.dart';
 export 'src/transfer_journal.dart';

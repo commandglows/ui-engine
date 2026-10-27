@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,13 @@ class _FakeBackend {
 
   /// Answers the next sign call with this map instead.
   Map<String, Object?>? signAnswer;
+
+  /// Runs inside each PUT before it answers, to hold a part in flight.
+  Future<void> Function(int number)? holdPut;
+
+  /// PUTs in flight now, and the most there were at once.
+  int inFlight = 0;
+  int maxInFlight = 0;
 
   Future<Map<String, Object?>> call(
     String method,
@@ -70,11 +79,18 @@ class _FakeBackend {
   }) async {
     final number = int.parse(target.url.pathSegments.last);
     puts.add(number);
-    final failure = failOnce.remove(number);
-    if (failure != null) throw failure;
-    stored[number] = bytes;
-    onSent(bytes.length);
-    return '"etag-$number"';
+    inFlight++;
+    if (inFlight > maxInFlight) maxInFlight = inFlight;
+    try {
+      await holdPut?.call(number);
+      final failure = failOnce.remove(number);
+      if (failure != null) throw failure;
+      stored[number] = bytes;
+      onSent(bytes.length);
+      return '"etag-$number"';
+    } finally {
+      inFlight--;
+    }
   }
 }
 
@@ -86,12 +102,14 @@ void main() {
     _FakeBackend backend, {
     TransferJournal? journal,
     RetryPolicy? retry,
+    int partConcurrency = 3,
   }) =>
       SignedUploadClient(
         call: backend.call,
         put: backend.put,
         retry: retry ?? RetryPolicy(sleep: (_) async {}),
         journal: journal,
+        partConcurrency: partConcurrency,
       );
 
   Future<Map<String, Object?>> upload(
@@ -113,11 +131,39 @@ void main() {
         control: control,
       );
 
+  /// [bytes] through [uploadSignedParts] directly, in parts of 4 bytes.
+  Future<List<SignedPartReceipt>> sendParts(
+    _FakeBackend backend,
+    Uint8List bytes, {
+    int partConcurrency = 3,
+    TransferControl? control,
+    Map<int, SignedPartReceipt> stored = const {},
+    void Function(SignedPartReceipt receipt)? onStored,
+  }) =>
+      uploadSignedParts(
+        parts: [
+          for (var start = 0, n = 1; start < bytes.length; start += 4, n++)
+            (number: n, bytes: min(4, bytes.length - start)),
+        ],
+        source: Stream.fromIterable([bytes.sublist(0, 3), bytes.sublist(3)]),
+        totalBytes: bytes.length,
+        sign: (number, checksum, size) async => (
+          url: Uri.parse('https://bucket.test/u1/$number'),
+          headers: const <String, String>{},
+        ),
+        put: backend.put,
+        retry: RetryPolicy(sleep: (_) async {}),
+        control: control,
+        stored: stored,
+        onStored: onStored,
+        partConcurrency: partConcurrency,
+      );
+
   test('sends each part once and completes with the receipts', () async {
     final backend = _FakeBackend();
     final progress = <int>[];
     final result = await upload(
-      clientOf(backend),
+      clientOf(backend, partConcurrency: 1),
       bytesOf(10),
       control: TransferControl(onProgress: (done, _) => progress.add(done)),
     );
@@ -136,7 +182,7 @@ void main() {
   test('a transient failure signs the part again and resends it', () async {
     final backend = _FakeBackend();
     backend.failOnce[2] = const BlobTransientFailure('réseau');
-    await upload(clientOf(backend), bytesOf(10));
+    await upload(clientOf(backend, partConcurrency: 1), bytesOf(10));
     expect(backend.puts, [1, 2, 2, 3]);
     expect(
       backend.calls.where((call) => call.endsWith('/parts/2/sign')),
@@ -148,7 +194,7 @@ void main() {
     final backend = _FakeBackend();
     backend.failOnce[2] = StateError('refusé');
     await expectLater(
-      upload(clientOf(backend), bytesOf(10)),
+      upload(clientOf(backend, partConcurrency: 1), bytesOf(10)),
       throwsStateError,
     );
     expect(backend.puts, [1, 2]);
@@ -160,7 +206,12 @@ void main() {
     backend.failOnce[3] = const BlobTransientFailure('réseau');
     await expectLater(
       upload(
-        clientOf(backend, journal: journal, retry: RetryPolicy.none),
+        clientOf(
+          backend,
+          journal: journal,
+          retry: RetryPolicy.none,
+          partConcurrency: 1,
+        ),
         bytesOf(10),
       ),
       throwsA(isA<BlobTransientFailure>()),
@@ -209,6 +260,95 @@ void main() {
     await expectLater(
       upload(clientOf(backend), bytesOf(10)),
       throwsFormatException,
+    );
+  });
+
+  test('parts go up several at a time', () async {
+    final backend = _FakeBackend();
+    final secondStarted = Completer<void>();
+    backend.holdPut = (number) async {
+      if (number == 2) secondStarted.complete();
+      // Sequential parts never start part 2 while part 1 waits: the timeout
+      // fails the test instead of hanging it.
+      if (number == 1) {
+        await secondStarted.future.timeout(const Duration(seconds: 2));
+      }
+    };
+    final result = await upload(clientOf(backend), bytesOf(10));
+    expect(result, {'id': 'asset-1', 'bytes': 10});
+    expect(backend.puts.toSet(), {1, 2, 3});
+  });
+
+  test('never more than partConcurrency parts go up at once', () async {
+    final backend = _FakeBackend()
+      ..holdPut = (_) => Future<void>.delayed(const Duration(milliseconds: 5));
+    await upload(clientOf(backend, partConcurrency: 2), bytesOf(40));
+    expect(backend.puts, hasLength(10));
+    expect(backend.maxInFlight, 2);
+  });
+
+  test('a failed part stops new parts and rethrows that error', () async {
+    final backend = _FakeBackend()..failOnce[3] = StateError('refusé');
+    backend.holdPut =
+        (_) => Future<void>.delayed(const Duration(milliseconds: 5));
+    await expectLater(
+      sendParts(backend, bytesOf(40), partConcurrency: 2),
+      throwsStateError,
+    );
+    expect(backend.puts.length, lessThan(10));
+  });
+
+  test('a cancellation midway, then a resume, re-sends only the missing parts',
+      () async {
+    final backend = _FakeBackend()
+      ..failOnce[3] = const BlobTransferCancelled();
+    final journal = <int, SignedPartReceipt>{};
+    await expectLater(
+      sendParts(
+        backend,
+        bytesOf(40),
+        partConcurrency: 2,
+        onStored: (receipt) {
+          journal[receipt.number] = receipt;
+        },
+      ),
+      throwsA(isA<BlobTransferCancelled>()),
+    );
+    final storedBefore = backend.stored.keys.toSet();
+    expect(journal.keys.toSet(), storedBefore);
+    expect(storedBefore, isNot(contains(3)));
+
+    backend.puts.clear();
+    final receipts = await sendParts(
+      backend,
+      bytesOf(40),
+      partConcurrency: 2,
+      stored: journal,
+    );
+    final missing = {for (var n = 1; n <= 10; n++) n}.difference(storedBefore);
+    expect(backend.puts.toSet(), missing);
+    expect(backend.puts, hasLength(missing.length));
+    expect(
+      receipts.map((receipt) => receipt.number),
+      [for (var n = 1; n <= 10; n++) n],
+    );
+  });
+
+  test('receipts come back in part order even when parts finish out of order',
+      () async {
+    final backend = _FakeBackend();
+    final finished = <int>[];
+    backend.holdPut = (number) async {
+      // Part 1 is the slowest, part 3 the quickest.
+      await Future<void>.delayed(Duration(milliseconds: 10 * (4 - number)));
+      finished.add(number);
+    };
+    final receipts = await sendParts(backend, bytesOf(12));
+    expect(finished, [3, 2, 1]);
+    expect(receipts.map((receipt) => receipt.number), [1, 2, 3]);
+    expect(
+      receipts.map((receipt) => receipt.etag),
+      ['"etag-1"', '"etag-2"', '"etag-3"'],
     );
   });
 }

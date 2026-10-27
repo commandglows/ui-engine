@@ -1154,9 +1154,23 @@ another S3-compatible bucket is an endpoint change.
   marks the file as used and drops the least recently used ones above
   `maxBytes`, never the file just fetched; `peek`, `remove`, `evictToFit`.
 
-Not yet: background transfers (Android/iOS), parallel parts for signed
-uploads, a journal that survives a restart on the web, translatable error
-messages.
+- Signed uploads send three parts at a time too
+  (`SignedUploadClient(partConcurrency:)`, `uploadSignedParts(partConcurrency:)`):
+  the source is read once, at most that many parts in memory, journal notes
+  written one at a time; the first failure starts no new part and is
+  rethrown.
+- `BrowserTransferJournal(prefix:)` keeps the resume notes in
+  `localStorage`, so a web upload resumes its missing parts after a reload
+  (its constructor throws off the web; use `FileTransferJournal` there).
+  `KeyValueTransferJournal(store)` is the same over any synchronous
+  key-value store; a full or blocked store only means the upload starts
+  over.
+- Error messages: every `BlobStoreException` keeps its data and a reason
+  (`BlobAccessReason`, `BlobTransientReason`); `messageIn(BlobStrings.en)`,
+  `BlobStrings.fr` or the app's own `BlobStrings` give the text, `message`
+  stays French.
+
+Not yet: background transfers (Android/iOS).
 
 ## `flutter/shipglows_xml`
 

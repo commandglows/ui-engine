@@ -149,9 +149,14 @@ Map<String, Object?> signedPartReceiptToJson(SignedPartReceipt receipt) => {
 /// [sign] and put by [put]; a part that fails transiently is signed and sent
 /// again by [retry], so a flaky connection does not restart the file.
 ///
+/// Up to [partConcurrency] parts go up at once. The source is read only when
+/// a part slot frees up, so memory holds at most that many parts. The first
+/// failure starts no new part, lets the parts in flight end, and is rethrown.
+///
 /// Parts already in [stored] (a resume) are read past without being sent
 /// again when their checksum still matches; [onStored] hears each newly
-/// stored part, to note it. Returns the receipts in part order.
+/// stored part, one at a time, to note it. Returns the receipts in part
+/// order.
 ///
 /// Throws a [FormatException] when the source does not fit the parts.
 Future<List<SignedPartReceipt>> uploadSignedParts({
@@ -168,71 +173,165 @@ Future<List<SignedPartReceipt>> uploadSignedParts({
   TransferControl? control,
   Map<int, SignedPartReceipt> stored = const {},
   FutureOr<void> Function(SignedPartReceipt receipt)? onStored,
+  int partConcurrency = 3,
 }) async {
   if (parts.isEmpty) {
     throw const FormatException('The upload has no part instructions.');
   }
-  final receipts = <SignedPartReceipt>[];
-  final builder = BytesBuilder(copy: false);
-  var index = 0;
+  assert(partConcurrency >= 1);
+  final receipts = List<SignedPartReceipt?>.filled(parts.length, null);
+  // Bytes done (stored or skipped parts), plus what each part in flight sent.
   var done = 0;
-  await for (final chunk in source) {
-    control?.check();
-    var offset = 0;
-    while (offset < chunk.length) {
-      if (index >= parts.length) {
-        throw const FormatException('The file exceeds its upload parts.');
+  final inFlight = <int, int>{};
+  void report() => control?.report(
+    done + inFlight.values.fold(0, (sum, sent) => sum + sent),
+    totalBytes,
+  );
+  // Notes go one at a time: two writers of one journal file would race.
+  var noting = Future<void>.value();
+  var failed = false;
+  Object? firstError;
+  StackTrace? firstStack;
+
+  // The source is read once, in order, by one reader at a time: a
+  // StreamIterator takes one moveNext at a time, and the reads wait their turn
+  // in [reads].
+  final pieces = StreamIterator<List<int>>(source);
+  var chunk = const <int>[];
+  var offset = 0;
+  var cut = 0;
+  var reads = Future<void>.value();
+
+  // Whether bytes remain in the source past the last part.
+  Future<bool> hasMore() async {
+    if (offset < chunk.length) return true;
+    while (await pieces.moveNext()) {
+      if (pieces.current.isNotEmpty) return true;
+    }
+    return false;
+  }
+
+  // Cuts the next part off the source; null once none is left to start.
+  Future<({int index, Uint8List bytes})?> cutNext() async {
+    final index = cut;
+    if (failed || index >= parts.length) return null;
+    cut++;
+    final part = parts[index];
+    final builder = BytesBuilder(copy: false);
+    while (builder.length < part.bytes) {
+      if (offset == chunk.length) {
+        if (!await pieces.moveNext()) break;
+        chunk = pieces.current;
+        offset = 0;
+        control?.check();
+        continue;
       }
-      final part = parts[index];
       final take = min(part.bytes - builder.length, chunk.length - offset);
       builder.add(chunk.sublist(offset, offset + take));
       offset += take;
-      if (builder.length != part.bytes) continue;
-      final bytes = builder.takeBytes();
-      final checksum = sha256.convert(bytes).toString();
-      final kept = stored[part.number];
-      if (kept != null &&
-          kept.checksumSha256 == checksum &&
-          kept.bytes == bytes.length) {
-        receipts.add(kept);
-      } else {
-        final sentBefore = done;
-        final etag = await retry.run(
+    }
+    if (builder.length != part.bytes) {
+      throw const FormatException('The file does not match its upload parts.');
+    }
+    if (cut == parts.length && await hasMore()) {
+      throw const FormatException('The file exceeds its upload parts.');
+    }
+    return (index: index, bytes: builder.takeBytes());
+  }
+
+  Future<({int index, Uint8List bytes})?> nextCut() {
+    final next = reads.then((_) => cutNext());
+    reads = next.then<void>((_) {}, onError: (Object _) {});
+    return next;
+  }
+
+  Future<void> sendPart(int index, Uint8List bytes) async {
+    final part = parts[index];
+    final checksum = sha256.convert(bytes).toString();
+    final kept = stored[part.number];
+    if (kept != null &&
+        kept.checksumSha256 == checksum &&
+        kept.bytes == bytes.length) {
+      receipts[index] = kept;
+      done += bytes.length;
+      report();
+      return;
+    }
+    final etag = await retry
+        .run(
           () async {
-            control?.report(sentBefore, totalBytes);
+            inFlight[part.number] = 0;
+            report();
             final target = await sign(part.number, checksum, bytes.length);
             control?.check();
             return put(
               target,
               bytes,
-              onSent: (sent) => control?.report(sentBefore + sent, totalBytes),
+              onSent: (sent) {
+                inFlight[part.number] = sent;
+                report();
+              },
             );
           },
           control: control,
-        );
-        if (etag.trim().isEmpty) {
-          throw const FormatException('Storage returned no part receipt.');
-        }
-        final receipt = (
-          number: part.number,
-          etag: etag,
-          checksumSha256: checksum,
-          bytes: bytes.length,
-        );
-        await onStored?.call(receipt);
-        receipts.add(receipt);
+        )
+        .whenComplete(() {
+          inFlight.remove(part.number);
+        });
+    if (etag.trim().isEmpty) {
+      throw const FormatException('Storage returned no part receipt.');
+    }
+    // Moved from in flight to done in one step, so progress never dips.
+    done += bytes.length;
+    report();
+    final receipt = (
+      number: part.number,
+      etag: etag,
+      checksumSha256: checksum,
+      bytes: bytes.length,
+    );
+    final write = noting.then<void>((_) async {
+      await onStored?.call(receipt);
+    });
+    noting = write.then<void>((_) {}, onError: (Object _) {});
+    await write;
+    receipts[index] = receipt;
+  }
+
+  Future<void> worker() async {
+    try {
+      while (!failed) {
+        final next = await nextCut();
+        if (next == null || failed) return;
+        await sendPart(next.index, next.bytes);
       }
-      done += bytes.length;
-      control?.report(done, totalBytes);
-      index++;
+    } on Object catch (error, stack) {
+      // The other workers finish the part they are sending, then stop.
+      if (firstError == null) {
+        firstError = error;
+        firstStack = stack;
+      }
+      failed = true;
     }
   }
-  if (builder.length != 0 || index != parts.length || done != totalBytes) {
+
+  try {
+    await Future.wait([
+      for (var i = 0; i < min(partConcurrency, parts.length); i++) worker(),
+    ]);
+  } finally {
+    await pieces.cancel();
+  }
+  final error = firstError;
+  if (error != null) {
+    Error.throwWithStackTrace(error, firstStack ?? StackTrace.current);
+  }
+  if (cut != parts.length || done != totalBytes) {
     throw const FormatException(
       'The file does not match its upload parts.',
     );
   }
-  return receipts;
+  return [for (final receipt in receipts) receipt!];
 }
 
 /// The client side of the ShipGlows signed upload protocol.
@@ -242,7 +341,8 @@ class SignedUploadClient {
     required this.put,
     this.retry = const RetryPolicy(),
     this.journal,
-  });
+    this.partConcurrency = 3,
+  }) : assert(partConcurrency >= 1);
 
   final SignedUploadCall call;
   final SignedPartPut put;
@@ -252,6 +352,13 @@ class SignedUploadClient {
   /// after a lost connection sends only the missing parts; without it every
   /// part goes again.
   final TransferJournal? journal;
+
+  /// Parts of one upload sent at the same time; see [uploadSignedParts].
+  final int partConcurrency;
+
+  /// The journal notes, chained: a note's read-modify-write must not overlap
+  /// another's, even when two uploads of this client store parts together.
+  Future<void> _noting = Future.value();
 
   /// Uploads the [byteSize] bytes [openRead] gives (called once to hash
   /// them when [checksumSha256] is null, once to send them) through the
@@ -318,6 +425,7 @@ class SignedUploadClient {
         put: put,
         retry: retry,
         control: control,
+        partConcurrency: partConcurrency,
         stored: await _storedParts(journalId),
         onStored: (receipt) => _noteStored(journalId, receipt),
       );
@@ -361,7 +469,13 @@ class SignedUploadClient {
     };
   }
 
-  Future<void> _noteStored(String journalId, SignedPartReceipt receipt) async {
+  Future<void> _noteStored(String journalId, SignedPartReceipt receipt) {
+    final write = _noting.then((_) => _writeStored(journalId, receipt));
+    _noting = write.then<void>((_) {}, onError: (Object _) {});
+    return write;
+  }
+
+  Future<void> _writeStored(String journalId, SignedPartReceipt receipt) async {
     final journal = this.journal;
     if (journal == null) return;
     final note = await journal.read(journalId);

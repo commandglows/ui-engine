@@ -174,8 +174,8 @@ class S3BlobStore implements BlobStore {
         await _expectOk(response, control: control),
       ).descendants('UploadId').firstOrNull?.text;
       if (uploadId == null || uploadId.isEmpty) {
-        throw const BlobTransientFailure(
-          'Réponse S3 sans identifiant d’envoi.',
+        throw const BlobTransientFailure.because(
+          BlobTransientReason.uploadIdMissing,
         );
       }
       return uploadId;
@@ -185,7 +185,9 @@ class S3BlobStore implements BlobStore {
     try {
       return await _sendParts(key, file, length, upload, journalId, control);
     } on _UploadGone {
-      throw const BlobTransientFailure('Envoi abandonné par le stockage.');
+      throw const BlobTransientFailure.because(
+        BlobTransientReason.uploadAborted,
+      );
     }
   }
 
@@ -302,7 +304,9 @@ class S3BlobStore implements BlobStore {
       final body = parseSafeXml(await _expectOk(completed, control: control));
       // S3 may answer 200 with an <Error> body when completion fails late.
       if (body.localName == 'Error') {
-        throw const BlobTransientFailure('Assemblage de l’envoi refusé.');
+        throw const BlobTransientFailure.because(
+          BlobTransientReason.assemblyRefused,
+        );
       }
       await journal?.delete(journalId);
       final etag = body.descendants('ETag').firstOrNull?.text ?? '';
@@ -403,7 +407,9 @@ class S3BlobStore implements BlobStore {
           await response.drain<void>();
           await _deleteQuietly(partial);
           etag = null;
-          throw const BlobTransientFailure('Objet modifié, reprise à zéro.');
+          throw const BlobTransientFailure.because(
+            BlobTransientReason.objectChanged,
+          );
         }
         if (status != HttpStatus.ok && status != HttpStatus.partialContent) {
           await _expectOk(response, control: control);
@@ -611,19 +617,20 @@ class S3BlobStore implements BlobStore {
     final code = _errorCode(body);
     if (status == HttpStatus.forbidden || status == HttpStatus.unauthorized) {
       throw BlobAccessDenied(switch (code) {
-        'SignatureDoesNotMatch' => 'Clé secrète refusée par le stockage.',
-        'InvalidAccessKeyId' => 'Identifiant de clé inconnu du stockage.',
-        _ => const BlobAccessDenied().message,
+        'SignatureDoesNotMatch' => BlobAccessReason.secretKeyRejected,
+        'InvalidAccessKeyId' => BlobAccessReason.accessKeyUnknown,
+        _ => BlobAccessReason.credentials,
       });
     }
     if (status == HttpStatus.notFound && code == 'NoSuchBucket') {
-      throw BlobAccessDenied('Bucket « ${config.bucket} » introuvable.');
+      throw BlobAccessDenied(BlobAccessReason.bucketMissing, config.bucket);
     }
     if (status == HttpStatus.notFound && code == 'NoSuchUpload') {
       throw const _UploadGone();
     }
-    throw BlobTransientFailure(
-      'Le stockage a répondu $status${code == null ? '' : ' ($code)'}.',
+    throw BlobTransientFailure.because(
+      BlobTransientReason.storageAnswered,
+      detail: '$status${code == null ? '' : ' ($code)'}',
     );
   }
 
@@ -655,8 +662,12 @@ class S3BlobStore implements BlobStore {
     return switch (error) {
       BlobStoreException() || _UploadGone() => error,
       SocketException() || TimeoutException() || HandshakeException() =>
-        const BlobTransientFailure('Stockage injoignable.'),
-      _ => BlobTransientFailure('Échange interrompu : $error'),
+        const BlobTransientFailure.because(BlobTransientReason.unreachable),
+      _ => BlobTransientFailure.because(
+        BlobTransientReason.interrupted,
+        detail: '$error',
+        cause: error,
+      ),
     };
   }
 
