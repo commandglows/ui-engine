@@ -1,10 +1,10 @@
 ---
 artifact: technical_context
 metadata_schema_version: "1.0"
-artifact_version: "1.5.0"
+artifact_version: "1.6.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
-updated: "2026-10-26"
+updated: "2026-10-27"
 status: active
 source_skill: sg-docs
 scope: package-map
@@ -28,6 +28,7 @@ evidence:
   - "2026-10-23: shipglows_flutter_zoom added after its move from shipglows-email-engine (ea6ec1a); Ctrl+= / Ctrl+- / Ctrl+0 checked by the operator in CommandGlows."
   - "2026-10-26: shipglows_clerk_auth added from the CommandGlows Clerk OIDC spike (proven by the operator on Android and Windows); decision: Clerk is the single auth provider, one Clerk application per product."
   - "2026-10-26: shipglows_convex added (ConvexHttpClient over the HTTP API, no SDK); wire format checked against the installed convex 1.47.0 browser HTTP client (convex_encoded_json, args in a list, HTTP 560 for failed functions); no consumer yet, not run against a deployment."
+  - "2026-10-27: shipglows_reviews added (6cfef27, 7e833aa, 1ca99e1); CommandGlows Windows sends reviews to Convex reviews:submit (commandglows ef9a3f31), a review sent from the app read back with reviews:listRecent on the dev deployment. Same pass: rows added for calendar, contact, demo, menu, metrics, organize, settings_convex, storage and xml (descriptions from their pubspec.yaml, consumers from path dependencies), shipglows_convex and shipglows_notification_center consumers refreshed."
 next_review: "2027-01-22"
 next_step: "Update the consumer column when an app adopts or drops a package."
 ---
@@ -60,10 +61,20 @@ do nothing or fall back to plain Flutter.
 | `shipglows_settings_firestore` | `SettingsRemote` over one Firestore document per account (`users/{uid}/settings/profile`) | via plugin dep | CommandGlows |
 | `shipglows_guide` | In-app guidance: tours across routes, coach marks on a `GuideTarget` (spotlight, « try it »), one-step tips, first-visit `GuideTrigger`, progress in a `GuideStore`, navigation through app or scope callbacks; extracted from the ContentGlows guided tour | no | ContentGlows (publish tour, legacy `inapp_tour_*` keys), ReplayGlows (Feed coach marks) |
 | `shipglows_feedback` | In-app messages info/success/warning/error: `showFeedback` / `context.showError`…, floating snack bar from `ShipglowsTheme` (new `success` and `warning` roles), durations by kind, repeats not queued, kind spoken (`FeedbackStrings` FR/EN, app-wide `FeedbackStringsScope`), `FeedbackMessenger` read before an await, « Copy details » (`details:`), a second action, `FeedbackInline` (in place, announced), `FeedbackErrorState` (retry, compact), `FeedbackLog` of messages shown; `shipglows_undo_trash` draws its « Undo » snack bar with it | no | `shipglows_undo_trash`, BeatGlows, BestFriedChicken, Claiire, CommandGlows, CommunityGlows, ContentGlows, DreamGlows, GoCharbon, ReplayGlows, ShipGlows app (2026-10-24) |
-| `shipglows_notification_center` | Notification center: latest notifications read/unread, open, delete, « Mark all as read », « Delete all » (confirmed), unread summary and `NotificationBadge` / `NotificationBellButton`, empty and error states (`FeedbackErrorState`); storage is a `NotificationStore` port (callback, memory); `FeedbackHistory` keeps the in-app messages shown (`FeedbackLog` of `shipglows_feedback`); `NotificationStrings` FR/EN | no | ReplayGlows (2026-10-25) |
+| `shipglows_notification_center` | Notification center: latest notifications read/unread, open, delete, « Mark all as read », « Delete all » (confirmed), unread summary and `NotificationBadge` / `NotificationBellButton`, empty and error states (`FeedbackErrorState`); storage is a `NotificationStore` port (callback, memory); `FeedbackHistory` keeps the in-app messages shown (`FeedbackLog` of `shipglows_feedback`); `NotificationStrings` FR/EN | no | ReplayGlows (2026-10-25), DreamGlows `path_flutter` (2026-10-27) |
 | `shipglows_onboarding` | First-run introduction: two-column card of `OnboardingPage`s (language, welcome, features, access) with previews, segmented progress bar, narrow single-column layout, per-account `OnboardingGate` over an `OnboardingCompletionStore`, `OnboardingThemeData`; extracted from the ReplayGlows introduction | no | ReplayGlows (web; key `onboarding_completed:v1:<user>`) |
-| `shipglows_convex` | Convex HTTP client without the SDK: `ConvexHttpClient` (`query`, `mutation`, `action`, `uploadBytes`) with a bearer `token` callback and one retry after `unauthenticated`, `ConvexException` codes, epoch-ms time helpers; plain JSON args only | no | none yet (2026-10-26) |
+| `shipglows_convex` | Convex HTTP client without the SDK: `ConvexHttpClient` (`query`, `mutation`, `action`, `uploadBytes`) with a bearer `token` callback and one retry after `unauthenticated`, `ConvexException` codes, epoch-ms time helpers; plain JSON args only | no | `shipglows_settings_convex`, CommandGlows (reviews, 2026-10-27) |
 | `shipglows_clerk_auth` | Clerk sign-in for native apps without the beta Clerk SDK: OIDC Authorization Code + PKCE through the system browser (Custom Tab, Windows loopback), `ClerkAuthClient` (`restore`, `signIn`, `accessToken` with refresh, `signOut` with revocation), session in secure storage per OAuth client; one Clerk application and one public OAuth client per product | via plugin dep (`flutter_web_auth_2`, `flutter_secure_storage`) | CommandGlows (Android + Windows, 2026-10-26) |
+| `shipglows_settings_convex` | `ConvexSettingsRemote`: `SettingsRemote` over one Convex settings row per account | no | CommandGlows |
+| `shipglows_reviews` | Customer reviews on Android, iOS, macOS, Windows and web: `ShipglowsReviews` counts launches and positive moments, asks at the right time (`ReviewPolicy`, no review gating) with the store prompt or an in-app invitation, `ShipglowsReviewForm` (stars, topic, comment, email, publish consent) sent to a `ReviewSink` with an offline outbox, public rating page (store or `ReviewSite`), `ShipglowsReviewSettings` rows, FR/EN strings; state through the `shipglows_settings` storage port (file, localStorage on web) | via plugin dep (`in_app_review`) | CommandGlows (Windows, Convex `reviews:submit`, 2026-10-27) |
+| `shipglows_contact` | Backend-free « Nous contacter » button: `ShipglowsContactButton` / `showShipglowsContactSheet` over `ContactChannel`s (WhatsApp, Messenger, Instagram, Telegram, email, phone, SMS, link) opened by deeplink, `supportEmail` labelled per app, FR/EN strings | no | none yet (2026-10-27) |
+| `shipglows_organize` | Folders, tags and search independent of storage: `FolderTree`, `TagRules`, `OrganizeQuery` / `OrganizeFilter`, accent-free `searchKey`, `nameKey`, `normalizeLabels` | no | BeatGlows, CommandGlows, ContentGlows, ShipGlows app |
+| `shipglows_storage` | Files kept off the device: `BlobStore` over S3-compatible buckets (R2, MinIO, AWS, SigV4), `FolderBlobStore`, `MemoryBlobStore`, signed multipart uploads resumable through a transfer journal (file, browser), `BlobCache`, typed `BlobStoreException`s | no | BeatGlows, ContentGlows |
+| `shipglows_xml` | Safe XML reader `parseSafeXml`: refuses entities and DOCTYPE, bounds size, depth and node count (`SafeXmlLimits`) | no | `shipglows_storage`, BeatGlows |
+| `shipglows_calendar` | Calendar views (day, week, month, agenda, day strip, mini month), `CalendarEvent` model and `CalendarTimeZone` seam | no | ContentGlows, DreamGlows `path_flutter` |
+| `shipglows_metrics` | Metric tiles, deltas, sparklines, bars, progress, freshness line, period selector and `MetricGrid` dashboard layout | no | ContentGlows |
+| `shipglows_demo` | Demo mode surfaces: `DemoBanner`, `DemoExitButton`, exit and account dialogs, FR/EN strings | no | ContentGlows, DreamGlows `path_flutter` |
+| `shipglows_menu` | Action menu model shared by the tray and in-app menus (`ShipglowsMenu`, items, submenus, separators) and an anchored, searchable action list (`showShipglowsMenu`) | no | command bar, command bar window, tray; CommandGlows |
 
 ## Cross-Package Contracts
 
