@@ -1788,6 +1788,57 @@ ShipglowsCalendar(
 )
 ```
 
+## `flutter/shipglows_reviews`
+
+Customer reviews, the same on every app: the store's rating prompt at the
+right moment, the app's own review form sent to its backend, and the
+settings rows. Depends on `in_app_review`, `package_info_plus`,
+`shipglows_settings` (device state), `shipglows_feedback`, `shipglows_theme`
+and `shipglows_icons`.
+
+- `ShipglowsReviews.open(config: ShipglowsReviewsConfig(appId:, appStoreId:,
+  microsoftStoreId:, playStoreListed:, policy:), storage:, sink:)` once at
+  startup; never throws. Counts launches, reads the install (Google Play,
+  App Store, TestFlight, direct installer or APK, web) and sends the
+  reviews left unsent.
+- Store prompt: `maybeAskForStoreReview()` at a natural break. The
+  `ReviewPolicy` asks only after 7 days, 5 launches and 3 successes since the
+  last prompt, never within 3 days of an error or 30 of a form review, 120
+  days apart, 3 a year, once per version, never again after « Noter sur le
+  Store ». Never in debug builds (`promptInDebug`), never where the install
+  has no store prompt (sideloaded APK, WinSparkle, web). `eligibility` says
+  why it waits. With `followFeedback` (default) every `shipglows_feedback`
+  success counts as a positive moment and every error as a problem.
+- Form: `showShipglowsReviewForm(context, reviews:, appName:, topic:)` (a
+  bottom sheet on compact windows, a dialog otherwise): stars, topic
+  (praise, idea, problem, other), message, optional address, consent to
+  publish as a testimonial with an optional display name, a note on what is
+  sent. Ctrl+Enter sends. The thank-you offers the store page to everyone,
+  whatever the rating: Google Play and Apple forbid sending only happy
+  people to rate.
+- `ShipglowsReviewSettings(reviews:, appName:)`: « Donner mon avis » (with
+  the reviews waiting offline) and « Noter {app} » where there is a store
+  page. `ShipglowsStarRating` alone. `ShipglowsReviewStrings.fr` / `.en`,
+  `ShipglowsReviewStringsScope`.
+- Backend: a `ReviewSink` (`CallbackReviewSink` over a Convex mutation, a
+  Firestore collection, a REST call). `CustomerReview.toJson()` is plain
+  JSON with a device-made `id` for deduplication; no device id, no IP.
+  Unsent reviews stay on the device, retried 30 s doubling to 5 min, on
+  resume and at the next launch; `ReviewRejectedException` drops one.
+  Field table and Convex example in `flutter/shipglows_reviews/README.md`.
+
+```dart
+final reviews = await ShipglowsReviews.open(
+  config: const ShipglowsReviewsConfig(appId: 'commandglows'),
+  storage: settingsStorage,
+  sink: CallbackReviewSink(
+    (review) => convex.mutation('reviews:submit', review.toJson()),
+  ),
+);
+unawaited(reviews.maybeAskForStoreReview()); // back on the home screen
+showShipglowsReviewForm(context, reviews: reviews, appName: 'CommandGlows');
+```
+
 ## `flutter/shipglows_demo`
 
 The demo-mode surfaces every app shows the same way. Each app keeps its own

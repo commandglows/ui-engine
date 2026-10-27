@@ -1,0 +1,27 @@
+name: shipglows_reviews
+description: Customer reviews for ShipGlows Flutter apps — the store rating prompt at the right moment, an in-app review form sent to the app's backend, and the settings rows.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  in_app_review: ^2.0.10
+  package_info_plus: ^10.2.2
+  shipglows_feedback:
+    path: ../shipglows_feedback
+  shipglows_icons:
+    path: ../shipglows_icons
+  shipglows_settings:
+    path: ../shipglows_settings
+  shipglows_theme:
+    path: ../shipglows_theme
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
