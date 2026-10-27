@@ -50,6 +50,8 @@ void main() {
 
   setUp(() => now = DateTime.utc(2026, 6));
 
+  final openedUrls = <Uri>[];
+
   Future<ShipglowsReviews> open({
     SettingsStorage? storage,
     ReviewSink? sink,
@@ -63,7 +65,46 @@ void main() {
     followFeedback: false,
     observeLifecycle: false,
     clock: clock,
+    openUrl: (url) async {
+      openedUrls.add(url);
+      return true;
+    },
   );
+
+  /// A screen whose context the prompts are shown over.
+  Future<BuildContext> screen(WidgetTester tester) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ShipglowsReviewStringsScope(
+          strings: ShipglowsReviewStrings.en,
+          child: Builder(
+            builder: (inner) {
+              context = inner;
+              return const Scaffold();
+            },
+          ),
+        ),
+      ),
+    );
+    return context;
+  }
+
+  /// Five launches of a settled install.
+  Future<ShipglowsReviews> settled(FakeStore store, {
+    ShipglowsReviewsConfig settings = config,
+  }) async {
+    final storage = MemorySettingsStorage();
+    for (var i = 0; i < 4; i++) {
+      (await open(storage: storage, store: store, settings: settings))
+          .dispose();
+    }
+    final reviews = await open(storage: storage, store: store, settings: settings);
+    for (var i = 0; i < 3; i++) {
+      await reviews.recordPositiveMoment();
+    }
+    return reviews;
+  }
 
   group('ReviewPolicy', () {
     const policy = ReviewPolicy();
@@ -255,40 +296,120 @@ void main() {
       reviews.dispose();
     });
 
-    test('asks the store once the policy allows it, then waits', () async {
+    testWidgets('asks the store once the policy allows it, then waits', (
+      tester,
+    ) async {
+      final context = await screen(tester);
       final store = FakeStore();
-      final storage = MemorySettingsStorage();
-      for (var i = 0; i < 4; i++) {
-        (await open(storage: storage, store: store)).dispose();
-      }
-      final reviews = await open(storage: storage, store: store);
-      expect(await reviews.maybeAskForStoreReview(), isFalse);
-      for (var i = 0; i < 3; i++) {
-        await reviews.recordPositiveMoment();
-      }
-      expect(await reviews.maybeAskForStoreReview(), isTrue);
+      final reviews = await settled(store);
+      await reviews.recordProblem();
+      expect(
+        await reviews.maybeAskForReview(context, appName: 'TestGlows'),
+        isFalse,
+      );
+      now = now.add(const Duration(days: 4));
+      expect(
+        await reviews.maybeAskForReview(context, appName: 'TestGlows'),
+        isTrue,
+      );
       expect(store.requests, 1);
       expect(reviews.state.positiveMoments, 0);
       expect(
         reviews.eligibility,
         const ReviewNotYet(ReviewWait.recentPrompt),
       );
+      await tester.pump();
+      expect(find.byType(AlertDialog), findsNothing);
       reviews.dispose();
     });
 
-    test('never asks where the store has no prompt', () async {
-      final reviews = await open(store: FakeStore(canPrompt: false));
-      expect(
-        reviews.eligibility,
-        const ReviewNotYet(ReviewWait.storeUnavailable),
+    testWidgets('invites by itself where the store has no prompt', (
+      tester,
+    ) async {
+      final context = await screen(tester);
+      final store = FakeStore(canPrompt: false, listing: null);
+      final reviews = await settled(
+        store,
+        settings: const ShipglowsReviewsConfig(
+          appId: 'testglows',
+          promptInDebug: true,
+          reviewSite: ReviewSite(
+            name: 'Trustpilot',
+            url: 'https://example.com/review',
+          ),
+        ),
       );
+      expect(reviews.eligibility, isA<ReviewEligible>());
+      final asked = reviews.maybeAskForReview(context, appName: 'TestGlows');
+      await tester.pumpAndSettle();
+      expect(find.text('Your opinion on TestGlows'), findsOneWidget);
+      expect(find.text('Rate on Trustpilot'), findsOneWidget);
+      expect(store.requests, 0);
+
+      await tester.tap(find.text('Rate on Trustpilot'));
+      await tester.pumpAndSettle();
+      expect(await asked, isTrue);
+      expect(openedUrls.last, Uri.parse('https://example.com/review'));
+      expect(reviews.eligibility, const ReviewNotYet(ReviewWait.alreadyRated));
       reviews.dispose();
+    });
+
+    testWidgets('« Don’t ask again » stops the invitation', (tester) async {
+      final context = await screen(tester);
+      final reviews = await settled(FakeStore(canPrompt: false, listing: null));
+      final asked = reviews.maybeAskForReview(context, appName: 'TestGlows');
+      await tester.pumpAndSettle();
+      expect(find.text('Rate on Trustpilot'), findsNothing);
+      await tester.tap(find.text('Don’t ask again'));
+      await tester.pumpAndSettle();
+      expect(await asked, isTrue);
+      expect(reviews.eligibility, const ReviewNotYet(ReviewWait.optedOut));
+      reviews.dispose();
+    });
+
+    test('asks nothing where the invitation is off and no prompt exists',
+        () async {
+      final reviews = await open(
+        store: FakeStore(canPrompt: false, listing: null),
+        settings: const ShipglowsReviewsConfig(
+          appId: 'testglows',
+          promptInDebug: true,
+          inviteWithoutStorePrompt: false,
+        ),
+      );
+      expect(reviews.eligibility, const ReviewNotYet(ReviewWait.noPrompt));
+      expect(reviews.ratingPage, isNull);
+      reviews.dispose();
+    });
+
+    test('the store page comes before the review site', () async {
+      const site = ReviewSite(name: 'Trustpilot', url: 'https://example.com');
+      const withSite = ShipglowsReviewsConfig(
+        appId: 'testglows',
+        reviewSite: site,
+      );
+      final onStore = await open(settings: withSite);
+      expect(
+        onStore.ratingPage,
+        const StoreRatingPage(ReviewStore.googlePlay),
+      );
+      onStore.dispose();
+      final offStore = await open(
+        store: FakeStore(canPrompt: false, listing: null),
+        settings: withSite,
+      );
+      expect(offStore.ratingPage, const SiteRatingPage(site));
+      expect(
+        ShipglowsReviewStrings.fr.pageName(offStore.ratingPage!),
+        'Trustpilot',
+      );
+      offStore.dispose();
     });
 
     test('rating on the store stops the prompt', () async {
       final store = FakeStore();
       final reviews = await open(store: store);
-      expect(await reviews.rateOnStore(), isTrue);
+      expect(await reviews.openRatingPage(), isTrue);
       expect(store.listingsOpened, 1);
       expect(reviews.eligibility, const ReviewNotYet(ReviewWait.alreadyRated));
       reviews.dispose();

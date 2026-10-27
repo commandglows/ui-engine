@@ -55,7 +55,7 @@ Future<ReviewSendResult?> showShipglowsReviewForm(
 
 /// The review form: stars, topic, message, an optional address to answer,
 /// consent to publish as a testimonial, then a thank-you that offers the
-/// store page to everyone. Pops the route with the [ReviewSendResult] when
+/// public rating page (store or review site) to everyone. Pops the route with the [ReviewSendResult] when
 /// closed.
 class ShipglowsReviewForm extends StatefulWidget {
   const ShipglowsReviewForm({
@@ -347,7 +347,7 @@ class _ShipglowsReviewFormState extends State<ShipglowsReviewForm> {
   ) {
     final strings = _strings;
     final textTheme = Theme.of(context).textTheme;
-    final listing = widget.reviews.storeInfo.listing;
+    final page = widget.reviews.ratingPage;
     final message = [
       _fill(
         result == ReviewSendResult.sent
@@ -386,20 +386,20 @@ class _ShipglowsReviewFormState extends State<ShipglowsReviewForm> {
             style: textTheme.bodyMedium?.copyWith(color: theme.textMuted),
           ),
         ),
-        if (listing != null) ...[
+        if (page != null) ...[
           SizedBox(height: theme.spaceXl),
           Text(
-            _fill(strings.rateAlso, store: strings.storeName(listing)),
+            _fill(strings.rateAlso, store: strings.pageName(page)),
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: theme.text),
           ),
           SizedBox(height: theme.spaceSm),
           Center(
             child: OutlinedButton.icon(
-              onPressed: () => unawaited(widget.reviews.rateOnStore()),
+              onPressed: () => unawaited(widget.reviews.openRatingPage()),
               icon: const Icon(ShipglowsIcons.star, size: ShipglowsScale.iconSm),
               label: Text(
-                _fill(strings.rateOn, store: strings.storeName(listing)),
+                _fill(strings.rateOn, store: strings.pageName(page)),
               ),
             ),
           ),

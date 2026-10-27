@@ -1,9 +1,10 @@
 import 'package:flutter/widgets.dart';
 
 import 'customer_review.dart';
+import 'rating_page.dart';
 
-/// Texts of the review form and settings rows. `{app}` is the app's name,
-/// `{store}` the store's ([storeName]), `{count}` a number. The app picks the
+/// Texts of the review form, invitation and settings rows. `{app}` is the
+/// app's name, `{store}` the rating page's ([pageName]), `{count}` a number. The app picks the
 /// language: [en], [fr], or its own values, once for the app with
 /// [ShipglowsReviewStringsScope].
 @immutable
@@ -14,6 +15,10 @@ class ShipglowsReviewStrings {
     required this.pending,
     required this.rateApp,
     required this.rateAppSubtitle,
+    required this.invitationTitle,
+    required this.invitationMessage,
+    required this.later,
+    required this.dontAskAgain,
     required this.formTitle,
     required this.formLead,
     required this.ratingLabel,
@@ -64,6 +69,14 @@ class ShipglowsReviewStrings {
   /// Settings row that opens the store page (`{app}`, `{store}`).
   final String rateApp;
   final String rateAppSubtitle;
+
+  /// The app's own invitation, where the store has no rating prompt
+  /// (Windows, the web): title and message (`{app}`), « Plus tard » and
+  /// « Ne plus me demander ».
+  final String invitationTitle;
+  final String invitationMessage;
+  final String later;
+  final String dontAskAgain;
 
   final String formTitle;
   final String formLead;
@@ -130,6 +143,12 @@ class ShipglowsReviewStrings {
     pending: '{count} waiting to be sent',
     rateApp: 'Rate {app}',
     rateAppSubtitle: 'On {store}. Your rating helps others find {app}.',
+    invitationTitle: 'Your opinion on {app}',
+    invitationMessage:
+        'You have been using {app} for a while. Two minutes to tell us what '
+        'you think? Every message is read.',
+    later: 'Later',
+    dontAskAgain: 'Don’t ask again',
     formTitle: 'Your feedback on {app}',
     formLead: 'Tell us what works for you and what does not.',
     ratingLabel: 'Your rating',
@@ -182,6 +201,12 @@ class ShipglowsReviewStrings {
     rateApp: 'Noter {app}',
     rateAppSubtitle: 'Sur {store}. Votre note aide d’autres personnes à '
         'découvrir {app}.',
+    invitationTitle: 'Votre avis sur {app}',
+    invitationMessage:
+        'Vous utilisez {app} depuis un moment. Deux minutes pour nous dire ce '
+        'que vous en pensez ? Chaque message est lu.',
+    later: 'Plus tard',
+    dontAskAgain: 'Ne plus me demander',
     formTitle: 'Votre avis sur {app}',
     formLead: 'Dites-nous ce qui vous plaît et ce qui vous gêne.',
     ratingLabel: 'Votre note',
@@ -241,6 +266,12 @@ class ShipglowsReviewStrings {
     ReviewStore.googlePlay => googlePlay,
     ReviewStore.appStore => appStore,
     ReviewStore.microsoftStore => microsoftStore,
+  };
+
+  /// The store's name, or the review site's (`Trustpilot`).
+  String pageName(RatingPage page) => switch (page) {
+    StoreRatingPage(:final store) => storeName(store),
+    SiteRatingPage(:final site) => site.name,
   };
 
   String topicName(ReviewTopic topic) => switch (topic) {

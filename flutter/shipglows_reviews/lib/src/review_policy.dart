@@ -2,17 +2,21 @@ import 'package:flutter/foundation.dart';
 
 import 'review_state.dart';
 
-/// Why the store prompt is not asked for now.
+/// Why no review is asked for now.
 enum ReviewWait {
   /// A debug or profile build ([ShipglowsReviewsConfig.promptInDebug]).
   debugBuild,
 
-  /// This install cannot show the store's own prompt (outside Google Play
-  /// and the App Store, TestFlight, web, desktop without a store).
-  storeUnavailable,
+  /// This install has no store prompt (outside Google Play and the App
+  /// Store) and the app's own invitation is off
+  /// ([ShipglowsReviewsConfig.inviteWithoutStorePrompt]).
+  noPrompt,
 
-  /// The person already opened the store page from the app to rate it.
+  /// The person already opened the rating page from the app.
   alreadyRated,
+
+  /// The person chose « Ne plus me demander ».
+  optedOut,
 
   /// [ReviewPolicy.maxPromptsPerYear] reached.
   yearlyLimit,
@@ -40,7 +44,7 @@ enum ReviewWait {
   fewPositiveMoments,
 }
 
-/// Whether the store prompt may be asked for now.
+/// Whether a review may be asked for now.
 sealed class ReviewEligibility {
   const ReviewEligibility();
 }
@@ -65,8 +69,8 @@ final class ReviewNotYet extends ReviewEligibility {
   String toString() => 'ReviewNotYet(${reason.name})';
 }
 
-/// When the store's rating prompt is asked for: someone who has used the
-/// app for a while, just succeeded at something, has not met an error
+/// When a review is asked for (the store's rating prompt, or the app's own
+/// invitation where there is none): someone who has used the app for a while, just succeeded at something, has not met an error
 /// lately, and was not asked recently. Google Play and Apple add their own
 /// quotas on top (Apple: three times a year at most), so asking does not
 /// mean a prompt is shown.
@@ -111,6 +115,9 @@ class ReviewPolicy {
 
     if (state.ratedOnStoreAt != null) {
       return const ReviewNotYet(ReviewWait.alreadyRated);
+    }
+    if (state.optedOutAt != null) {
+      return const ReviewNotYet(ReviewWait.optedOut);
     }
     final lastYear = state.prompts.where((at) => within(at, _year)).length;
     if (lastYear >= maxPromptsPerYear) {

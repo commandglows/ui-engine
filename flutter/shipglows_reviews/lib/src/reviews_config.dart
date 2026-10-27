@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'rating_page.dart';
 import 'review_policy.dart';
 
 /// The app's reviews setup, given once to `ShipglowsReviews.open`.
@@ -10,6 +11,8 @@ class ShipglowsReviewsConfig {
     this.appStoreId = '',
     this.microsoftStoreId = '',
     this.playStoreListed = false,
+    this.reviewSite,
+    this.inviteWithoutStorePrompt = true,
     this.policy = const ReviewPolicy(),
     this.promptInDebug = false,
   });
@@ -30,11 +33,23 @@ class ShipglowsReviewsConfig {
   /// Play page to rate it.
   final bool playStoreListed;
 
-  /// When the store prompt is asked for.
+  /// The public page to rate the app where it has no store page (Windows
+  /// installer builds, the web, sideloaded APKs); `null` offers the form
+  /// only there.
+  final ReviewSite? reviewSite;
+
+  /// Where the store has no rating prompt (Windows, the web, sideloaded
+  /// APKs), the app shows its own invitation at the same moments: the form,
+  /// the [reviewSite], « Plus tard », « Ne plus me demander ». No store rule
+  /// applies there; the invitation still offers the same choices to
+  /// everyone.
+  final bool inviteWithoutStorePrompt;
+
+  /// When the store prompt or the invitation is shown.
   final ReviewPolicy policy;
 
-  /// Lets debug and profile builds ask for the store prompt (to try it with
-  /// Google Play's internal app sharing or a TestFlight build). Off: the
+  /// Lets debug and profile builds ask (to try the invitation, or the store
+  /// prompt with Google Play's internal app sharing or TestFlight). Off: the
   /// automatic prompt never interrupts development.
   final bool promptInDebug;
 }

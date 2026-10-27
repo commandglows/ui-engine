@@ -9,7 +9,7 @@ import 'strings.dart';
 
 /// The settings rows: « Donner mon avis » (opens the form; says how many
 /// reviews wait while offline) and « Noter {app} » where the app has a store
-/// page.
+/// page or a review site.
 class ShipglowsReviewSettings extends StatelessWidget {
   const ShipglowsReviewSettings({
     super.key,
@@ -28,7 +28,7 @@ class ShipglowsReviewSettings extends StatelessWidget {
     return ValueListenableBuilder<ShipglowsReviewsStatus>(
       valueListenable: reviews.status,
       builder: (context, status, _) {
-        final store = status.listing;
+        final page = status.ratingPage;
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -56,7 +56,7 @@ class ShipglowsReviewSettings extends StatelessWidget {
                 ),
               ),
             ),
-            if (store != null)
+            if (page != null)
               ListTile(
                 leading: const Icon(ShipglowsIcons.star),
                 title: Text(
@@ -66,11 +66,11 @@ class ShipglowsReviewSettings extends StatelessWidget {
                   ShipglowsReviewStrings.fill(
                     texts.rateAppSubtitle,
                     app: appName,
-                    store: texts.storeName(store),
+                    store: texts.pageName(page),
                   ),
                 ),
                 trailing: const Icon(ShipglowsIcons.open),
-                onTap: () => unawaited(reviews.rateOnStore()),
+                onTap: () => unawaited(reviews.openRatingPage()),
               ),
           ],
         );

@@ -1,15 +1,22 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shipglows_feedback/shipglows_feedback.dart';
 import 'package:shipglows_settings/shipglows_settings.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'customer_review.dart';
+import 'default_storage_io.dart'
+    if (dart.library.js_interop) 'default_storage_web.dart';
+import 'rating_page.dart';
+import 'review_invitation.dart';
 import 'review_policy.dart';
 import 'review_sink.dart';
 import 'review_state.dart';
 import 'reviews_config.dart';
 import 'store_review.dart';
+import 'strings.dart';
 
 /// What the settings rows and the form show.
 @immutable
@@ -17,27 +24,27 @@ class ShipglowsReviewsStatus {
   const ShipglowsReviewsStatus({
     this.pending = 0,
     this.sending = false,
-    this.listing,
+    this.ratingPage,
   });
 
   /// Reviews written and not yet accepted by the backend.
   final int pending;
   final bool sending;
 
-  /// The store page where the person can rate the app, or `null`.
-  final ReviewStore? listing;
+  /// Where the person can rate the app publicly, or `null`.
+  final RatingPage? ratingPage;
 
-  bool get canRateOnStore => listing != null;
+  bool get canRate => ratingPage != null;
 
   @override
   bool operator ==(Object other) =>
       other is ShipglowsReviewsStatus &&
       other.pending == pending &&
       other.sending == sending &&
-      other.listing == listing;
+      other.ratingPage == ratingPage;
 
   @override
-  int get hashCode => Object.hash(pending, sending, listing);
+  int get hashCode => Object.hash(pending, sending, ratingPage);
 }
 
 /// How a review left the form.
@@ -60,23 +67,26 @@ final class ReviewNotSavedException implements Exception {
   String toString() => 'Review not saved: $cause';
 }
 
-/// Customer reviews for one app: the store's rating prompt at the right
-/// moment, the app's own review form sent to its backend, and the store
-/// page.
+/// Customer reviews for one app, on Android, iOS, macOS, Windows and the
+/// web: the store's rating prompt (or the app's own invitation where there
+/// is none) at the right moment, the app's review form sent to its backend,
+/// and the public rating page (store page or review site).
 ///
 /// - [open] once at startup (after `WidgetsFlutterBinding.ensureInitialized`):
 ///   counts the launch and sends the reviews left from an earlier session.
 /// - [recordPositiveMoment] after a success, [recordProblem] after an error.
 ///   With `followFeedback` (on by default) every success and error message
 ///   of `shipglows_feedback` counts by itself.
-/// - [maybeAskForStoreReview] at a natural break (back on the home screen,
-///   after a task is done, never in the middle of one): asks the store for
-///   its prompt when the [ReviewPolicy] allows it.
-/// - [submit] sends the form's review; [rateOnStore] opens the store page.
+/// - [maybeAskForReview] at a natural break (back on the home screen, after
+///   a task is done, never in the middle of one): when the [ReviewPolicy]
+///   allows it, asks the store for its prompt (Google Play, App Store), or
+///   shows the app's invitation (Windows, the web, sideloaded APKs).
+/// - [submit] sends the form's review; [openRatingPage] opens the store page
+///   or the review site.
 ///
-/// Never asks how the person feels before choosing between the store and the
-/// private form: both stores forbid filtering who is sent to rate. The form
-/// and the store are offered to everyone.
+/// Never asks how the person feels before choosing between the public page
+/// and the private form: the stores and review sites forbid filtering who is
+/// sent to rate. Both are offered to everyone.
 class ShipglowsReviews with WidgetsBindingObserver {
   ShipglowsReviews._({
     required this.config,
@@ -87,7 +97,9 @@ class ShipglowsReviews with WidgetsBindingObserver {
     required DateTime Function() clock,
     required StoreInfo info,
     required ReviewState state,
+    required Future<bool> Function(Uri url) openUrl,
   }) : _storage = storage,
+       _openUrl = openUrl,
        _sink = sink,
        _store = store,
        _bucket = bucket,
@@ -97,7 +109,7 @@ class ShipglowsReviews with WidgetsBindingObserver {
        _status = ValueNotifier(
          ShipglowsReviewsStatus(
            pending: state.outbox.length,
-           listing: info.listing,
+           ratingPage: _ratingPageOf(info, config),
          ),
        );
 
@@ -105,19 +117,20 @@ class ShipglowsReviews with WidgetsBindingObserver {
   /// sending the reviews left unsent. Never throws: an unreadable state
   /// starts afresh, an unreadable store disables the store prompt.
   ///
-  /// [storage] is the app's settings storage (`FileSettingsStorage` on the
-  /// app support folder, a `CallbackSettingsStorage` on the web); the state
-  /// lives in its [bucket]. [store] defaults to [InAppReviewBackend] from
-  /// [config].
+  /// [storage] defaults to `shipglows.reviews.json` in the app support
+  /// folder (`%APPDATA%` on Windows), and to `localStorage` on the web; any
+  /// `SettingsStorage` works, the app's own included (the state lives in its
+  /// [bucket]). [store] defaults to [InAppReviewBackend] from [config].
   static Future<ShipglowsReviews> open({
     required ShipglowsReviewsConfig config,
-    required SettingsStorage storage,
     required ReviewSink sink,
+    SettingsStorage? storage,
     StoreReviewBackend? store,
     String bucket = 'reviews',
     bool followFeedback = true,
     bool observeLifecycle = true,
     @visibleForTesting DateTime Function()? clock,
+    @visibleForTesting Future<bool> Function(Uri url)? openUrl,
   }) async {
     final backend =
         store ??
@@ -134,9 +147,11 @@ class ShipglowsReviews with WidgetsBindingObserver {
       debugPrint('shipglows_reviews: store unavailable: $error');
       info = StoreInfo(platform: currentPlatformName());
     }
+    var deviceStorage = storage;
     ReviewState state;
     try {
-      state = ReviewState.fromJson(await storage.read(bucket));
+      deviceStorage ??= await defaultReviewStorage();
+      state = ReviewState.fromJson(await deviceStorage.read(bucket));
     } on Object catch (error) {
       debugPrint('shipglows_reviews: state unreadable, starting afresh: $error');
       state = const ReviewState();
@@ -153,13 +168,16 @@ class ShipglowsReviews with WidgetsBindingObserver {
     );
     final reviews = ShipglowsReviews._(
       config: config,
-      storage: storage,
+      storage: deviceStorage ?? MemorySettingsStorage(),
       sink: sink,
       store: backend,
       bucket: bucket,
       clock: now,
       info: info,
       state: state,
+      openUrl:
+          openUrl ??
+          (url) => launchUrl(url, mode: LaunchMode.externalApplication),
     );
     await reviews._save();
     if (observeLifecycle) WidgetsBinding.instance.addObserver(reviews);
@@ -176,6 +194,7 @@ class ShipglowsReviews with WidgetsBindingObserver {
   final String _bucket;
   final DateTime Function() _clock;
   final StoreInfo _info;
+  final Future<bool> Function(Uri url) _openUrl;
   final ValueNotifier<ShipglowsReviewsStatus> _status;
 
   ReviewState _state;
@@ -205,20 +224,35 @@ class ShipglowsReviews with WidgetsBindingObserver {
   /// The device state, for diagnostics.
   ReviewState get state => _state;
 
-  bool get canRateOnStore => _info.listing != null;
+  /// The store page, or else [ShipglowsReviewsConfig.reviewSite].
+  RatingPage? get ratingPage => _ratingPageOf(_info, config);
+
+  static RatingPage? _ratingPageOf(
+    StoreInfo info,
+    ShipglowsReviewsConfig config,
+  ) {
+    if (info.listing case final store?) return StoreRatingPage(store);
+    if (config.reviewSite case final site?) return SiteRatingPage(site);
+    return null;
+  }
+
+  /// The store's own prompt where the install has one; otherwise the app's
+  /// invitation, unless [ShipglowsReviewsConfig.inviteWithoutStorePrompt] is
+  /// off.
+  bool get usesStorePrompt => _info.canPrompt;
 
   DateTime _now() => _clock().toUtc();
 
   String? get _version =>
       _info.appVersion.isEmpty ? null : _info.appVersion;
 
-  /// Whether [maybeAskForStoreReview] would ask now, or why not.
+  /// Whether [maybeAskForReview] would ask now, or why not.
   ReviewEligibility get eligibility {
     if (!kReleaseMode && !config.promptInDebug) {
       return const ReviewNotYet(ReviewWait.debugBuild);
     }
-    if (!_info.canPrompt) {
-      return const ReviewNotYet(ReviewWait.storeUnavailable);
+    if (!_info.canPrompt && !config.inviteWithoutStorePrompt) {
+      return const ReviewNotYet(ReviewWait.noPrompt);
     }
     return config.policy.evaluate(_state, now: _now(), version: _version);
   }
@@ -238,17 +272,32 @@ class ShipglowsReviews with WidgetsBindingObserver {
     return _save();
   }
 
-  /// Asks the store for its rating prompt when [eligibility] allows it, and
-  /// returns whether it asked. The store decides whether a prompt shows; the
-  /// app never learns whether the person rated. Never throws.
-  Future<bool> maybeAskForStoreReview() async {
+  /// When [eligibility] allows it, asks for a review and returns `true`:
+  /// the store's rating prompt where the install has one (the store decides
+  /// whether it shows; the app never learns whether the person rated),
+  /// otherwise the app's invitation ([showShipglowsReviewInvitation]) over
+  /// [context]. Never throws.
+  Future<bool> maybeAskForReview(
+    BuildContext context, {
+    required String appName,
+    ShipglowsReviewStrings? strings,
+  }) async {
     if (_disposed || _asking || eligibility is! ReviewEligible) return false;
     _asking = true;
     try {
       // Saved first: a crash during the prompt does not ask again at once.
       _state = _state.withPrompt(_now(), version: _version);
       await _save();
-      await _store.requestReview();
+      if (_info.canPrompt) {
+        await _store.requestReview();
+      } else if (context.mounted) {
+        await showShipglowsReviewInvitation(
+          context,
+          reviews: this,
+          appName: appName,
+          strings: strings,
+        );
+      }
     } on Object catch (error) {
       debugPrint('shipglows_reviews: review prompt failed: $error');
     } finally {
@@ -257,19 +306,35 @@ class ShipglowsReviews with WidgetsBindingObserver {
     return true;
   }
 
-  /// Opens the store page to rate the app; afterwards the automatic prompt
-  /// stops. Returns `false` when there is no store page or it did not open.
-  Future<bool> rateOnStore() async {
-    if (_disposed || _info.listing == null) return false;
+  /// Opens [ratingPage]: the store page, or the review site in the browser.
+  /// Afterwards the automatic prompt stops. Returns `false` when there is no
+  /// page or it did not open.
+  Future<bool> openRatingPage() async {
+    final page = ratingPage;
+    if (_disposed || page == null) return false;
     try {
-      await _store.openListing();
+      switch (page) {
+        case StoreRatingPage():
+          await _store.openListing();
+        case SiteRatingPage(:final site):
+          final url = Uri.tryParse(site.url);
+          if (url == null || !await _openUrl(url)) return false;
+      }
     } on Object catch (error) {
-      debugPrint('shipglows_reviews: store page did not open: $error');
+      debugPrint('shipglows_reviews: rating page did not open: $error');
       return false;
     }
     _state = _state.copyWith(ratedOnStoreAt: _now());
     await _save();
     return true;
+  }
+
+  /// « Ne plus me demander »: no automatic prompt or invitation any more.
+  /// The form and the settings rows stay.
+  Future<void> optOut() {
+    if (_disposed) return Future.value();
+    _state = _state.copyWith(optedOutAt: _now());
+    return _save();
   }
 
   /// Saves [draft] on the device, then sends it.
@@ -398,7 +463,7 @@ class ShipglowsReviews with WidgetsBindingObserver {
     _status.value = ShipglowsReviewsStatus(
       pending: _state.outbox.length,
       sending: sending ?? _status.value.sending,
-      listing: _info.listing,
+      ratingPage: ratingPage,
     );
   }
 

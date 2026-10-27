@@ -16,6 +16,7 @@ class ReviewState {
     this.promptedVersion,
     this.lastReviewAt,
     this.ratedOnStoreAt,
+    this.optedOutAt,
     this.outbox = const [],
   });
 
@@ -26,22 +27,26 @@ class ReviewState {
   final DateTime? firstSeenAt;
   final int launches;
 
-  /// Successes since the last store prompt.
+  /// Successes since the last prompt.
   final int positiveMoments;
   final DateTime? lastProblemAt;
 
-  /// When the store prompt was asked for, oldest first. The system may have
+  /// When the store prompt was asked for or the invitation shown, oldest
+  /// first. The system may have
   /// shown nothing: Google Play and Apple keep their own quotas.
   final List<DateTime> prompts;
 
-  /// The app version of the last store prompt.
+  /// The app version of the last prompt.
   final String? promptedVersion;
 
   /// The last review sent through the app's own form.
   final DateTime? lastReviewAt;
 
-  /// The person opened the store page from the app to rate it.
+  /// The person opened the rating page (store or review site) from the app.
   final DateTime? ratedOnStoreAt;
+
+  /// The person chose « Ne plus me demander » in the app's invitation.
+  final DateTime? optedOutAt;
 
   /// Reviews written and not yet accepted by the backend, oldest first.
   final List<CustomerReview> outbox;
@@ -57,6 +62,7 @@ class ReviewState {
     String? promptedVersion,
     DateTime? lastReviewAt,
     DateTime? ratedOnStoreAt,
+    DateTime? optedOutAt,
     List<CustomerReview>? outbox,
   }) => ReviewState(
     firstSeenAt: firstSeenAt ?? this.firstSeenAt,
@@ -67,6 +73,7 @@ class ReviewState {
     promptedVersion: promptedVersion ?? this.promptedVersion,
     lastReviewAt: lastReviewAt ?? this.lastReviewAt,
     ratedOnStoreAt: ratedOnStoreAt ?? this.ratedOnStoreAt,
+    optedOutAt: optedOutAt ?? this.optedOutAt,
     outbox: outbox ?? this.outbox,
   );
 
@@ -92,6 +99,7 @@ class ReviewState {
     'promptedVersion': promptedVersion,
     'lastReviewAt': _time(lastReviewAt),
     'ratedOnStoreAt': _time(ratedOnStoreAt),
+    'optedOutAt': _time(optedOutAt),
     'outbox': [for (final review in outbox) review.toJson()],
   };
 
@@ -115,6 +123,7 @@ class ReviewState {
           : null,
       lastReviewAt: _readTime(json['lastReviewAt']),
       ratedOnStoreAt: _readTime(json['ratedOnStoreAt']),
+      optedOutAt: _readTime(json['optedOutAt']),
       outbox: outbox is List
           ? [
               for (final entry in outbox)
