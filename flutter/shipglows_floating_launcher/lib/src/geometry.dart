@@ -16,12 +16,12 @@ import 'package:flutter/foundation.dart';
 class ShipglowsFloatingLauncherGeometry {
   const ShipglowsFloatingLauncherGeometry({
     this.bubbleSize = 64,
-    this.actionSize = 40,
-    this.radius = 92,
+    this.actionSize = 46,
+    this.radius = 82,
     this.maxRadius = 128,
-    this.actionGap = 8,
-    this.stepAngle = 34,
-    this.maxSweep = 300,
+    this.actionGap = 6,
+    this.stepAngle = 36,
+    this.maxSweep = 320,
     this.tooltipWidth = 220,
     this.tooltipHeight = 72,
     this.tooltipGap = 10,

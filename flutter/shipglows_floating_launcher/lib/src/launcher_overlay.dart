@@ -695,7 +695,7 @@ class _ActionButton extends StatelessWidget {
     final color = active ? theme.onAccent : theme.icon;
     final icon = item.icon;
     final face = icon != null
-        ? Icon(icon, size: ShipglowsScale.iconMd, color: color)
+        ? Icon(icon, size: ShipglowsScale.iconLg, color: color)
         : Text(
             item.label.characters.first.toUpperCase(),
             style: TextStyle(
