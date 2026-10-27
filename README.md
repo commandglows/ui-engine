@@ -783,7 +783,11 @@ web, macOS and Linux). Native Win32, no third-party plugin.
   through `onQuitRequested` (false keeps the app running).
 - Launch at Windows sign-in (`setLaunchAtStartup`, `launchAtStartup`): an
   entry `<appName>` under `HKCU\…\CurrentVersion\Run` starting this
-  executable with `--launched-at-startup`; turned off in Task Manager reads
+  executable with `--launched-at-startup` (a dev build, run from
+  `<project>\build\windows\…\runner\Debug` or `Profile`, registers
+  `shipglows-dev start -ProjectPath <project> -FlutterDevice windows`
+  instead, since its exe lacks the hot reloads; a stale entry of this
+  executable is rewritten at the next start); turned off in Task Manager reads
   as off, and turning it on again clears that. After such a launch the main
   window starts as the user chose (`ShipglowsTrayStartupWindow`): hidden in
   the tray until opened (default; minimized while the icon is missing),
