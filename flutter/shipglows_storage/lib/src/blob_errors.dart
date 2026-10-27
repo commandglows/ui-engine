@@ -39,6 +39,14 @@ final class BlobInvalidKey extends BlobStoreException {
   BlobInvalidKey(String key) : super('Clé de stockage invalide : « $key ».');
 }
 
+/// What was downloaded does not have the expected SHA-256: the object is
+/// not the one asked for, or it was damaged. The target was left untouched;
+/// sending again would fetch the same bytes, so it is not retried.
+final class BlobChecksumMismatch extends BlobStoreException {
+  BlobChecksumMismatch(String key)
+      : super('Contenu inattendu pour « $key » : empreinte différente.');
+}
+
 /// The transfer was stopped through `TransferControl.cancel`.
 final class BlobTransferCancelled extends BlobStoreException {
   const BlobTransferCancelled() : super('Transfert annulé.');

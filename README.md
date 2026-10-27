@@ -1143,7 +1143,20 @@ another S3-compatible bucket is an endpoint change.
   names a bucket or provider key is refused; with a journal a resend skips
   the parts already stored.
 
-Not yet: a local cache and background transfers.
+- `download(key, target, expectedSha256:)` checks the bytes before
+  `target` is written (a resumed download is checked whole) and throws
+  `BlobChecksumMismatch` otherwise; `sha256OfFile(file)` hashes in chunks.
+- `S3BlobStore(partConcurrency: 3)`: the parts of one file go up three at a
+  time (each holds `partBytes` in memory); resume and progress are
+  unchanged.
+- `BlobCache(directory:, store:, maxBytes:)`: `fetch(key, expectedSha256:)`
+  downloads on demand into `directory` (two callers share one download),
+  marks the file as used and drops the least recently used ones above
+  `maxBytes`, never the file just fetched; `peek`, `remove`, `evictToFit`.
+
+Not yet: background transfers (Android/iOS), parallel parts for signed
+uploads, a journal that survives a restart on the web, translatable error
+messages.
 
 ## `flutter/shipglows_xml`
 

@@ -9,6 +9,8 @@
 ///   over HTTPS, signed by [SigV4Signer]; large files go up in parts.
 /// - [FolderBlobStore]: a folder another program keeps in sync.
 /// - [MemoryBlobStore]: for tests.
+/// - [BlobCache]: objects fetched on demand into a local folder, checked
+///   against their SHA-256, least recently used dropped above a size.
 /// - [TransferControl]: progress and cancellation of one transfer;
 ///   [RetryPolicy]: tries again after a network hiccup, with growing waits;
 ///   [TransferJournal] ([FileTransferJournal], [MemoryTransferJournal]):
@@ -19,8 +21,10 @@
 /// - [parseS3Endpoint] and [testBlobStore] for a storage settings page.
 library;
 
+export 'src/blob_cache.dart';
 export 'src/blob_store.dart';
 export 'src/blob_store_probe.dart';
+export 'src/file_hash.dart';
 export 'src/file_transfer_journal.dart';
 export 'src/folder_blob_store.dart';
 export 'src/s3_blob_store.dart';

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shipglows_storage/shipglows_storage.dart';
 
@@ -93,6 +94,31 @@ void runBlobStoreContract(
     expect(target.readAsBytesSync(), source.readAsBytesSync());
     expect(got!.bytes, 300000);
     expect(put.bytes, 300000);
+  });
+
+  test('download checks the expected SHA-256', () async {
+    final bytes = bytesOf('bonjour');
+    await store.putBytes('${prefix}files/checked.txt', bytes);
+    final good = File('${scratch.path}/good.txt');
+    expect(
+      await store.download(
+        '${prefix}files/checked.txt',
+        good,
+        expectedSha256: sha256.convert(bytes).toString(),
+      ),
+      isNotNull,
+    );
+    expect(good.readAsStringSync(), 'bonjour');
+    final bad = File('${scratch.path}/bad.txt');
+    await expectLater(
+      store.download(
+        '${prefix}files/checked.txt',
+        bad,
+        expectedSha256: sha256.convert(bytesOf('autre')).toString(),
+      ),
+      throwsA(isA<BlobChecksumMismatch>()),
+    );
+    expect(bad.existsSync(), isFalse);
   });
 
   if (large) {

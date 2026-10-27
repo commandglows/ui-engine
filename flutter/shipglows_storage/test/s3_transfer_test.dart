@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -24,11 +25,13 @@ void main() {
   });
 
   /// A store cutting files over 1 KiB in parts of 1 KiB, never waiting
-  /// between retries.
+  /// between retries, sending one part at a time unless [partConcurrency]
+  /// says otherwise so the order of calls is known.
   S3BlobStore storeOn(
     FakeS3Server server, {
     TransferJournal? journal,
     RetryPolicy? retry,
+    int partConcurrency = 1,
   }) =>
       S3BlobStore(
         (
@@ -41,6 +44,7 @@ void main() {
         journal: journal,
         multipartThreshold: 1024,
         partBytes: 1024,
+        partConcurrency: partConcurrency,
       );
 
   File sourceOf(int bytes) => File('${scratch.path}/source.bin')
@@ -119,8 +123,7 @@ void main() {
     expect(server.calls.where((call) => call.contains('?uploads')), isEmpty);
     expect(partCalls().map((call) => call.split('partNumber=')[1][0]),
         ['3', '4', '5']);
-    expect(progress.take(2), [1024, 2048],
-        reason: 'the stored parts count as sent');
+    expect(progress.first, 2048, reason: 'the stored parts count as sent');
     expect(server.uploads, isEmpty);
   });
 
@@ -208,5 +211,66 @@ void main() {
       throwsA(isA<BlobAccessDenied>()),
     );
     expect(server.calls, hasLength(1));
+  });
+
+  test('parts go up several at a time', () async {
+    // Part 1 is answered only once part 2 has arrived: one at a time, the
+    // upload would never finish.
+    final part2Arrived = Completer<void>();
+    server.intercept = (request, body) async {
+      final number = request.uri.queryParameters['partNumber'];
+      if (number == '2' && !part2Arrived.isCompleted) part2Arrived.complete();
+      if (number == '1') {
+        await part2Arrived.future.timeout(const Duration(seconds: 5));
+      }
+      return false;
+    };
+    final source = sourceOf(5000);
+    final progress = <int>[];
+    await storeOn(server, partConcurrency: 3).putFile(
+      'big.bin',
+      source,
+      control: TransferControl(onProgress: (done, _) => progress.add(done)),
+    );
+    expect(server.objects['big.bin']!.bytes, source.readAsBytesSync());
+    expect(partCalls(), hasLength(5));
+    expect(progress.last, 5000);
+  });
+
+  test('a parallel upload cancelled midway resumes the missing parts',
+      () async {
+    final journal = MemoryTransferJournal();
+    final source = sourceOf(6000);
+    final control = TransferControl();
+    cancelAtPart(control, 4);
+    await expectLater(
+      storeOn(server, journal: journal, partConcurrency: 2)
+          .putFile('big.bin', source, control: control),
+      throwsA(isA<BlobTransferCancelled>()),
+    );
+    server.intercept = null;
+    final storedBefore = server.uploads.values.single.keys.toSet();
+    server.calls.clear();
+    await storeOn(server, journal: journal, partConcurrency: 2)
+        .putFile('big.bin', source);
+    expect(server.objects['big.bin']!.bytes, source.readAsBytesSync());
+    final resent = partCalls()
+        .map((call) => int.parse(call.split('partNumber=')[1].split('&')[0]))
+        .toSet();
+    expect(resent.intersection(storedBefore), isEmpty,
+        reason: 'stored parts are not sent again');
+  });
+
+  test('a download with the wrong checksum leaves no file', () async {
+    server.objects['a.bin'] =
+        (bytes: Uint8List.fromList([1, 2, 3]), etag: '"v1"');
+    final target = File('${scratch.path}/a.bin');
+    await expectLater(
+      storeOn(server, journal: MemoryTransferJournal())
+          .download('a.bin', target, expectedSha256: 'not-it'),
+      throwsA(isA<BlobChecksumMismatch>()),
+    );
+    expect(target.existsSync(), isFalse);
+    expect(File('${target.path}.part').existsSync(), isFalse);
   });
 }

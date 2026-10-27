@@ -84,10 +84,14 @@ abstract interface class BlobStore {
 
   /// Writes the object under [key] to [target] and returns what was written,
   /// or null when there is none; [target] is then left untouched.
+  ///
+  /// With [expectedSha256] (lowercase hex), the bytes are checked before
+  /// [target] is written: a mismatch throws [BlobChecksumMismatch].
   Future<BlobInfo?> download(
     String key,
     File target, {
     TransferControl? control,
+    String? expectedSha256,
   });
 
   /// What is stored under [key], or null when there is none.
@@ -166,9 +170,14 @@ class MemoryBlobStore implements BlobStore {
     String key,
     File target, {
     TransferControl? control,
+    String? expectedSha256,
   }) async {
     final object = await getBytes(key, control: control);
     if (object == null) return null;
+    if (expectedSha256 != null &&
+        sha256.convert(object.bytes).toString() != expectedSha256) {
+      throw BlobChecksumMismatch(key);
+    }
     await target.parent.create(recursive: true);
     await target.writeAsBytes(object.bytes, flush: true);
     return object.info;

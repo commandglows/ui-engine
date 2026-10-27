@@ -125,6 +125,7 @@ class FolderBlobStore implements BlobStore {
     String key,
     File target, {
     TransferControl? control,
+    String? expectedSha256,
   }) async {
     final file = _fileOf(key);
     if (!await file.exists()) return null;
@@ -134,6 +135,10 @@ class FolderBlobStore implements BlobStore {
       final total = await file.length();
       await _replace(target, (partial) async {
         copied = await _copy(file.openRead(), partial, total, control);
+        if (expectedSha256 != null &&
+            copied.digest.toString() != expectedSha256) {
+          throw BlobChecksumMismatch(key);
+        }
       });
     } on PathNotFoundException {
       return null;
