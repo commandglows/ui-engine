@@ -169,13 +169,6 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
       data['geometry'],
     );
     if (geometry != null) _geometry = geometry;
-    final binding = WidgetsBinding.instance;
-    debugPrint(
-      'shipglows_floating_launcher: snapshot applied, ${items.length} items, '
-      'workArea ${workArea == null ? 'null' : 'set'}, '
-      'framesEnabled ${binding.framesEnabled}, '
-      'lifecycle ${binding.lifecycleState?.name}',
-    );
   }
 
   Future<void> _onShow(Object? data) async {
@@ -282,7 +275,8 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   // Whether the fan should be open; it may still be animating.
   bool _open = false;
   String? _hovered;
-  FloatingLauncherLayout? _layout;
+  // Size of the view at the last layout; the window's own size before any.
+  Size? _viewSize;
   // Whether the pointer is inside the window's shape.
   bool _pointerInside = false;
   // Placement count when a drag started: until the report that follows it
@@ -332,12 +326,9 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     if (mounted) setState(() {});
     final dragged = _dragPlacements;
     if (dragged != null && _controller.placements != dragged) {
-      // The drag ended: the fan opens once the arc is laid out for the new
-      // place, after the rebuild above.
+      // The drag ended: the arc is laid out from the new place.
       _dragPlacements = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _pointerInside) _expand();
-      });
+      if (_pointerInside) _expand();
     }
   }
 
@@ -353,13 +344,9 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   void _expand() {
     _collapseTimer?.cancel();
     _collapseTimer = null;
-    final layout = _layout;
-    if (_open ||
-        _dragPlacements != null ||
-        layout == null ||
-        layout.count == 0) {
-      return;
-    }
+    if (_open || _dragPlacements != null) return;
+    final layout = _currentLayout();
+    if (layout.count == 0) return;
     _open = true;
     unawaited(_unfold(layout));
   }
@@ -407,9 +394,21 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     _syncShape();
   }
 
+  // The arc for the controller's state now (actions, geometry, work area),
+  // whether or not a frame has laid it out yet.
+  FloatingLauncherLayout _currentLayout() {
+    final geometry = _controller.geometry;
+    final size = _viewSize ?? geometry.windowSize;
+    return FloatingLauncherLayout.compute(
+      geometry: geometry,
+      center: size.center(Offset.zero),
+      count: _controller.items.length,
+      workArea: _controller.workArea,
+    );
+  }
+
   void _syncShape() {
-    final layout = _layout;
-    if (layout == null) return;
+    final layout = _currentLayout();
     final open = _open || _fan.status != AnimationStatus.dismissed;
     final hovered = _hovered;
     final index = hovered == null
@@ -449,15 +448,9 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
       type: MaterialType.transparency,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final size = constraints.biggest;
+          _viewSize = constraints.biggest;
           final items = _controller.items;
-          final layout = FloatingLauncherLayout.compute(
-            geometry: _controller.geometry,
-            center: size.center(Offset.zero),
-            count: items.length,
-            workArea: _controller.workArea,
-          );
-          _layout = layout;
+          final layout = _currentLayout();
           // A new layout (actions, screen side) reshapes the window; an
           // unchanged one costs nothing.
           WidgetsBinding.instance.addPostFrameCallback((_) {
