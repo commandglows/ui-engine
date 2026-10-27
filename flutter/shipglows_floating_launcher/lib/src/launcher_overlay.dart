@@ -169,6 +169,13 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
       data['geometry'],
     );
     if (geometry != null) _geometry = geometry;
+    final binding = WidgetsBinding.instance;
+    debugPrint(
+      'shipglows_floating_launcher: snapshot applied, ${items.length} items, '
+      'workArea ${workArea == null ? 'null' : 'set'}, '
+      'framesEnabled ${binding.framesEnabled}, '
+      'lifecycle ${binding.lifecycleState?.name}',
+    );
   }
 
   Future<void> _onShow(Object? data) async {
@@ -319,11 +326,18 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
       _fan.value = 0;
       return;
     }
+    // This surface is the home route of the MaterialApp, whose page is built
+    // once: a new snapshot, geometry or work area must lay the arc out again
+    // here, or the layout of the first frame (no actions yet) stays.
+    if (mounted) setState(() {});
     final dragged = _dragPlacements;
     if (dragged != null && _controller.placements != dragged) {
-      // The drag ended and the layout now follows the new place.
+      // The drag ended: the fan opens once the arc is laid out for the new
+      // place, after the rebuild above.
       _dragPlacements = null;
-      if (_pointerInside) _expand();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pointerInside) _expand();
+      });
     }
   }
 
