@@ -49,10 +49,7 @@ class _FakeBackend {
         'uploadId': 'u1',
         'parts': [
           for (var start = 0, n = 1; start < size; start += 4, n++)
-            {
-              'partNumber': n,
-              'sizeBytes': start + 4 > size ? size - start : 4,
-            },
+            {'partNumber': n, 'sizeBytes': start + 4 > size ? size - start : 4},
         ],
       };
     }
@@ -93,10 +90,10 @@ class _FakeBackend {
 
 void main() {
   Map<String, Object?> note(String tag) => {
-        'parts': {
-          '1': {'etag': '"$tag"', 'checksumSha256': 'c', 'bytes': 4},
-        },
-      };
+    'parts': {
+      '1': {'etag': '"$tag"', 'checksumSha256': 'c', 'bytes': 4},
+    },
+  };
 
   group('KeyValueTransferJournal', () {
     test('write, read and delete round trip', () async {
@@ -107,10 +104,7 @@ void main() {
       await journal.write('abc123', note('a'));
       expect(await journal.read('abc123'), note('a'));
       // A new journal over the same store reads it back: a reload.
-      expect(
-        await KeyValueTransferJournal(store).read('abc123'),
-        note('a'),
-      );
+      expect(await KeyValueTransferJournal(store).read('abc123'), note('a'));
 
       await journal.delete('abc123');
       expect(await journal.read('abc123'), isNull);
@@ -200,11 +194,13 @@ void main() {
     final bytes = Uint8List.fromList(List.generate(10, (i) => i));
 
     SignedUploadClient clientOver(KeyValueStore store) => SignedUploadClient(
-          call: backend.call,
-          put: backend.put,
-          retry: RetryPolicy.none,
-          journal: KeyValueTransferJournal(store),
-        );
+      call: backend.call,
+      put: backend.put,
+      retry: RetryPolicy.none,
+      journal: KeyValueTransferJournal(store),
+      // One part at a time, so the order of puts is known.
+      partConcurrency: 1,
+    );
 
     Future<Map<String, Object?>> upload(SignedUploadClient client) =>
         client.upload(
@@ -226,10 +222,7 @@ void main() {
 
     // The reload: a new client and a new journal over the same storage.
     backend.puts.clear();
-    expect(
-      await upload(clientOver(store)),
-      {'id': 'asset-1', 'bytes': 10},
-    );
+    expect(await upload(clientOver(store)), {'id': 'asset-1', 'bytes': 10});
     expect(backend.puts, [3]);
   });
 
@@ -241,6 +234,8 @@ void main() {
       put: backend.put,
       retry: RetryPolicy.none,
       journal: KeyValueTransferJournal(store),
+      // One part at a time, so the order of puts is known.
+      partConcurrency: 1,
     );
 
     final result = await client.upload(
