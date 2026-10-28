@@ -2133,3 +2133,26 @@ callback (for Clerk, `ClerkAuthClient.accessToken`).
   `uploadBytes`, times through `dateTimeToConvexMillis`. No realtime
   subscriptions.
 - Usage and error table in `flutter/shipglows_convex/README.md`.
+
+## `flutter/shipglows_ai`
+
+OpenRouter client for every platform (Android, iOS, macOS, Windows, Linux,
+web), written for the suite rather than extracted from one app. Depends on
+`http` and `flutter_secure_storage`.
+
+- `OpenRouterClient(keyStore:, appTitle:, appUrl:)`: `complete(AiRequest)`
+  for one answer, `stream(AiRequest)` for the answer as it is written
+  (Server-Sent Events, keep-alive comments skipped, an error mid-stream
+  raised), `models()` for the catalogue with prices (no key needed),
+  `checkKey()` for the key's limit and credit left. `AiRequest.transform(
+  model:, instruction:, text:)` is the usual text action; `fallbackModels`
+  becomes OpenRouter's `models` list.
+- `OpenRouterKeyStore` is swappable: `SecureOpenRouterKeyStore` (system
+  keychain), `MemoryOpenRouterKeyStore`, `CallbackOpenRouterKeyStore` (the
+  app's own storage). Read before every request; never logged.
+- Failures are a sealed `AiException` with a French message and
+  `retryable`: `AiMissingKey`, `AiInvalidKey`, `AiInsufficientCredits`,
+  `AiRefused`, `AiBadRequest`, `AiRateLimited` (`retryAfter`),
+  `AiProviderUnavailable`, `AiTimeout`, `AiNetworkFailure`, `AiBadResponse`.
+  Nothing is retried by the client.
+- Usage, key-store and error tables in `flutter/shipglows_ai/README.md`.
