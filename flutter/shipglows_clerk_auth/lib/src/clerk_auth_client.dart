@@ -69,7 +69,13 @@ class ClerkAuthClient {
   }
 
   /// Opens Clerk's sign-in, then stores the new session.
-  Future<ClerkSession> signIn() async {
+  ///
+  /// The browser keeps its own Clerk session, so by default Clerk may finish
+  /// silently with the same account. Pass [forceLogin] `true` to send
+  /// `prompt=login`, which makes Clerk show its sign-in form even when the
+  /// browser is already signed in. Use it to switch accounts or to
+  /// reauthenticate before a sensitive action.
+  Future<ClerkSession> signIn({bool forceLogin = false}) async {
     _ensureUsable();
     final verifier = _randomUrlSafe(64);
     final state = _randomUrlSafe(24);
@@ -88,6 +94,7 @@ class ClerkAuthClient {
             'state': state,
             'code_challenge': challenge,
             'code_challenge_method': 'S256',
+            if (forceLogin) 'prompt': 'login',
           },
         ),
         callbackScheme: config.callbackScheme,

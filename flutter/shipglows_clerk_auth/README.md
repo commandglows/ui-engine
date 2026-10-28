@@ -24,6 +24,11 @@ await clerk.signOut();
 (`id-token-unavailable`) rather than returning a stale token. Pass
 `forceRefresh: true` to refresh it even when it is still fresh.
 
+The browser keeps its own Clerk session, so `signIn()` can finish with the same
+account without asking again. To switch accounts or reauthenticate, call
+`signIn(forceLogin: true)`: it sends `prompt=login` and Clerk shows its sign-in
+form. The default (`false`) keeps the previous behaviour.
+
 Token and userinfo calls time out after 10 seconds and fail with `network`,
 which keeps the stored session. An unreadable stored session (for example after
 a Keystore reset) is deleted and reads as signed out; `signOut()` never throws
