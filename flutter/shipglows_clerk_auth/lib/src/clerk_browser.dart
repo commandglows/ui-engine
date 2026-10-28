@@ -11,6 +11,10 @@ abstract interface class ClerkBrowser {
   });
 }
 
+/// Seconds the desktop loopback listener stays open. The plugin default is
+/// 5 minutes, too short for Clerk's e-mail code flow.
+const _desktopLoopbackTimeoutSeconds = 900;
+
 /// The system browser: a Custom Tab on Android; on desktop the default
 /// browser with a loopback listener (no embedded webview, per RFC 8252).
 class SystemClerkBrowser implements ClerkBrowser {
@@ -25,7 +29,10 @@ class SystemClerkBrowser implements ClerkBrowser {
       return await FlutterWebAuth2.authenticate(
         url: url.toString(),
         callbackUrlScheme: callbackScheme,
-        options: const FlutterWebAuth2Options(useWebview: false),
+        options: const FlutterWebAuth2Options(
+          useWebview: false,
+          timeout: _desktopLoopbackTimeoutSeconds,
+        ),
       );
     } on PlatformException catch (error) {
       if (error.code == 'CANCELED') {
