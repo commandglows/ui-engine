@@ -468,8 +468,7 @@ class _PdfDocumentViewerState extends State<PdfDocumentViewer>
       );
       return Column(
         children: [
-          // One toolbar row in the dock: view mode, pages per screen,
-          // zoom, pager.
+          // One toolbar row: view mode, pages per screen, zoom, pager.
           widget.toolbarBuilder?.call(context, toolbar) ?? toolbar,
           Expanded(
             // Keyboard reading: Page ↑/↓ and the arrows turn or scroll
