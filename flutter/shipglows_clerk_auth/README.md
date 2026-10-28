@@ -1,7 +1,7 @@
 # shipglows_clerk_auth
 
-Clerk sign-in for native ShipGlows Flutter apps (Android, Windows): OIDC
-Authorization Code + PKCE in the system browser, no Clerk SDK.
+Clerk sign-in for ShipGlows Flutter apps (Android, Windows, and web opt-in):
+OIDC Authorization Code + PKCE in the system browser, no Clerk SDK.
 
 ## Usage
 
@@ -10,6 +10,7 @@ final clerk = ClerkAuthClient(
   config: ClerkAuthConfig.fromEnvironment(
     androidScheme: 'com.example.app',
     desktopPort: 47821,
+    webRedirectPath: '/auth.html', // omit to keep web without Clerk sign-in
   ),
 );
 await clerk.restore();                  // once at launch
@@ -20,4 +21,49 @@ await clerk.signOut();
 ```
 
 `idToken()` returns `null` when signed out and throws `ClerkAuthException`
-(`id-token-unavailable`) rather than returning a stale token.
+(`id-token-unavailable`) rather than returning a stale token. Pass
+`forceRefresh: true` to refresh it even when it is still fresh.
+
+## Web (opt-in)
+
+Web needs `webRedirectPath`; without it `supportsPlatform` is false on web and
+the app keeps its own sign-in there.
+
+- Redirect URI: `<app origin><webRedirectPath>`, for example
+  `http://localhost:3033/auth.html`, registered exactly on the Clerk OAuth
+  application (also register `http://127.0.0.1:3033/auth.html` for local dev).
+- The browser opens in a new tab; the callback page posts the callback URL back
+  to the opener (or stores it in `localStorage` when there is no opener, which
+  `flutter_web_auth_2` polls). The page must be served from the app origin.
+- Session storage uses `flutter_secure_storage` on web (WebCrypto, stored in
+  `localStorage`). It requires HTTPS or `localhost`.
+- The browser must allow CORS calls to the Clerk token and userinfo endpoints
+  from the app origin.
+
+Callback page, saved as `web/auth.html` in the app (the plugin's own template,
+with the same behaviour):
+
+```html
+<!DOCTYPE html>
+<title>Authentication complete</title>
+<p>Authentication is complete. If this does not happen automatically, please close the window.</p>
+<script>
+  function postAuthenticationMessage() {
+    const message = {
+      'flutter-web-auth-2': window.location.href
+    };
+
+    if (window.opener) {
+      window.opener.postMessage(message, window.location.origin);
+      window.close();
+    } else if (window.parent && window.parent !== window) {
+      window.parent.postMessage(message, window.location.origin);
+    } else {
+      localStorage.setItem('flutter-web-auth-2', window.location.href);
+      window.close();
+    }
+  }
+
+  postAuthenticationMessage();
+</script>
+```

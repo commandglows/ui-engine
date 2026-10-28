@@ -11,6 +11,7 @@ class ClerkAuthConfig {
     required this.clientId,
     required this.androidScheme,
     required this.desktopPort,
+    this.webRedirectPath,
     this.scopes = const ['openid', 'profile', 'email', 'offline_access'],
   });
 
@@ -19,11 +20,13 @@ class ClerkAuthConfig {
   factory ClerkAuthConfig.fromEnvironment({
     required String androidScheme,
     required int desktopPort,
+    String? webRedirectPath,
   }) => ClerkAuthConfig(
     issuer: const String.fromEnvironment(issuerEnvironmentName),
     clientId: const String.fromEnvironment(clientIdEnvironmentName),
     androidScheme: androidScheme,
     desktopPort: desktopPort,
+    webRedirectPath: webRedirectPath,
   );
 
   static const issuerEnvironmentName = 'CLERK_OIDC_ISSUER';
@@ -39,16 +42,26 @@ class ClerkAuthConfig {
 
   /// Loopback port for desktop, unique per app so two apps never collide.
   final int desktopPort;
+
+  /// Web callback page, relative to the app origin (for example `/auth.html`).
+  /// Opt-in: null keeps the web target without Clerk sign-in. The page must
+  /// be registered as `<origin><webRedirectPath>` on the Clerk application.
+  final String? webRedirectPath;
   final List<String> scopes;
 
   bool get isConfigured =>
       issuer.trim().startsWith('https://') && clientId.trim().isNotEmpty;
 
-  /// Android and Windows today; the other targets keep their own sign-in.
+  /// Android and Windows today.
   static bool get supportsCurrentPlatform =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.windows);
+
+  /// Whether this build can sign in: the native platforms above, or web when
+  /// [webRedirectPath] is set. The other targets keep their own sign-in.
+  bool get supportsPlatform =>
+      supportsCurrentPlatform || (kIsWeb && webRedirectPath != null);
 
   String get androidRedirectUri => '$androidScheme://oauth/clerk';
   String get desktopRedirectUri => 'http://localhost:$desktopPort/callback';
@@ -59,11 +72,24 @@ class ClerkAuthConfig {
   Uri get revokeEndpoint => Uri.parse('$_base/oauth/token/revoke');
   Uri get userInfoEndpoint => Uri.parse('$_base/oauth/userinfo');
 
-  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
-  String get redirectUri => _isAndroid ? androidRedirectUri : desktopRedirectUri;
+  bool get _isAndroid =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  String get redirectUri {
+    if (kIsWeb) {
+      return '${Uri.base.origin}${webRedirectPath ?? ''}';
+    }
+    return _isAndroid ? androidRedirectUri : desktopRedirectUri;
+  }
 
   /// What the browser helper waits for: the scheme on Android, the loopback
-  /// origin on desktop.
-  String get callbackScheme =>
-      _isAndroid ? androidScheme : 'http://localhost:$desktopPort';
+  /// origin on desktop. On web the helper ignores it (the callback page posts
+  /// back to the app origin) but still requires a valid URL scheme, so the
+  /// page's own scheme is given.
+  String get callbackScheme {
+    if (kIsWeb) {
+      return Uri.base.scheme;
+    }
+    return _isAndroid ? androidScheme : 'http://localhost:$desktopPort';
+  }
 }

@@ -1,9 +1,11 @@
-/// Clerk sign-in for native ShipGlows Flutter apps (Android, Windows).
+/// Clerk sign-in for ShipGlows Flutter apps (Android, Windows, and web when
+/// the app sets a web callback page).
 ///
 /// Each product has its own Clerk application and one public OAuth client
 /// (PKCE required, no secret). The app opens Clerk's hosted sign-in in the
 /// system browser — a Custom Tab on Android, the default browser with a
-/// loopback listener on Windows — so no beta Clerk Flutter SDK is involved.
+/// loopback listener on Windows, a new tab on web — so no beta Clerk Flutter
+/// SDK is involved.
 ///
 /// - [ClerkAuthConfig]: issuer, client id and the app's redirect URIs.
 /// - [ClerkAuthClient]: `restore()` at launch, `signIn()`, `accessToken()`

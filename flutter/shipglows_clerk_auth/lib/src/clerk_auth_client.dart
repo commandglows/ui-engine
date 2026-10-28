@@ -143,16 +143,19 @@ class ClerkAuthClient {
 
   /// A usable id_token for the product backend (Convex checks it), or `null`
   /// when signed out. Refreshes first when the stored id_token is missing or
-  /// its `exp` falls within the freshness margin. A refresh that returns no
-  /// id_token keeps the previous one only while it is still valid; otherwise
-  /// this throws [ClerkAuthException] rather than sending a stale token.
-  Future<String?> idToken() async {
+  /// its `exp` falls within the freshness margin, or always with
+  /// [forceRefresh]. A refresh that returns no id_token keeps the previous one
+  /// only while it is still valid; otherwise this throws [ClerkAuthException]
+  /// rather than sending a stale token.
+  Future<String?> idToken({bool forceRefresh = false}) async {
     final current = _session.value;
     if (current == null) {
       return null;
     }
     final stored = current.idToken;
-    if (stored != null && _isIdTokenFresh(stored, _clock())) {
+    if (!forceRefresh &&
+        stored != null &&
+        _isIdTokenFresh(stored, _clock())) {
       return stored;
     }
     final refreshed = await _refresh(current);
@@ -184,7 +187,7 @@ class ClerkAuthClient {
           'token_type_hint': 'refresh_token',
           'client_id': config.clientId,
         },
-      );
+      ).timeout(const Duration(seconds: 5));
     } on Exception {
       // Offline: the token stays valid server-side but no longer exists here.
     }
@@ -292,10 +295,10 @@ class ClerkAuthClient {
         'CLERK_OIDC_ISSUER / CLERK_OIDC_CLIENT_ID missing.',
       );
     }
-    if (!ClerkAuthConfig.supportsCurrentPlatform) {
+    if (!config.supportsPlatform) {
       throw const ClerkAuthException(
         'unsupported-platform',
-        'Clerk native sign-in runs on Android and Windows.',
+        'Clerk sign-in is not available on this platform.',
       );
     }
   }
