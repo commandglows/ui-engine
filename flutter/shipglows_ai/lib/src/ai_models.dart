@@ -313,7 +313,9 @@ final class AiDone extends AiActivity {
   final bool truncated;
 }
 
-/// The call failed with [error]. The client rethrows the same error.
+/// The call failed with [error]. For an expected failure the client rethrows
+/// that same [AiException]; for an unexpected error it reports [AiBadResponse]
+/// here and rethrows the original error.
 final class AiFailed extends AiActivity {
   const AiFailed(super.id, this.error);
 
