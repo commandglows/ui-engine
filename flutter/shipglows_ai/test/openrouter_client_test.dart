@@ -243,4 +243,212 @@ void main() {
     await callback.write('   ');
     expect(saved, isNull);
   });
+
+  test('transformText sends one instruction and returns the trimmed text', () async {
+    late http.Request sent;
+    final client = _client((request) async {
+      sent = request;
+      return _json({
+        'choices': [
+          {
+            'message': {'role': 'assistant', 'content': '  Bonjour.\n'},
+            'finish_reason': 'stop',
+          },
+        ],
+      });
+    });
+
+    final text = await client.transformText(
+      model: 'anthropic/claude-haiku-5.5',
+      instruction: 'Corrige.',
+      text: 'bonjour',
+    );
+
+    expect(text, 'Bonjour.');
+    expect(jsonDecode(sent.body)['messages'], [
+      {'role': 'system', 'content': 'Corrige.'},
+      {'role': 'user', 'content': 'bonjour'},
+    ]);
+  });
+
+  test('a filled context goes first, as a system message', () async {
+    late http.Request sent;
+    final client = _client((request) async {
+      sent = request;
+      return _json({
+        'choices': [
+          {
+            'message': {'role': 'assistant', 'content': 'ok'},
+          },
+        ],
+      });
+    });
+
+    await client.transformText(
+      model: 'anthropic/claude-haiku-5.5',
+      instruction: 'Corrige.',
+      text: 'bonjour',
+      context: const AiContext(who: ' Diane ', how: 'Bref.'),
+    );
+
+    expect(jsonDecode(sent.body)['messages'], [
+      {'role': 'system', 'content': 'Diane\n\nResponse style: Bref.'},
+      {'role': 'system', 'content': 'Corrige.'},
+      {'role': 'user', 'content': 'bonjour'},
+    ]);
+  });
+
+  test('an empty context adds no message', () {
+    const empty = AiContext(who: '  ', how: '');
+    expect(empty.isEmpty, isTrue);
+    expect(empty.toMessage(), isNull);
+    final request = AiRequest.transform(
+      model: 'm',
+      instruction: 'Corrige.',
+      text: 'x',
+      context: empty,
+    );
+    expect(request.messages, hasLength(2));
+  });
+
+  test('a filled context becomes one system message in the right format', () {
+    expect(
+      const AiContext(who: ' Diane ', how: 'Bref.').toMessage(),
+      const AiMessage.system('Diane\n\nResponse style: Bref.'),
+    );
+    expect(
+      const AiContext(how: 'Bref.').toMessage(),
+      const AiMessage.system('Response style: Bref.'),
+    );
+  });
+
+  test('preview returns what would be sent, without a call or a key', () {
+    // Synchronous and on the request itself: there is no client, key store
+    // or HTTP call involved, so nothing can be sent or read.
+    final request = AiRequest.transform(
+      model: 'anthropic/claude-haiku-5.5',
+      fallbackModels: ['openai/gpt-5.5-mini'],
+      instruction: 'Corrige.',
+      text: 'bonjour',
+      context: const AiContext(who: 'Rédactrice'),
+    );
+
+    final preview = request.preview();
+
+    expect(preview.model, 'anthropic/claude-haiku-5.5');
+    expect(preview.fallbackModels, ['openai/gpt-5.5-mini']);
+    expect(preview.messages.first, const AiMessage.system('Rédactrice'));
+    expect(
+      [for (final message in preview.messages) message.toJson()],
+      request.toJson()['messages'],
+    );
+  });
+
+  test('withRoute returns a new request and leaves the original alone', () {
+    final original = AiRequest.transform(
+      model: 'anthropic/claude-haiku-5.5',
+      fallbackModels: ['openai/gpt-5.5-mini'],
+      instruction: 'Corrige.',
+      text: 'bonjour',
+    );
+
+    final routed = original.withRoute(
+      const AiRoute(
+        model: 'google/gemini-test',
+        fallbackModels: ['mistral/test'],
+        context: AiContext(who: 'Diane', how: 'Court.'),
+      ),
+    );
+
+    expect(identical(routed, original), isFalse);
+    expect(original.model, 'anthropic/claude-haiku-5.5');
+    expect(original.fallbackModels, ['openai/gpt-5.5-mini']);
+    expect(original.messages, hasLength(2));
+    expect(routed.model, 'google/gemini-test');
+    expect(routed.fallbackModels, ['mistral/test']);
+    expect(routed.messages, [
+      const AiMessage.system('Diane\n\nResponse style: Court.'),
+      const AiMessage.system('Corrige.'),
+      const AiMessage.user('bonjour'),
+    ]);
+    expect(original.withRoute(const AiRoute()).model, original.model);
+  });
+
+  test('activity reports Working then Done', () async {
+    final client = _client(
+      (_) async => _json({
+        'choices': [
+          {
+            'message': {'role': 'assistant', 'content': 'ok'},
+            'finish_reason': 'length',
+          },
+        ],
+      }),
+    );
+    final events = <AiActivity>[];
+    final subscription = client.activity.listen(events.add);
+
+    final answer = await client.complete(
+      const AiRequest(model: 'm', messages: [AiMessage.user('x')]),
+    );
+    await subscription.cancel();
+
+    expect(answer.truncated, isTrue);
+    expect(events, hasLength(2));
+    expect(events.first, isA<AiWorking>());
+    expect(events.last, isA<AiDone>());
+    expect((events.last as AiDone).truncated, isTrue);
+    expect(events.last.id, events.first.id);
+  });
+
+  test('activity reports Failed on a 401 and the error is still raised', () async {
+    final client = _client(
+      (_) async => _json({'error': {'message': 'bad key'}}, 401),
+    );
+    final events = <AiActivity>[];
+    final subscription = client.activity.listen(events.add);
+
+    await expectLater(
+      client.complete(
+        const AiRequest(model: 'm', messages: [AiMessage.user('x')]),
+      ),
+      throwsA(isA<AiInvalidKey>()),
+    );
+    await subscription.cancel();
+
+    expect(events, hasLength(2));
+    expect(events.first, isA<AiWorking>());
+    expect(events.last, isA<AiFailed>());
+    expect((events.last as AiFailed).error, isA<AiInvalidKey>());
+  });
+
+  test('an unexpected error ends the call as AiBadResponse and is rethrown', () async {
+    // `model` is a number: the `as String?` cast throws a TypeError, which is
+    // not an AiException.
+    final client = _client(
+      (_) async => _json({
+        'model': 42,
+        'choices': [
+          {
+            'message': {'role': 'assistant', 'content': 'ok'},
+          },
+        ],
+      }),
+    );
+    final events = <AiActivity>[];
+    final subscription = client.activity.listen(events.add);
+
+    await expectLater(
+      client.complete(
+        const AiRequest(model: 'm', messages: [AiMessage.user('x')]),
+      ),
+      throwsA(isA<TypeError>()),
+    );
+    await subscription.cancel();
+
+    expect(events, hasLength(2));
+    expect(events.first, isA<AiWorking>());
+    expect(events.last, isA<AiFailed>());
+    expect((events.last as AiFailed).error, isA<AiBadResponse>());
+  });
 }

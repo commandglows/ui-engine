@@ -5,8 +5,8 @@ macOS, Windows, Linux and the web. One key from the user reaches every
 model OpenRouter lists (Anthropic, OpenAI, Google, Mistral, open models).
 
 1. **Asking.** `complete` for one answer, `stream` for the answer as it is
-   written, `AiRequest.transform` for the usual text action: one
-   instruction applied to a text.
+   written, `transformText` for the usual text action: one instruction
+   applied to a text, answer trimmed.
 2. **Choosing a model.** `models()` reads the catalogue (no key needed),
    with prices and context length. `fallbackModels` lets OpenRouter switch
    when the first model is down.
@@ -24,14 +24,14 @@ final ai = OpenRouterClient(
   appUrl: 'https://www.commandglows.com',
 );
 
-final answer = await ai.complete(
-  AiRequest.transform(
-    model: 'anthropic/claude-haiku-5.5',
-    fallbackModels: ['openai/gpt-5.5-mini'],
-    instruction: 'Corrige les fautes. Renvoie seulement le texte corrigé.',
-    text: selection,
-  ),
+final request = AiRequest.transform(
+  model: 'anthropic/claude-haiku-5.5',
+  fallbackModels: ['openai/gpt-5.5-mini'],
+  instruction: 'Corrige les fautes. Renvoie seulement le texte corrigé.',
+  text: selection,
 );
+
+final answer = await ai.complete(request);
 
 await for (final piece in ai.stream(request)) {
   buffer.write(piece);
@@ -40,6 +40,70 @@ await for (final piece in ai.stream(request)) {
 
 `appTitle` and `appUrl` name the app on the user's OpenRouter dashboard
 (`X-Title`, `HTTP-Referer`).
+
+## Transforming a selection
+
+```dart
+final fixed = await ai.transformText(
+  model: 'anthropic/claude-haiku-5.5',
+  instruction: 'Fix the spelling. Return only the corrected text.',
+  text: selection,
+  route: const AiRoute(model: 'openai/gpt-5.5-mini'), // this call only
+);
+```
+
+`route` and `context` apply to this call only.
+
+## Preview before sending
+
+```dart
+final preview = request.preview(); // no network call, no key read
+print(preview); // the model, the fallbacks and the messages toJson would send
+```
+
+## Routes for one call
+
+`AiRoute` replaces the model, the fallbacks, or adds a context for one call.
+`request.withRoute(route)` returns a new request; the original is never
+modified. A null field keeps the request's value.
+
+```dart
+final routed = request.withRoute(
+  const AiRoute(model: 'google/gemini-test', context: AiContext(how: 'Short.')),
+);
+```
+
+## Who and how
+
+`AiContext(who:, how:)` becomes the first system message, before the
+instruction. Blank fields count as absent; with both blank, nothing is added.
+
+```dart
+const context = AiContext(
+  who: 'A support agent for a Flutter app',
+  how: 'Warm, two sentences at most.',
+);
+```
+
+## Activity
+
+`ai.activity` reports each call: an `AiWorking(id)` first, then `AiDone(id,
+truncated:)` or `AiFailed(id, error)`. Failures are still thrown to the
+caller. It is a broadcast stream: an event emitted with no listener is lost.
+
+```dart
+ai.activity.listen((event) {
+  switch (event) {
+    case AiWorking(:final id):
+      showBusy(id);
+    case AiDone(:final id):
+      hideBusy(id);
+    case AiFailed(:final id, :final error):
+      hideBusy(id);
+      showError(error.message);
+  }
+});
+```
 
 ## Key stores
 
@@ -55,7 +119,7 @@ store. A keychain that cannot be read counts as no key.
 
 ## Errors
 
-Every failure is a sealed `AiException` with a French `message` ready for
+Every expected failure is a sealed `AiException` with a French `message` ready for
 the user, the HTTP `statusCode` and OpenRouter's `providerMessage` (for
 logs only: it can quote the request). `retryable` says whether sending
 again later may work. Nothing is retried by the client.
@@ -68,10 +132,14 @@ again later may work. Nothing is retried by the client.
 | `AiRefused` | 403, moderation | no |
 | `AiBadRequest` | other 4xx (unknown model, too long) | no |
 | `AiRateLimited` | 429, with `retryAfter` | yes |
-| `AiProviderUnavailable` | 408, 5xx, an `error` body with status 200, an error in the middle of a stream | yes |
+| `AiProviderUnavailable` | 408, 5xx, an `error` body with a 5xx or no `code`, an error in the middle of a stream | yes |
 | `AiTimeout` | no answer within `timeout` (60 s; the first byte for `stream`) | yes |
 | `AiNetworkFailure` | no network, DNS, TLS | yes |
-| `AiBadResponse` | an answer that is not the expected JSON | no |
+| `AiBadResponse` | an answer that is not the expected JSON, or a field of the wrong type (an unexpected error, not an `AiException`: it is rethrown as it is) | no |
+
+An `error` body inside a 200 answer (or a stream) gets the class of its `code`:
+401, 402, 403 and 429 give the same class as the HTTP status; 400 and other 4xx
+give `AiBadRequest`; 408, 5xx or no code give `AiProviderUnavailable`.
 
 ## Privacy
 

@@ -1,3 +1,5 @@
+import 'ai_exception.dart';
+
 /// Who speaks in a conversation.
 enum AiRole { system, user, assistant }
 
@@ -24,7 +26,9 @@ final class AiMessage {
 
 /// One request. [model] is an OpenRouter id such as
 /// `anthropic/claude-haiku-5.5`; [fallbackModels] are tried in order when it
-/// is down or refuses the request (OpenRouter `models`).
+/// is down or refuses the request (OpenRouter `models`). The request keeps the
+/// lists passed in [messages] and [fallbackModels] without copying them: do
+/// not modify them after passing them.
 final class AiRequest {
   const AiRequest({
     required this.model,
@@ -35,7 +39,8 @@ final class AiRequest {
   });
 
   /// A single instruction applied to [text]: the usual shape of a text
-  /// action (rewrite, translate, clean a dictation).
+  /// action (rewrite, translate, clean a dictation). A filled [context] goes
+  /// first, as a system message before the instruction.
   factory AiRequest.transform({
     required String model,
     required String instruction,
@@ -43,12 +48,17 @@ final class AiRequest {
     List<String> fallbackModels = const [],
     double? temperature,
     int? maxTokens,
+    AiContext? context,
   }) => AiRequest(
     model: model,
     fallbackModels: fallbackModels,
     temperature: temperature,
     maxTokens: maxTokens,
-    messages: [AiMessage.system(instruction), AiMessage.user(text)],
+    messages: [
+      ?context?.toMessage(),
+      AiMessage.system(instruction),
+      AiMessage.user(text),
+    ],
   );
 
   final String model;
@@ -69,6 +79,90 @@ final class AiRequest {
     'max_tokens': ?maxTokens,
     if (stream) 'stream': true,
   };
+
+  /// What [toJson] would send, without calling OpenRouter or reading the key.
+  AiPreview preview() => AiPreview(
+    model: model,
+    fallbackModels: List.unmodifiable(fallbackModels),
+    messages: List.unmodifiable(messages),
+  );
+
+  /// Returns a NEW request with [route] applied: the model and the fallbacks
+  /// are replaced when the route sets them, and the route's context message
+  /// goes first, before the other system messages. The original request is
+  /// never modified; the route only lives for one call.
+  AiRequest withRoute(AiRoute route) => AiRequest(
+    model: route.model ?? model,
+    fallbackModels: route.fallbackModels ?? fallbackModels,
+    temperature: temperature,
+    maxTokens: maxTokens,
+    messages: [?route.context?.toMessage(), ...messages],
+  );
+}
+
+/// The messages a request would send, as returned by [AiRequest.preview].
+/// Plain values for a confirmation screen; nothing is sent.
+final class AiPreview {
+  const AiPreview({
+    required this.model,
+    this.fallbackModels = const [],
+    required this.messages,
+  });
+
+  final String model;
+  final List<String> fallbackModels;
+  final List<AiMessage> messages;
+
+  @override
+  String toString() => [
+    'Model: $model',
+    if (fallbackModels.isNotEmpty) 'Fallbacks: ${fallbackModels.join(', ')}',
+    for (final message in messages) '${message.role.name}: ${message.content}',
+  ].join('\n');
+}
+
+/// A temporary route for one call: another model, other fallbacks, or an
+/// extra context. Applied with [AiRequest.withRoute]; a null field keeps the
+/// value of the request.
+final class AiRoute {
+  const AiRoute({this.model, this.fallbackModels, this.context});
+
+  final String? model;
+  final List<String>? fallbackModels;
+  final AiContext? context;
+}
+
+/// Who the text is for and how the answer should read, sent as one system
+/// message. Blank fields count as absent.
+final class AiContext {
+  const AiContext({this.who, this.how});
+
+  /// Who is speaking, or who the text is for, in plain words.
+  final String? who;
+
+  /// How the answer should read, e.g. "short and informal".
+  final String? how;
+
+  bool get isEmpty => _clean(who) == null && _clean(how) == null;
+
+  /// The system message for this context, or null when [isEmpty]. The two
+  /// parts are separated by a blank line.
+  AiMessage? toMessage() {
+    final whoText = _clean(who);
+    final howText = _clean(how);
+    if (whoText == null && howText == null) return null;
+    return AiMessage.system(
+      [
+        ?whoText,
+        if (howText != null) 'Response style: $howText',
+      ].join('\n\n'),
+    );
+  }
+
+  static String? _clean(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
 }
 
 /// Tokens counted by OpenRouter for one answer; [cost] in credits (US
@@ -193,4 +287,35 @@ final class OpenRouterKeyInfo {
       freeTier: data['is_free_tier'] == true,
     );
   }
+}
+
+/// Lifecycle of one call ([OpenRouterClient.complete], `stream`,
+/// `transformText`). Every call emits [AiWorking], then exactly one of
+/// [AiDone] or [AiFailed], with the same [id]. A cancelled stream emits no
+/// end event.
+sealed class AiActivity {
+  const AiActivity(this.id);
+
+  /// Identifies one call; unique within the client.
+  final String id;
+}
+
+/// The call has started.
+final class AiWorking extends AiActivity {
+  const AiWorking(super.id);
+}
+
+/// The call succeeded. [truncated] is true when the answer was cut by
+/// [AiRequest.maxTokens].
+final class AiDone extends AiActivity {
+  const AiDone(super.id, {this.truncated = false});
+
+  final bool truncated;
+}
+
+/// The call failed with [error]. The client rethrows the same error.
+final class AiFailed extends AiActivity {
+  const AiFailed(super.id, this.error);
+
+  final AiException error;
 }

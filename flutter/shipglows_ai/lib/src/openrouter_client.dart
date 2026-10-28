@@ -13,6 +13,9 @@ import 'openrouter_key_store.dart';
 /// (`X-Title`, `HTTP-Referer`). The key is read from [keyStore] before each
 /// request and never logged. Failures are [AiException]s; nothing is retried
 /// here, the caller decides with [AiException.retryable].
+///
+/// [activity] reports the start and end of each call, for a UI that has no
+/// window of its own to show progress in.
 class OpenRouterClient {
   OpenRouterClient({
     required this.keyStore,
@@ -37,73 +40,138 @@ class OpenRouterClient {
   final http.Client _http;
   final bool _ownsHttp;
 
+  final _activity = StreamController<AiActivity>.broadcast();
+  int _sequence = 0;
+
+  /// Start and end of each call. Each call emits [AiWorking], then exactly one
+  /// [AiDone] or [AiFailed] with the same id; a stream cancelled by its
+  /// listener emits no end event. An unexpected error (not an [AiException])
+  /// is reported as [AiFailed] with an [AiBadResponse], then rethrown as it
+  /// is. A broadcast stream: an event emitted while nobody listens is lost.
+  Stream<AiActivity> get activity => _activity.stream;
+
   /// One full answer.
   Future<AiCompletion> complete(AiRequest request) async {
-    final response = await _send(
-      'POST',
-      'chat/completions',
-      body: request.toJson(),
-      requireKey: true,
-    );
-    final json = _decodeObject(response.body, response.statusCode);
-    _throwIfErrorBody(json, response.statusCode);
-    final choices = json['choices'];
-    if (choices is! List || choices.isEmpty) {
-      throw AiBadResponse(statusCode: response.statusCode);
+    final id = _begin();
+    try {
+      final response = await _send(
+        'POST',
+        'chat/completions',
+        body: request.toJson(),
+        requireKey: true,
+      );
+      final json = _decodeObject(response.body, response.statusCode);
+      _throwIfErrorBody(json, response.statusCode);
+      final choices = json['choices'];
+      if (choices is! List || choices.isEmpty) {
+        throw AiBadResponse(statusCode: response.statusCode);
+      }
+      final choice = choices.first;
+      final message = choice is Map<String, Object?> ? choice['message'] : null;
+      final content = message is Map<String, Object?>
+          ? message['content']
+          : null;
+      final completion = AiCompletion(
+        text: content is String ? content : '',
+        model: json['model'] as String? ?? request.model,
+        finishReason: choice is Map<String, Object?>
+            ? choice['finish_reason'] as String?
+            : null,
+        usage: AiUsage.fromJson(json['usage']),
+        id: json['id'] as String?,
+      );
+      _emit(AiDone(id, truncated: completion.truncated));
+      return completion;
+    } on AiException catch (error) {
+      _emit(AiFailed(id, error));
+      rethrow;
+    } catch (error, stack) {
+      _emit(AiFailed(id, const AiBadResponse()));
+      Error.throwWithStackTrace(error, stack);
     }
-    final choice = choices.first;
-    final message = choice is Map<String, Object?> ? choice['message'] : null;
-    final content = message is Map<String, Object?> ? message['content'] : null;
-    return AiCompletion(
-      text: content is String ? content : '',
-      model: json['model'] as String? ?? request.model,
-      finishReason: choice is Map<String, Object?>
-          ? choice['finish_reason'] as String?
-          : null,
-      usage: AiUsage.fromJson(json['usage']),
-      id: json['id'] as String?,
+  }
+
+  /// One instruction applied to [text]; returns the answer, trimmed. [route]
+  /// and [context] apply to this call only. [model] is the default model,
+  /// which [route] can replace. Goes through [complete], so [activity]
+  /// reports it.
+  Future<String> transformText({
+    required String model,
+    required String text,
+    required String instruction,
+    AiRoute? route,
+    AiContext? context,
+  }) async {
+    final base = AiRequest.transform(
+      model: model,
+      instruction: instruction,
+      text: text,
+      context: context,
     );
+    final request = route == null ? base : base.withRoute(route);
+    final completion = await complete(request);
+    return completion.text.trim();
   }
 
   /// The answer piece by piece, as the model writes it. Cancelling the
   /// subscription closes the connection.
   Stream<String> stream(AiRequest request) async* {
-    final key = await _key();
-    final httpRequest = http.Request('POST', baseUrl.resolve('chat/completions'))
-      ..headers.addAll(_headers(key))
-      ..body = jsonEncode(request.toJson(stream: true));
-    final http.StreamedResponse response;
+    final id = _begin();
+    var truncated = false;
     try {
-      response = await _http.send(httpRequest).timeout(timeout);
-    } on TimeoutException {
-      throw const AiTimeout();
-    } on http.ClientException catch (error) {
-      throw AiNetworkFailure(providerMessage: error.message);
-    }
-    if (response.statusCode != 200) {
-      final body = await response.stream.bytesToString();
-      throw _errorFor(response.statusCode, body, response.headers);
-    }
-    final lines = response.stream
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
-    try {
-      await for (final line in lines) {
-        // `: OPENROUTER PROCESSING` keeps the connection alive.
-        if (!line.startsWith('data:')) continue;
-        final data = line.substring(5).trim();
-        if (data == '[DONE]') return;
-        final json = _decodeObject(data, 200);
-        _throwIfErrorBody(json, 200);
-        final choices = json['choices'];
-        if (choices is! List || choices.isEmpty) continue;
-        final choice = choices.first;
-        final delta = choice is Map<String, Object?> ? choice['delta'] : null;
-        final content = delta is Map<String, Object?> ? delta['content'] : null;
-        if (content is String && content.isNotEmpty) yield content;
+      final key = await _key();
+      final httpRequest = http.Request(
+        'POST',
+        baseUrl.resolve('chat/completions'),
+      )
+        ..headers.addAll(_headers(key, accept: 'text/event-stream'))
+        ..body = jsonEncode(request.toJson(stream: true));
+      final http.StreamedResponse response;
+      try {
+        response = await _http.send(httpRequest).timeout(timeout);
+      } on TimeoutException {
+        throw const AiTimeout();
+      } on http.ClientException catch (error) {
+        throw AiNetworkFailure(providerMessage: error.message);
       }
-    } on http.ClientException catch (error) {
-      throw AiNetworkFailure(providerMessage: error.message);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = await response.stream.bytesToString();
+        throw _errorFor(response.statusCode, body, response.headers);
+      }
+      final lines = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+      try {
+        await for (final line in lines) {
+          // `: OPENROUTER PROCESSING` keeps the connection alive.
+          if (!line.startsWith('data:')) continue;
+          final data = line.substring(5).trim();
+          if (data == '[DONE]') break;
+          final json = _decodeObject(data, 200);
+          _throwIfErrorBody(json, 200);
+          final choices = json['choices'];
+          if (choices is! List || choices.isEmpty) continue;
+          final choice = choices.first;
+          final finish = choice is Map<String, Object?>
+              ? choice['finish_reason']
+              : null;
+          if (finish is String) truncated = finish == 'length';
+          final delta = choice is Map<String, Object?> ? choice['delta'] : null;
+          final content = delta is Map<String, Object?>
+              ? delta['content']
+              : null;
+          if (content is String && content.isNotEmpty) yield content;
+        }
+      } on http.ClientException catch (error) {
+        throw AiNetworkFailure(providerMessage: error.message);
+      }
+      _emit(AiDone(id, truncated: truncated));
+    } on AiException catch (error) {
+      _emit(AiFailed(id, error));
+      rethrow;
+    } catch (error, stack) {
+      _emit(AiFailed(id, const AiBadResponse()));
+      Error.throwWithStackTrace(error, stack);
     }
   }
 
@@ -128,9 +196,21 @@ class OpenRouterClient {
   }
 
   /// Closes the HTTP client this instance created; one given to it stays
-  /// open.
+  /// open. Ends [activity].
   void close() {
     if (_ownsHttp) _http.close();
+    unawaited(_activity.close());
+  }
+
+  /// Starts a call: gives it an id and reports [AiWorking].
+  String _begin() {
+    final id = '${++_sequence}';
+    _emit(AiWorking(id));
+    return id;
+  }
+
+  void _emit(AiActivity event) {
+    if (!_activity.isClosed) _activity.add(event);
   }
 
   Future<String> _key() async {
@@ -139,11 +219,14 @@ class OpenRouterClient {
     return key.trim();
   }
 
-  Map<String, String> _headers(String? key) {
+  Map<String, String> _headers(
+    String? key, {
+    String accept = 'application/json',
+  }) {
     final authorization = key == null ? null : 'Bearer $key';
     return {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      'Accept': accept,
       'X-Title': appTitle,
       'HTTP-Referer': ?appUrl,
       'Authorization': ?authorization,

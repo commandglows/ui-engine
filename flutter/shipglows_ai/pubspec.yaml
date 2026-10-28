@@ -1,6 +1,6 @@
 name: shipglows_ai
 description: OpenRouter client for ShipGlows Flutter apps on Android, iOS, macOS, Windows, Linux and the web — chat completions, streaming, the model list and a key check, with the user's key kept in a swappable key store.
-version: 0.1.0
+version: 0.2.0
 publish_to: "none"
 
 environment:
