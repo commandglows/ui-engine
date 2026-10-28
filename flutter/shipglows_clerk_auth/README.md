@@ -24,6 +24,11 @@ await clerk.signOut();
 (`id-token-unavailable`) rather than returning a stale token. Pass
 `forceRefresh: true` to refresh it even when it is still fresh.
 
+Token and userinfo calls time out after 10 seconds and fail with `network`,
+which keeps the stored session. An unreadable stored session (for example after
+a Keystore reset) is deleted and reads as signed out; `signOut()` never throws
+on storage errors.
+
 ## Web (opt-in)
 
 Web needs `webRedirectPath`; without it `supportsPlatform` is false on web and

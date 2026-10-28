@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'clerk_session.dart';
@@ -25,7 +26,14 @@ class SecureClerkSessionStore implements ClerkSessionStore {
 
   @override
   Future<ClerkSession?> read() async {
-    final raw = await _storage.read(key: _key);
+    String? raw;
+    try {
+      raw = await _storage.read(key: _key);
+    } on PlatformException {
+      // The Keystore or DPAPI can no longer open the entry: drop it and sign in again.
+      await clear();
+      return null;
+    }
     if (raw == null) {
       return null;
     }
@@ -45,8 +53,17 @@ class SecureClerkSessionStore implements ClerkSessionStore {
   Future<void> write(ClerkSession session) =>
       _storage.write(key: _key, value: jsonEncode(session.toJson()));
 
+  /// Best effort: a delete the platform refuses leaves the entry behind. The
+  /// refresh token is revoked on sign-out, so the next restore refuses it and
+  /// clears the entry again.
   @override
-  Future<void> clear() => _storage.delete(key: _key);
+  Future<void> clear() async {
+    try {
+      await _storage.delete(key: _key);
+    } on PlatformException {
+      // Ignored on purpose: callers clear local state and must not throw.
+    }
+  }
 }
 
 /// For tests and previews.

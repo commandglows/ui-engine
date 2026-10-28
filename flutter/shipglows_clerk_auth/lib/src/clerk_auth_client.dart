@@ -16,6 +16,10 @@ import 'clerk_session_store.dart';
 /// refreshed before use.
 const _idTokenMargin = Duration(minutes: 2);
 
+/// Bound on each Clerk token and userinfo call. A timeout is a `network`
+/// failure, never `invalid_grant`, so the stored session is kept.
+const _requestTimeout = Duration(seconds: 10);
+
 /// Signs in with Clerk's hosted pages and keeps the session across launches.
 ///
 /// Call [restore] once at launch, then read [session]. [accessToken] returns
@@ -239,11 +243,15 @@ class ClerkAuthClient {
   Future<Map<String, dynamic>> _tokenRequest(Map<String, String> body) async {
     final http.Response response;
     try {
-      response = await _http.post(
-        config.tokenEndpoint,
-        headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body,
-      );
+      response = await _http
+          .post(
+            config.tokenEndpoint,
+            headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const ClerkAuthException('network', 'timeout');
     } on Exception catch (error) {
       throw ClerkAuthException('network', error.runtimeType.toString());
     }
@@ -264,10 +272,14 @@ class ClerkAuthClient {
   Future<Map<String, dynamic>> _userInfo(String accessToken) async {
     final http.Response response;
     try {
-      response = await _http.get(
-        config.userInfoEndpoint,
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
+      response = await _http
+          .get(
+            config.userInfoEndpoint,
+            headers: {'Authorization': 'Bearer $accessToken'},
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const ClerkAuthException('network', 'timeout');
     } on Exception catch (error) {
       throw ClerkAuthException('network', error.runtimeType.toString());
     }
