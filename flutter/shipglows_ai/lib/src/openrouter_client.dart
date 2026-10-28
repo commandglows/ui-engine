@@ -114,8 +114,7 @@ class OpenRouterClient {
     final data = json['data'];
     if (data is! List) throw AiBadResponse(statusCode: response.statusCode);
     return [
-      for (final entry in data)
-        if (AiModel.fromJson(entry) case final model?) model,
+      for (final entry in data) ?AiModel.fromJson(entry),
     ];
   }
 
@@ -140,13 +139,16 @@ class OpenRouterClient {
     return key.trim();
   }
 
-  Map<String, String> _headers(String? key) => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'X-Title': appTitle,
-    'HTTP-Referer': ?appUrl,
-    if (key != null) 'Authorization': 'Bearer $key',
-  };
+  Map<String, String> _headers(String? key) {
+    final authorization = key == null ? null : 'Bearer $key';
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-Title': appTitle,
+      'HTTP-Referer': ?appUrl,
+      'Authorization': ?authorization,
+    };
+  }
 
   Future<http.Response> _send(
     String method,
