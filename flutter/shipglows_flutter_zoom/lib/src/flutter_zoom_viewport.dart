@@ -6,6 +6,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+/// A configured zoom boundary that prevented further zooming.
+enum ZoomLimit { minimum, maximum }
+
 /// Keeps a Flutter application surface filled while scaling its complete UI.
 class FlutterZoomViewport extends StatefulWidget {
   const FlutterZoomViewport({
@@ -39,6 +42,7 @@ class FlutterZoomViewport extends StatefulWidget {
     ],
     this.reflowDelay = const Duration(milliseconds: 150),
     this.onZoomChanged,
+    this.onZoomLimitReached,
   }) : assert(minimumZoom > 0),
        assert(maximumZoom >= minimumZoom),
        assert(initialZoom >= minimumZoom && initialZoom <= maximumZoom),
@@ -76,6 +80,11 @@ class FlutterZoomViewport extends StatefulWidget {
   /// so the wheel answers at once even when the app is costly to lay out.
   final Duration reflowDelay;
   final ValueChanged<double>? onZoomChanged;
+
+  /// Called once when a wheel or pinch reaches a zoom limit, and again after
+  /// the zoom leaves that limit and reaches it anew. Use this to show a
+  /// localized notification in the host application.
+  final ValueChanged<ZoomLimit>? onZoomLimitReached;
 
   @override
   State<FlutterZoomViewport> createState() => _FlutterZoomViewportState();
@@ -130,6 +139,7 @@ class _FlutterZoomViewportState extends State<FlutterZoomViewport> {
 
   /// Pinches in progress, by pointer device.
   final Map<int, _Pinch> _pinches = {};
+  ZoomLimit? _reportedLimit;
 
   /// Zoom change for a Ctrl+wheel delta: [FlutterZoomViewport.zoomStep] per
   /// full notch, proportionally less for finer deltas, at most one step per
@@ -207,7 +217,22 @@ class _FlutterZoomViewportState extends State<FlutterZoomViewport> {
         ..panY = data.panY;
     }
     if (!pinch.zooming) return _withPan(data, scale: 1);
-    _setZoom(pinch.startZoom * data.scale / pinch.startScale);
+    final requestedZoom = pinch.startZoom * data.scale / pinch.startScale;
+    final zoom = _setZoom(requestedZoom);
+    if (requestedZoom >= widget.maximumZoom &&
+        zoom == widget.maximumZoom) {
+      // Pinch scale is measured from the start of the gesture. Rebase at the
+      // limit so reversing direction takes effect immediately instead of
+      // first undoing scale that could never be applied.
+      pinch
+        ..startZoom = zoom
+        ..startScale = data.scale;
+    } else if (requestedZoom <= widget.minimumZoom &&
+        zoom == widget.minimumZoom) {
+      pinch
+        ..startZoom = zoom
+        ..startScale = data.scale;
+    }
     // The content holds still while it is being pinched.
     return _withPan(data, scale: 1, panX: pinch.panX, panY: pinch.panY);
   }
@@ -267,13 +292,27 @@ class _FlutterZoomViewportState extends State<FlutterZoomViewport> {
     _layoutZoom = _zoom;
   }
 
-  void _setZoom(double value, {bool reflowNow = false}) {
+  double _setZoom(double value, {bool reflowNow = false}) {
     // Rounded so that fractional wheel deltas do not pile up float noise.
     final next =
         (value.clamp(widget.minimumZoom, widget.maximumZoom) * 1e6)
             .roundToDouble() /
         1e6;
-    if (next == _zoom) return;
+    final reachedLimit = next == widget.maximumZoom && value >= _zoom
+        ? ZoomLimit.maximum
+        : next == widget.minimumZoom && value <= _zoom
+        ? ZoomLimit.minimum
+        : null;
+    if (reachedLimit != null && reachedLimit != _reportedLimit) {
+      _reportedLimit = reachedLimit;
+      widget.onZoomLimitReached?.call(reachedLimit);
+    }
+    if (next == _zoom) return next;
+    if ((_reportedLimit == ZoomLimit.maximum &&
+            next < widget.maximumZoom) ||
+        (_reportedLimit == ZoomLimit.minimum && next > widget.minimumZoom)) {
+      _reportedLimit = null;
+    }
     _reflowTimer?.cancel();
     final reflow = reflowNow || widget.reflowDelay == Duration.zero;
     setState(() {
@@ -284,6 +323,7 @@ class _FlutterZoomViewportState extends State<FlutterZoomViewport> {
       _reflowTimer = Timer(widget.reflowDelay, _reflow);
     }
     widget.onZoomChanged?.call(next);
+    return next;
   }
 
   /// Moves the zoom one [FlutterZoomViewport.keyboardZoomStep] up

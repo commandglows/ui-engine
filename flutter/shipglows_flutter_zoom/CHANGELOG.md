@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Report when wheel or pinch zoom reaches either configured limit, without
+  repeating the notification callback while it remains blocked. Rebase pinch
+  scale at the limit so reversing direction takes effect immediately.
 - Move from `shipglows-email-engine/packages` to
   `shipglows-ui-engine/flutter`; the package name is unchanged.
 - Add Ctrl/Command+= (also Shift and the `+` keys) and Ctrl/Command+- (also

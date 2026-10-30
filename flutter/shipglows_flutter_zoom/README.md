@@ -19,6 +19,12 @@ Defaults follow CommunityGlows: 75–150 %, 5 % per key press. Each press lands
 on a multiple of `keyboardZoomStep`. `zoomInShortcuts`, `zoomOutShortcuts` and
 `resetShortcuts` replace the key bindings.
 
+`onZoomLimitReached` reports `ZoomLimit.minimum` or `ZoomLimit.maximum` once
+when a wheel or pinch reaches a configured boundary. The callback runs again
+after zooming away from that boundary and reaching it anew, so applications
+can show a localized notification without repeating it for every blocked
+wheel tick.
+
 ```yaml
 dependencies:
   shipglows_flutter_zoom:
