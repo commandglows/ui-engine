@@ -37,6 +37,7 @@ void main() {
 
   test('a trigger during a run joins it and never starts a second run', () async {
     final gate = Completer<void>();
+    final started = Completer<void>();
     var runs = 0;
     final scheduler = RoutineScheduler(
       store: MemoryRoutineStore(),
@@ -49,12 +50,14 @@ void main() {
         runOnStart: false,
         run: (_) async {
           runs++;
+          started.complete();
           await gate.future;
         },
       ),
     );
 
     final first = scheduler.trigger('sync');
+    await started.future;
     final second = scheduler.trigger('sync', trigger: RoutineTrigger.focus);
     gate.complete();
 
