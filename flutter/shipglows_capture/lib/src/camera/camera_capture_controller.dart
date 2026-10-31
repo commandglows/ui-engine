@@ -131,6 +131,7 @@ class CameraCaptureController extends ChangeNotifier {
       );
     } catch (error) {
       if (generation != _generation) return;
+      debugPrint('shipglows_capture: camera open failed: $error');
       await _release();
       _failure = CameraFailure.from(error);
       _set(CameraStatus.failed);
@@ -390,6 +391,7 @@ class CameraCaptureController extends ChangeNotifier {
     if (value == null || value.errorDescription == _cameraError) return;
     _cameraError = value.errorDescription;
     if (_cameraError == null) return;
+    debugPrint('shipglows_capture: camera error: $_cameraError');
     _failure = CameraFailure(CameraFailureCode.failed, _cameraError);
     _syncWithCamera();
     _notify();
