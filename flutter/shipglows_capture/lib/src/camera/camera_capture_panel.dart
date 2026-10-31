@@ -400,7 +400,10 @@ class _CameraChoice extends StatelessWidget {
           message: strings.chooseCamera,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 280),
+            // Expanded so a long name (« S21+ de Diane (Caméra virtuelle
+            // Windows) ») is cut by its ellipsis instead of overflowing.
             child: DropdownButton<CaptureCamera>(
+              isExpanded: true,
               value: cameras.contains(controller.camera)
                   ? controller.camera
                   : null,
