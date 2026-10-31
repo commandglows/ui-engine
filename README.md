@@ -1348,14 +1348,6 @@ ContentGlows (offline queue, per-account cache, partial writes), BeatGlows
   `MemorySecretStore` for tests. The app deletes the secrets a setting no
   longer needs (S3 keys when the storage choice leaves S3).
 
-## `flutter/shipglows_settings_firestore`
-
-`FirestoreSettingsRemote(document, decorate:)`: merged writes with a server
-`updatedAt`, `null` deletes the field, live `snapshots()` without local
-echoes, Timestamps read as ISO text, `permission-denied` mapped to
-`SettingsRemoteAuthException`. `decorate` adds derived fields for security
-rules.
-
 ## `flutter/shipglows_feedback`
 
 In-app messages: info, success, warning, error. One look and one queue in

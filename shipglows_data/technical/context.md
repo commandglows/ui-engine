@@ -1,7 +1,7 @@
 ---
 artifact: technical_context
 metadata_schema_version: "1.0"
-artifact_version: "1.7.0"
+artifact_version: "1.8.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
 updated: "2026-10-31"
@@ -22,6 +22,7 @@ evidence:
   - "2026-10-22: package list from flutter/, consumers from the apps' pubspec.yaml path dependencies."
   - "2026-10-23: shipglows_onboarding added (eef4566, 5390abd), ReplayGlows consumer (5711efc)."
   - "2026-10-23: shipglows_sync added (2b6f624, 61a6d87); CommandGlows recorded as consumer of shipglows_sync, shipglows_settings and shipglows_settings_firestore (f0f6eeb9)."
+  - "2026-10-31: shipglows_settings_firestore removed (suite auth lot 8, Firebase retired); CommandGlows uses shipglows_settings_convex since 2026-10-27."
   - "2026-10-23: ContentGlows (8f47c303, REST remote over /api/settings) and BeatGlows (15824f2, no account yet) consume shipglows_settings."
   - "2026-10-23: DreamGlows (6ba8566, PathTheme preset, mode and calendar zone) consumes shipglows_settings."
   - "2026-10-25: shipglows_updater added (WinSparkle on Windows from ContentGlows, verified sideloaded APK on Android, releases in a public shipglows-releases repository); no consumer yet, not run on a device."
@@ -61,7 +62,6 @@ do nothing or fall back to plain Flutter.
 | `shipglows_diagnostics` | Crash net: `FlutterError.onError` + `PlatformDispatcher.onError` chained, masked event buffer (repeats merged), report with app sections (`addSection`), optional `crash.log` (256 KB, `.1` rotation, engine label); widgets `ShipglowsDiagnosticsButton` (header/error view), `ShipglowsDiagnosticsPanel` (settings: copy, view, open log folder, clear), preview dialog; version from `appBuildName`/`appBuildNumber`; Sentry stays in the app via `onReport` | no | BeatGlows |
 | `shipglows_sync` | Device-to-account sync ported from CommunityGlows: `SyncStatus` (needsReview, unreachable…), `reconcileSnapshots` (union, conflicts chosen device/account), `SyncRecovery` copies, `SyncProgress`, widgets (chip, issue banner, review dialog/prompt, progress overlay, recovery panel), `SyncStrings` FR/EN; `rewriteSyncIds` / `holdsTemporaryId` for records created offline | no | CommandGlows, ContentGlows (settings) |
 | `shipglows_settings` | Typed user settings (`SettingKey`, `SettingsSchema` + migrations), device-first `SettingsController`, per-field push, per-account device copies, retry with backoff, first-sync review and recovery copies through `shipglows_sync`, nested map fields merged one by one (`SettingKey.map`, `setField`), fields waiting for an offline record's server id (`isTemporaryId`, `rewriteIds`), `SecretStore`, several windows on watched files (`WatchableSettingsStorage`, `reload`); remote and storage are ports | no | BeatGlows (local only), CommandGlows, ContentGlows, DreamGlows (local only, all windows) |
-| `shipglows_settings_firestore` | `SettingsRemote` over one Firestore document per account (`users/{uid}/settings/profile`) | via plugin dep | CommandGlows |
 | `shipglows_guide` | In-app guidance: tours across routes, coach marks on a `GuideTarget` (spotlight, « try it »), one-step tips, first-visit `GuideTrigger`, progress in a `GuideStore`, navigation through app or scope callbacks; extracted from the ContentGlows guided tour | no | ContentGlows (publish tour, legacy `inapp_tour_*` keys), ReplayGlows (Feed coach marks) |
 | `shipglows_feedback` | In-app messages info/success/warning/error: `showFeedback` / `context.showError`…, floating snack bar from `ShipglowsTheme` (new `success` and `warning` roles), durations by kind, repeats not queued, kind spoken (`FeedbackStrings` FR/EN, app-wide `FeedbackStringsScope`), `FeedbackMessenger` read before an await, « Copy details » (`details:`), a second action, `FeedbackInline` (in place, announced), `FeedbackErrorState` (retry, compact), `FeedbackLog` of messages shown; `shipglows_undo_trash` draws its « Undo » snack bar with it | no | `shipglows_undo_trash`, BeatGlows, BestFriedChicken, Claiire, CommandGlows, CommunityGlows, ContentGlows, DreamGlows, GoCharbon, ReplayGlows, ShipGlows app (2026-10-24) |
 | `shipglows_notification_center` | Notification center: latest notifications read/unread, open, delete, « Mark all as read », « Delete all » (confirmed), unread summary and `NotificationBadge` / `NotificationBellButton`, empty and error states (`FeedbackErrorState`); storage is a `NotificationStore` port (callback, memory); `FeedbackHistory` keeps the in-app messages shown (`FeedbackLog` of `shipglows_feedback`); `NotificationStrings` FR/EN | no | ReplayGlows (2026-10-25), DreamGlows `path_flutter` (2026-10-27) |
