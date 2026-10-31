@@ -279,6 +279,7 @@ class CameraCaptureController extends ChangeNotifier {
       camera.description,
       resolution,
       enableAudio: sound,
+      videoBitrate: _windowsVideoBitrate(resolution),
     );
     try {
       await controller.initialize();
@@ -287,6 +288,20 @@ class CameraCaptureController extends ChangeNotifier {
       await _disposeQuietly(controller);
       rethrow;
     }
+  }
+
+  // camera_windows gives the H.264 encoder no bitrate unless asked. With none,
+  // a recording on an AMD GPU crashed the app inside the hardware encoder
+  // (division by zero). Other platforms pick their own bitrate.
+  static int? _windowsVideoBitrate(ResolutionPreset resolution) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) return null;
+    return switch (resolution) {
+      ResolutionPreset.low => 1000000,
+      ResolutionPreset.medium => 2500000,
+      ResolutionPreset.high => 6000000,
+      ResolutionPreset.veryHigh => 12000000,
+      ResolutionPreset.ultraHigh || ResolutionPreset.max => 35000000,
+    };
   }
 
   // Releasing a camera that failed or vanished can throw too; the camera is

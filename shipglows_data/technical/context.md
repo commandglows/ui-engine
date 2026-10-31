@@ -31,6 +31,7 @@ evidence:
   - "2026-10-27: shipglows_reviews added (6cfef27, 7e833aa, 1ca99e1); CommandGlows Windows sends reviews to Convex reviews:submit (commandglows ef9a3f31), a review sent from the app read back with reviews:listRecent on the dev deployment. Same pass: rows added for calendar, contact, demo, menu, metrics, organize, settings_convex, storage and xml (descriptions from their pubspec.yaml, consumers from path dependencies), shipglows_convex and shipglows_notification_center consumers refreshed."
   - "2026-10-31: shipglows_capture added (camera first: `camera` 0.12.2, `camera_windows` 0.3.0+1); ContentGlows camera screen compiled and running in the managed Windows debug session; recording not yet checked on a camera, Android not run."
   - "2026-10-31: shipglows_capture on a Galaxy S21 (ContentGlows managed Android debug session): preview, 720p video with sound, take handed to the app. Impeller Vulkan showed no camera preview there; consumers set `ImpellerBackend` `opengles` in the Android manifest."
+  - "2026-10-31: Windows recording crashed the app in the AMD hardware H.264 encoder (division by zero, minidump) when camera_windows set no bitrate; the controller now passes `videoBitrate` on Windows. Then checked in ContentGlows with the Windows virtual camera of a phone: photo, 6.6 s 1280x720 H.264 at 6 Mb/s + AAC, no crash. No physical webcam tried yet."
 next_review: "2027-01-22"
 next_step: "Update the consumer column when an app adopts or drops a package."
 ---
