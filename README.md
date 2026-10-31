@@ -2198,3 +2198,52 @@ web), written for the suite rather than extracted from one app. Depends on
   `AiProviderUnavailable`, `AiTimeout`, `AiNetworkFailure`, `AiBadResponse`.
   Nothing is retried by the client.
 - Usage, key-store and error tables in `flutter/shipglows_ai/README.md`.
+
+## `flutter/shipglows_capture`
+
+Shared capture package, started with the camera: record a video with sound or
+take a photo from a phone's front or back camera, a laptop webcam or a USB
+camera, on Android, iOS, Windows and the web. Built on the `camera` plugin;
+Windows needs `camera_windows`, which the package lists (it is not endorsed
+by `camera`). Depends on `shipglows_icons` and `shipglows_theme`. Screen
+capture still lives in ContentGlows; it moves here once its Windows quality is
+accepted.
+
+- `CameraCaptureController(resolution:, withSound:)`: `open(cameraId:,
+  facing:)` lists the cameras (`CaptureCamera`: `id` to save the choice,
+  `facing`, the device's own `name` on Windows and the web, `index` when
+  several unnamed cameras share a facing) and opens one; `select`,
+  `switchCamera`, `startRecording`, `pauseRecording` / `resumeRecording`
+  (`CameraCaptureController.canPause`: not on Windows nor the web),
+  `stopRecording` and `takePhoto` return a `CameraTake` (file, camera,
+  duration with pauses left out, `withSound`); `close` releases the camera
+  and returns the video being recorded instead of dropping it. One action at
+  a time (`isBusy`); `elapsed` ticks four times a second while recording.
+- Failures are `CameraFailure` codes (`CAP_CAMERA_NONE`,
+  `CAP_CAMERA_PERMISSION_DENIED`, `CAP_CAMERA_UNSUPPORTED`,
+  `CAP_CAMERA_FAILED`), with the plugin's text kept for the logs only. A
+  refused microphone keeps the camera and records without sound
+  (`soundRefused`).
+- `CameraCapturePanel(controller:, onTake:, cameraId:, facing:,
+  onCameraChanged:, allowPhoto:)`: preview with the recording time, camera
+  choice (a switch button for two cameras, a list beyond), record / stop,
+  pause, photo; Space starts or stops the video. On phones it releases the
+  camera in the background and hands over the video being recorded.
+  `CameraCapturePreview(controller:)` is the preview alone.
+- The take's file stays where the plugin wrote it: the app moves it.
+- Apps declare the permissions: iOS `NSCameraUsageDescription` and
+  `NSMicrophoneUsageDescription` in `Info.plist`; Android gets `CAMERA` and
+  `RECORD_AUDIO` from the plugin's manifest.
+- `ShipglowsCaptureStrings.fr` / `.en`, `ShipglowsCaptureStringsScope`.
+- New base icons `camera`, `switchCamera`, `record`, `stop`, `pause`, `play`.
+
+```dart
+final camera = CameraCaptureController();
+
+CameraCapturePanel(
+  controller: camera,
+  cameraId: savedCameraId,
+  onCameraChanged: (camera) => saveCameraId(camera.id),
+  onTake: (take) => importCapture(take.path, take.kind),
+);
+```

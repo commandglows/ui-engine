@@ -50,6 +50,24 @@ abstract final class ShipglowsIcons {
   /// Audio, microphone.
   static const IconData audio = LucideIcons.mic;
 
+  /// Camera, photo.
+  static const IconData camera = LucideIcons.camera;
+
+  /// Switch to another camera.
+  static const IconData switchCamera = LucideIcons.switchCamera;
+
+  /// Start recording.
+  static const IconData record = LucideIcons.disc;
+
+  /// Stop recording or playback.
+  static const IconData stop = LucideIcons.square;
+
+  /// Pause.
+  static const IconData pause = LucideIcons.pause;
+
+  /// Play, resume.
+  static const IconData play = LucideIcons.play;
+
   /// Search.
   static const IconData search = LucideIcons.search;
 
@@ -285,6 +303,12 @@ abstract final class ShipglowsIcons {
     'screenshot': screenshot,
     'video': video,
     'audio': audio,
+    'camera': camera,
+    'switchCamera': switchCamera,
+    'record': record,
+    'stop': stop,
+    'pause': pause,
+    'play': play,
     'search': search,
     'commandBar': commandBar,
     'keyboard': keyboard,
