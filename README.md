@@ -2219,21 +2219,26 @@ accepted.
   facing:)` lists the cameras (`CaptureCamera`: `id` to save the choice,
   `facing`, the device's own `name` on Windows and the web, `index` when
   several unnamed cameras share a facing) and opens one; `select`,
-  `switchCamera`, `startRecording`, `pauseRecording` / `resumeRecording`
+  `switchCamera`, `refreshCameras` (lists again, keeps the open camera),
+  `startRecording`, `pauseRecording` / `resumeRecording`
   (`CameraCaptureController.canPause`: not on Windows nor the web),
   `stopRecording` and `takePhoto` return a `CameraTake` (file, camera,
   duration with pauses left out, `withSound`); `close` releases the camera
   and returns the video being recorded instead of dropping it. One action at
-  a time (`isBusy`); `elapsed` ticks four times a second while recording.
+  a time (`isBusy`, `isFinishing` while the stopped video is written);
+  `elapsed` ticks four times a second while recording. On Windows it sets
+  the H.264 bitrate, which camera_windows leaves unset.
 - Failures are `CameraFailure` codes (`CAP_CAMERA_NONE`,
   `CAP_CAMERA_PERMISSION_DENIED`, `CAP_CAMERA_UNSUPPORTED`,
   `CAP_CAMERA_FAILED`), with the plugin's text kept for the logs only. A
   refused microphone keeps the camera and records without sound
   (`soundRefused`).
 - `CameraCapturePanel(controller:, onTake:, cameraId:, facing:,
-  onCameraChanged:, allowPhoto:)`: preview with the recording time, camera
-  choice (a switch button for two cameras, a list beyond), record / stop,
-  pause, photo; Space starts or stops the video. On phones it releases the
+  onCameraChanged:, allowPhoto:)`: preview with the recording time, then
+  « Finishing the video… » and « Video done · 0:06 » / « Photo taken » for
+  three seconds; the camera list, always shown (plus a switch button for two
+  cameras, and a refresh on desktop and the web), record / stop, pause,
+  photo; Space starts or stops the video. On phones it releases the
   camera in the background and hands over the video being recorded.
   `CameraCapturePreview(controller:)` is the preview alone.
 - The take's file stays where the plugin wrote it: the app moves it.
