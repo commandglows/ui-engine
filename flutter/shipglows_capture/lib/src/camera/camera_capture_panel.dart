@@ -45,11 +45,21 @@ class CameraCapturePreview extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Center(child: CameraPreview(camera)),
-          if (controller.isRecording)
+          if (controller.isRecording && !controller.isFinishing)
             Positioned(
               top: theme.spaceMd,
               left: theme.spaceMd,
               child: _RecordingBadge(controller: controller),
+            ),
+          if (controller.isFinishing)
+            Center(
+              child: _Pill(
+                leading: const SizedBox.square(
+                  dimension: ShipglowsScale.iconSm,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                child: Text(strings.finishing, style: _pillText(context)),
+              ),
             ),
         ],
       );
@@ -128,6 +138,10 @@ class _CameraCapturePanelState extends State<CameraCapturePanel>
   CaptureCamera? _reported;
   bool _reopen = false;
 
+  // The last take, shown on the preview for a moment.
+  CameraTake? _done;
+  Timer? _doneTimer;
+
   // Desktop windows go inactive on focus loss: only phones release the
   // camera in the background.
   static bool get _releasesInBackground =>
@@ -162,6 +176,7 @@ class _CameraCapturePanelState extends State<CameraCapturePanel>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller.removeListener(_reportCamera);
+    _doneTimer?.cancel();
     super.dispose();
   }
 
@@ -192,7 +207,13 @@ class _CameraCapturePanelState extends State<CameraCapturePanel>
   }
 
   void _deliver(CameraTake? take) {
-    if (take != null && mounted) widget.onTake(take);
+    if (take == null || !mounted) return;
+    setState(() => _done = take);
+    _doneTimer?.cancel();
+    _doneTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _done = null);
+    });
+    widget.onTake(take);
   }
 
   Future<void> _toggleRecording() async {
@@ -216,7 +237,27 @@ class _CameraCapturePanelState extends State<CameraCapturePanel>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: CameraCapturePreview(controller: _controller)),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CameraCapturePreview(controller: _controller),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: theme.spaceMd,
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: _done == null
+                            ? const SizedBox.shrink()
+                            : _DoneNotice(key: ObjectKey(_done), take: _done!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             SizedBox(height: theme.spaceMd),
             ListenableBuilder(
               listenable: _controller,
@@ -268,7 +309,7 @@ class _Controls extends StatelessWidget {
           spacing: theme.spaceSm,
           runSpacing: theme.spaceSm,
           children: [
-            if (controller.cameras.length > 1)
+            if (controller.cameras.isNotEmpty)
               _CameraChoice(controller: controller),
             if (recording)
               FilledButton.icon(
@@ -334,38 +375,127 @@ class _Controls extends StatelessWidget {
   }
 }
 
+/// The camera list, always shown so the camera in use is named; a switch
+/// button for a phone's two cameras, and a refresh where a camera can be
+/// plugged in (desktop, web).
 class _CameraChoice extends StatelessWidget {
   const _CameraChoice({required this.controller});
 
   final CameraCaptureController controller;
 
+  static bool get _camerasCanBePlugged =>
+      kIsWeb ||
+      (defaultTargetPlatform != TargetPlatform.android &&
+          defaultTargetPlatform != TargetPlatform.iOS);
+
   @override
   Widget build(BuildContext context) {
     final strings = ShipglowsCaptureStrings.of(context);
-    final enabled = controller.canSwitch;
-    if (controller.cameras.length == 2) {
-      return IconButton(
-        onPressed: enabled ? controller.switchCamera : null,
-        tooltip: strings.switchCamera,
-        icon: const ShipglowsIcon('switchCamera'),
-      );
-    }
-    return Tooltip(
-      message: strings.chooseCamera,
-      child: DropdownButton<CaptureCamera>(
-        value: controller.camera,
-        onChanged: enabled
-            ? (camera) {
-                if (camera != null) unawaited(controller.select(camera));
-              }
-            : null,
-        items: [
-          for (final camera in controller.cameras)
-            DropdownMenuItem(
-              value: camera,
-              child: Text(strings.cameraLabel(camera)),
+    final enabled = controller.canChoose;
+    final cameras = controller.cameras;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: strings.chooseCamera,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280),
+            child: DropdownButton<CaptureCamera>(
+              value: cameras.contains(controller.camera)
+                  ? controller.camera
+                  : null,
+              onChanged: enabled
+                  ? (camera) {
+                      if (camera != null) unawaited(controller.select(camera));
+                    }
+                  : null,
+              items: [
+                for (final camera in cameras)
+                  DropdownMenuItem(
+                    value: camera,
+                    child: Text(
+                      strings.cameraLabel(camera),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
             ),
-        ],
+          ),
+        ),
+        if (cameras.length == 2)
+          IconButton(
+            onPressed: controller.canSwitch ? controller.switchCamera : null,
+            tooltip: strings.switchCamera,
+            icon: const ShipglowsIcon('switchCamera'),
+          ),
+        if (_camerasCanBePlugged)
+          IconButton(
+            onPressed: enabled ? controller.refreshCameras : null,
+            tooltip: strings.refreshCameras,
+            icon: const ShipglowsIcon('update'),
+          ),
+      ],
+    );
+  }
+}
+
+TextStyle? _pillText(BuildContext context) =>
+    Theme.of(context).textTheme.labelLarge?.copyWith(
+      color: ShipglowsTheme.of(context).text,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+/// A small rounded label laid over the preview.
+class _Pill extends StatelessWidget {
+  const _Pill({required this.leading, required this.child});
+
+  final Widget leading;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShipglowsTheme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surface,
+        borderRadius: BorderRadius.circular(ShipglowsScale.radiusFull),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: theme.spaceSm,
+          vertical: theme.spaceXs,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [leading, SizedBox(width: theme.spaceXs), child],
+        ),
+      ),
+    );
+  }
+}
+
+/// « Video done · 0:06 » or « Photo taken », right after the take.
+class _DoneNotice extends StatelessWidget {
+  const _DoneNotice({super.key, required this.take});
+
+  final CameraTake take;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShipglowsTheme.of(context);
+    final strings = ShipglowsCaptureStrings.of(context);
+    final text = take.kind == CameraTakeKind.video
+        ? '${strings.videoDone} · ${_clock(take.duration)}'
+        : strings.photoDone;
+    return Semantics(
+      liveRegion: true,
+      child: _Pill(
+        leading: ShipglowsIcon(
+          'success',
+          size: ShipglowsScale.iconSm,
+          color: theme.success,
+        ),
+        child: Text(text, style: _pillText(context)),
       ),
     );
   }
@@ -381,38 +511,17 @@ class _RecordingBadge extends StatelessWidget {
     final theme = ShipglowsTheme.of(context);
     final strings = ShipglowsCaptureStrings.of(context);
     final paused = controller.status == CameraStatus.paused;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.surface,
-        borderRadius: BorderRadius.circular(ShipglowsScale.radiusFull),
+    return _Pill(
+      leading: ShipglowsIcon(
+        paused ? 'pause' : 'record',
+        size: ShipglowsScale.iconSm,
+        color: paused ? theme.textMuted : theme.danger,
       ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: theme.spaceSm,
-          vertical: theme.spaceXs,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ShipglowsIcon(
-              paused ? 'pause' : 'record',
-              size: ShipglowsScale.iconSm,
-              color: paused ? theme.textMuted : theme.danger,
-            ),
-            SizedBox(width: theme.spaceXs),
-            ValueListenableBuilder<Duration>(
-              valueListenable: controller.elapsed,
-              builder: (context, elapsed, _) => Text(
-                paused
-                    ? '${_clock(elapsed)} · ${strings.paused}'
-                    : _clock(elapsed),
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: theme.text,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-          ],
+      child: ValueListenableBuilder<Duration>(
+        valueListenable: controller.elapsed,
+        builder: (context, elapsed, _) => Text(
+          paused ? '${_clock(elapsed)} · ${strings.paused}' : _clock(elapsed),
+          style: _pillText(context),
         ),
       ),
     );

@@ -13,6 +13,7 @@ class ShipglowsCaptureStrings {
     required this.externalCamera,
     required this.chooseCamera,
     required this.switchCamera,
+    required this.refreshCameras,
     required this.openCamera,
     required this.opening,
     required this.record,
@@ -21,6 +22,9 @@ class ShipglowsCaptureStrings {
     required this.resume,
     required this.paused,
     required this.takePhoto,
+    required this.finishing,
+    required this.videoDone,
+    required this.photoDone,
     required this.retry,
     required this.noSound,
     required this.noCamera,
@@ -36,6 +40,10 @@ class ShipglowsCaptureStrings {
 
   final String chooseCamera;
   final String switchCamera;
+
+  /// Lists the cameras again, for one plugged in since.
+  final String refreshCameras;
+
   final String openCamera;
   final String opening;
   final String record;
@@ -47,6 +55,14 @@ class ShipglowsCaptureStrings {
   final String paused;
 
   final String takePhoto;
+
+  /// Shown on the preview while the stopped video is being written.
+  final String finishing;
+
+  /// Shown on the preview for a moment once a take is done.
+  final String videoDone;
+  final String photoDone;
+
   final String retry;
 
   /// The microphone was refused: videos are recorded without sound.
@@ -64,6 +80,7 @@ class ShipglowsCaptureStrings {
     externalCamera: 'External camera',
     chooseCamera: 'Choose camera',
     switchCamera: 'Switch camera',
+    refreshCameras: 'Refresh the camera list',
     openCamera: 'Open camera',
     opening: 'Opening camera…',
     record: 'Record',
@@ -72,6 +89,9 @@ class ShipglowsCaptureStrings {
     resume: 'Resume',
     paused: 'Paused',
     takePhoto: 'Take photo',
+    finishing: 'Finishing the video…',
+    videoDone: 'Video done',
+    photoDone: 'Photo taken',
     retry: 'Try again',
     noSound: 'Microphone denied: the video is recorded without sound.',
     noCamera: 'No camera found. Connect one, then try again.',
@@ -87,6 +107,7 @@ class ShipglowsCaptureStrings {
     externalCamera: 'Caméra externe',
     chooseCamera: 'Choisir la caméra',
     switchCamera: 'Changer de caméra',
+    refreshCameras: 'Actualiser la liste des caméras',
     openCamera: 'Ouvrir la caméra',
     opening: 'Ouverture de la caméra…',
     record: 'Enregistrer',
@@ -95,6 +116,9 @@ class ShipglowsCaptureStrings {
     resume: 'Reprendre',
     paused: 'En pause',
     takePhoto: 'Prendre une photo',
+    finishing: 'Finalisation de la vidéo…',
+    videoDone: 'Vidéo terminée',
+    photoDone: 'Photo prise',
     retry: 'Réessayer',
     noSound: 'Micro refusé : la vidéo est enregistrée sans son.',
     noCamera: 'Aucune caméra trouvée.',

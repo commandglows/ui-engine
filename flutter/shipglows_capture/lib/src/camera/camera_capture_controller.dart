@@ -58,6 +58,7 @@ class CameraCaptureController extends ChangeNotifier {
   bool _soundRefused = false;
   String? _cameraError;
   bool _busy = false;
+  bool _finishing = false;
   bool _disposed = false;
   int _generation = 0;
   DateTime? _startedAt;
@@ -96,11 +97,18 @@ class CameraCaptureController extends ChangeNotifier {
   /// The plugin's controller of the open camera, for its preview.
   CameraController? get cameraController => _controller;
 
-  /// Another camera can be chosen now.
-  bool get canSwitch =>
-      _cameras.length > 1 &&
+  /// A camera of the list can be chosen now (or the list refreshed).
+  bool get canChoose =>
       !isBusy &&
-      (_status == CameraStatus.ready || _status == CameraStatus.failed);
+      (_status == CameraStatus.ready ||
+          _status == CameraStatus.failed ||
+          _status == CameraStatus.closed);
+
+  /// Another camera can be switched to now.
+  bool get canSwitch => _cameras.length > 1 && canChoose;
+
+  /// The video was stopped and the plugin is finishing its file.
+  bool get isFinishing => _finishing;
 
   /// Lists the cameras and opens [cameraId] if present, else the first one
   /// facing [facing], else the first listed. Reopening keeps the current
@@ -131,8 +139,36 @@ class CameraCaptureController extends ChangeNotifier {
 
   /// Opens [camera] instead of the current one.
   Future<void> select(CaptureCamera camera) async {
-    if (!canSwitch || camera == _camera) return;
+    if (!canChoose || (camera == _camera && _status == CameraStatus.ready)) {
+      return;
+    }
     await open(cameraId: camera.id);
+  }
+
+  /// Lists the cameras again, for one plugged in or removed since. The open
+  /// camera stays; when it is gone, another one opens.
+  Future<void> refreshCameras() async {
+    if (_disposed || !canChoose) return;
+    _busy = true;
+    _notify();
+    List<CameraDescription>? descriptions;
+    try {
+      descriptions = await _listCameras();
+    } catch (_) {
+      // Keep the current list; opening says what is wrong.
+    } finally {
+      _busy = false;
+    }
+    if (_disposed) return;
+    if (descriptions != null) _cameras = _numbered(descriptions);
+    final current = _camera;
+    final kept = _cameras.where((camera) => camera == current).firstOrNull;
+    if (kept == null || _status != CameraStatus.ready) {
+      await open(cameraId: kept?.id);
+      return;
+    }
+    _camera = kept;
+    _notify();
   }
 
   /// Opens the next camera of the list.
@@ -185,8 +221,15 @@ class CameraCaptureController extends ChangeNotifier {
     CameraTake? take;
     await _act(() async {
       if (!isRecording) return;
-      final file = await _controller!.stopVideoRecording();
+      _finishing = true;
       _stopClock();
+      _notify();
+      final XFile file;
+      try {
+        file = await _controller!.stopVideoRecording();
+      } finally {
+        _finishing = false;
+      }
       elapsed.value = _clock.elapsed;
       take = CameraTake(
         kind: CameraTakeKind.video,
