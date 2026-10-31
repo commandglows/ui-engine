@@ -25,6 +25,7 @@ class GuideScope extends StatefulWidget {
     this.resolveText,
     this.navigate,
     this.location,
+    this.openLink,
   });
 
   final GuideController controller;
@@ -40,6 +41,10 @@ class GuideScope extends StatefulWidget {
 
   /// Current route path from this scope's context.
   final String? Function(BuildContext context)? location;
+
+  /// Opens a step's [GuideLink] in the browser (`launchUrl`). Steps' links
+  /// are hidden when null.
+  final void Function(BuildContext context, String url)? openLink;
 
   static GuideController? maybeOf(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<_GuideScopeMarker>()
@@ -459,6 +464,9 @@ class _GuideOverlayState extends State<_GuideOverlay>
                     step: step,
                     strings: widget.scope.widget.strings,
                     text: (value) => widget.scope._text(context, value),
+                    openLink: widget.scope.widget.openLink == null
+                        ? null
+                        : (url) => widget.scope.widget.openLink!(context, url),
                     style: style,
                     targetShown: target != null,
                   ),
@@ -665,6 +673,7 @@ class _GuideCard extends StatelessWidget {
     required this.step,
     required this.strings,
     required this.text,
+    required this.openLink,
     required this.style,
     required this.targetShown,
   });
@@ -674,6 +683,7 @@ class _GuideCard extends StatelessWidget {
   final GuideStep step;
   final GuideStrings strings;
   final String Function(String value) text;
+  final void Function(String url)? openLink;
   final GuideThemeData style;
   final bool targetShown;
 
@@ -688,6 +698,7 @@ class _GuideCard extends StatelessWidget {
               .replaceAll('{current}', '${controller.stepIndex + 1}')
               .replaceAll('{total}', '${tour.steps.length}');
     final hint = step.hint;
+    final link = openLink == null ? null : step.link;
     final showTryIt = step.advanceOnTargetTap && targetShown;
 
     final card = Material(
@@ -726,9 +737,7 @@ class _GuideCard extends StatelessWidget {
                   ),
                   ExcludeSemantics(
                     child: Icon(
-                      tour.isTip
-                          ? ShipglowsIcons.idea
-                          : ShipglowsIcons.guide,
+                      tour.isTip ? ShipglowsIcons.idea : ShipglowsIcons.guide,
                       size: 20,
                       color: accent,
                     ),
@@ -778,6 +787,29 @@ class _GuideCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (link != null)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Semantics(
+                    link: true,
+                    child: TextButton.icon(
+                      onPressed: () => openLink!(link.url),
+                      icon: const Icon(ShipglowsIcons.open, size: 16),
+                      label: Text(text(link.label)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: accent,
+                        iconAlignment: IconAlignment.end,
+                        minimumSize: const Size(0, 44),
+                        padding: EdgeInsets.zero,
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (hint != null || showTryIt) ...[
                 const SizedBox(height: 10),
                 Padding(
@@ -862,11 +894,7 @@ class _GuideCard extends StatelessWidget {
       child: Row(
         children: [
           ExcludeSemantics(
-            child: Icon(
-              icon ?? ShipglowsIcons.idea,
-              size: 18,
-              color: accent,
-            ),
+            child: Icon(icon ?? ShipglowsIcons.idea, size: 18, color: accent),
           ),
           const SizedBox(width: 8),
           Expanded(

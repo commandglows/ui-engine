@@ -11,6 +11,7 @@ class GuideStep {
     required this.title,
     required this.body,
     this.hint,
+    this.link,
     this.targetId,
     this.route,
     this.routeLabel,
@@ -24,6 +25,10 @@ class GuideStep {
 
   /// Optional one-line call to action shown above the buttons.
   final String? hint;
+
+  /// Optional web page the step sends the user to, shown as a link under the
+  /// body when the [GuideScope] has an `openLink`.
+  final GuideLink? link;
 
   /// Id of the [GuideTarget] this step points at. When that target is not on
   /// screen, the card floats at the bottom instead.
@@ -43,6 +48,16 @@ class GuideStep {
 
   /// Invites the user to try the target: tapping it moves to the next step.
   final bool advanceOnTargetTap;
+}
+
+/// A link of a [GuideStep]: [label] is plain text or a translation key, like
+/// the step's other texts.
+@immutable
+class GuideLink {
+  const GuideLink({required this.label, required this.url});
+
+  final String label;
+  final String url;
 }
 
 /// A sequence of [GuideStep]s. A tour of one step is a tip: no progress bar,

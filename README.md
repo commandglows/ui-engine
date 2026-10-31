@@ -1746,6 +1746,9 @@ const videosTour = GuideTour(
   (its action runs first) moves to the next step.
 - `route` / `routeLabel`: the controller opens the route when the step
   starts; if the user leaves it, the card offers « Open {routeLabel} ».
+- `link`: `GuideLink(label:, url:)`, a web page the step sends the user to
+  (create an API key…), shown as an underlined link under the body; the
+  label goes through `resolveText`. Needs `GuideScope.openLink`.
 - A tour of one step is a tip: « Tip » header, no progress, « Got it » and
   the close button end it for good.
 - The card can be dragged anywhere (kept on screen), reset at each step.
@@ -1798,6 +1801,9 @@ GuideTarget(id: 'videos.filter', child: IconButton(...))      // pointable
   no `navigate` of its own; used while the scope is mounted. A tour started
   outside the shell (onboarding) opens its first route itself:
   `context.go(guide.activeStep?.route ?? '/home')`.
+- `GuideScope.openLink`: opens a step's `link` (`(context, url) =>
+  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)`); the
+  package has no `url_launcher`, so links stay hidden without it.
 - `GuideScope.of(context)` / `maybeOf`: the controller, for a « Replay the
   tour » button inside the shell.
 - `GuideTrigger.enabled: false` while the screen is not ready (loading); it
