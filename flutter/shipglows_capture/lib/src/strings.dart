@@ -97,10 +97,8 @@ class ShipglowsCaptureStrings {
     takePhoto: 'Prendre une photo',
     retry: 'Réessayer',
     noSound: 'Micro refusé : la vidéo est enregistrée sans son.',
-    noCamera: 'Aucune caméra trouvée. Branchez-en une, puis réessayez.',
-    permissionDenied:
-        'Accès à la caméra refusé. Autorisez-le dans les réglages du système, '
-        'puis réessayez.',
+    noCamera: 'Aucune caméra trouvée.',
+    permissionDenied: 'Accès à la caméra refusé dans les réglages du système.',
     unsupported: "La caméra n'est pas disponible sur cet appareil.",
     failed:
         'La caméra ne répond pas. Elle est peut-être utilisée par une autre app.',

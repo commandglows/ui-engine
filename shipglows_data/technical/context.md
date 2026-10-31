@@ -29,7 +29,7 @@ evidence:
   - "2026-10-26: shipglows_clerk_auth added from the CommandGlows Clerk OIDC spike (proven by the operator on Android and Windows); decision: Clerk is the single auth provider, one Clerk application per product."
   - "2026-10-26: shipglows_convex added (ConvexHttpClient over the HTTP API, no SDK); wire format checked against the installed convex 1.47.0 browser HTTP client (convex_encoded_json, args in a list, HTTP 560 for failed functions); no consumer yet, not run against a deployment."
   - "2026-10-27: shipglows_reviews added (6cfef27, 7e833aa, 1ca99e1); CommandGlows Windows sends reviews to Convex reviews:submit (commandglows ef9a3f31), a review sent from the app read back with reviews:listRecent on the dev deployment. Same pass: rows added for calendar, contact, demo, menu, metrics, organize, settings_convex, storage and xml (descriptions from their pubspec.yaml, consumers from path dependencies), shipglows_convex and shipglows_notification_center consumers refreshed."
-  - "2026-10-31: shipglows_capture added (camera first: `camera` 0.12.2, `camera_windows` 0.3.0+1); dependencies resolved, not run on a device, no consumer yet."
+  - "2026-10-31: shipglows_capture added (camera first: `camera` 0.12.2, `camera_windows` 0.3.0+1); ContentGlows camera screen compiled and running in the managed Windows debug session; recording not yet checked on a camera, Android not run."
 next_review: "2027-01-22"
 next_step: "Update the consumer column when an app adopts or drops a package."
 ---
@@ -75,7 +75,7 @@ do nothing or fall back to plain Flutter.
 | `shipglows_calendar` | Calendar views (day, week, month, agenda, day strip, mini month), `CalendarEvent` model and `CalendarTimeZone` seam | no | ContentGlows, DreamGlows `path_flutter` |
 | `shipglows_metrics` | Metric tiles, deltas, sparklines, bars, progress, freshness line, period selector and `MetricGrid` dashboard layout | no | ContentGlows |
 | `shipglows_demo` | Demo mode surfaces: `DemoBanner`, `DemoExitButton`, exit and account dialogs, FR/EN strings | no | ContentGlows, DreamGlows `path_flutter` |
-| `shipglows_capture` | Shared capture, camera first: `CameraCaptureController` (list, open, switch, record with sound, pause except Windows/web, photo, release returning the take), `CameraCapturePanel` / `CameraCapturePreview`, `CameraFailure` `CAP_CAMERA_*` codes, FR/EN strings; screen capture to move in from ContentGlows later | via plugin dep (`camera`, `camera_windows`) | none yet (ContentGlows planned) |
+| `shipglows_capture` | Shared capture, camera first: `CameraCaptureController` (list, open, switch, record with sound, pause except Windows/web, photo, release returning the take), `CameraCapturePanel` / `CameraCapturePreview`, `CameraFailure` `CAP_CAMERA_*` codes, FR/EN strings; screen capture to move in from ContentGlows later | via plugin dep (`camera`, `camera_windows`) | ContentGlows (camera screen, 2026-10-31) |
 | `shipglows_menu` | Action menu model shared by the tray and in-app menus (`ShipglowsMenu`, items, submenus, separators) and an anchored, searchable action list (`showShipglowsMenu`) | no | command bar, command bar window, tray; CommandGlows |
 
 ## Cross-Package Contracts
