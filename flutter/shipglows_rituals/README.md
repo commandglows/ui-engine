@@ -62,6 +62,8 @@ success. Completing a checklist never changes the host's tasks or health data.
 Invalid numeric drafts stay visible with a field error and block saving; optional
 number and choice responses can be cleared, and an untouched scale has no
 persisted response.
+Guided navigation leaves shared-theme spacing before the fields so a floating
+question label does not overlap the back/next controls.
 
 ## Consumers and boundaries
 
@@ -81,5 +83,8 @@ explicit integration owned by that application.
 
 Proof: source review and format, followed by a successful managed Windows debug
 restart/reload of the DreamGlows consumer. No automated tests, analyze or release
-build. Visual and interactive acceptance remain pending because the native
-Computer Use transport was unavailable in this integration session.
+build. DreamGlows' weekly cycle, draft/resume, conditional choices and hidden
+answer retention were exercised in T3's web preview in managed profile mode,
+including a cold reload and desktop/mobile viewport checks. The guided-label
+spacing fix was visually rechecked there. Native Windows, Android, numeric
+fields and full accessibility acceptance remain outside this browser proof.

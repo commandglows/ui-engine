@@ -864,6 +864,7 @@ class _RitualPageEditorState extends State<_RitualPageEditor> {
                       ),
                     ],
                   ),
+                  SizedBox(height: ShipglowsTheme.of(context).spaceMd),
                 ],
                 RitualFields(
                   template: widget.page.template,

@@ -9,7 +9,11 @@
   and intention/review links are exported. NoCocaïne adopts the core for its
   current local flows; DreamGlows adopts typed pages and review context.
   No tests/analyze or release build run. Visual and
-  save/resume acceptance remains pending (native Computer Use unavailable).
+  native acceptance remains pending (native Computer Use unavailable). The
+  DreamGlows weekly cycle, draft/resume and conditional/hidden responses were
+  verified in T3's web preview in managed profile mode, at desktop/mobile sizes
+  and after reload; guided-label overlap corrected with shared-theme spacing.
+  Numeric fields, Android and full accessibility acceptance remain unverified.
   ContentGlows' five-category narrative ritual is inspected only; a future
   migration must retain its API, AI guard and explicit proposal approval.
 
