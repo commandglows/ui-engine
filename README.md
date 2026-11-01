@@ -1088,14 +1088,18 @@ Flutter; `shipglows_settings` builds on it, and business-data stores can too.
 
 Human routines and reusable reflection templates, extracted from DreamGlows.
 The core is pure Dart: question/checklist models, daily or Monday–Sunday
-periods, answer pages, original-template snapshots and JSON v1. The Flutter
+periods, answer pages, original-template snapshots and compatible JSON v1/v2.
+Typed choices/numbers/scales and declarative prior-answer conditions are shared.
+Pure invitation policies cover civil periods, fixed rolling windows and explicit
+events; intention/review records retain readable link snapshots. The Flutter
 package provides `RitualTemplateCard`, embeddable `RitualFields`, page/model
 editors, French/English copy and shared-theme spacing. Apps supply all content,
 item references and persistence callbacks; neither package has a network,
 AI or app/backend dependency. DreamGlows consumes both through local paths.
 ContentGlows' narrative ritual was inspected and remains on its existing
-API/synthesis/approval flow; it is not a consumer yet. No health-app integration
-or cross-app data sharing is introduced.
+API/synthesis/approval flow; it is not a consumer yet. NoCocaïne consumes only
+the core for existing invitations, conditional check-in steps and local journal
+links, retaining its UI and health rules. No cross-app data sharing is introduced.
 
 See [`shipglows_rituals`](flutter/shipglows_rituals/README.md) for integration
 and [`shipglows_rituals_core`](flutter/shipglows_rituals_core/README.md) for the

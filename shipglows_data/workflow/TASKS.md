@@ -4,8 +4,11 @@
 
 - [ ] 2026-11-01: `shipglows_rituals_core` (pure Dart) and `shipglows_rituals`
   extracted from DreamGlows, which consumes the shared models and editors.
-  Reusable fields, JSON v1, template snapshots, FR/EN and host-owned save
-  callbacks are implemented. No tests/analyze or release build run. Visual and
+  Reusable typed/conditional fields, compatible JSON v1/v2, template snapshots,
+  FR/EN and host-owned save callbacks are implemented. Pure invitation policies
+  and intention/review links are exported. NoCocaïne adopts the core for its
+  current local flows; DreamGlows adopts typed pages and review context.
+  No tests/analyze or release build run. Visual and
   save/resume acceptance remains pending (native Computer Use unavailable).
   ContentGlows' five-category narrative ritual is inspected only; a future
   migration must retain its API, AI guard and explicit proposal approval.

@@ -15,14 +15,25 @@ dependencies:
 
 - `RitualTemplateCard`: a model's period, start/resume/read action, customizer
   and caller-supplied saved/completed state.
-- `RitualFields`: text questions and checkboxes embedded in any existing screen.
-  The caller owns/disposes its question controllers, checked set and callbacks.
+- `RitualFields`: text, checkbox, single/multiple choice, number and scale
+  prompts, including declarative `showWhen` visibility. Legacy callers can keep
+  supplying controllers, checked state and callbacks; typed callers pass
+  `values`, `onValueChanged`, and optional numeric draft/error maps. A
+  `RitualPromptFieldBuilder` can replace any default field while receiving a
+  `RitualPromptFieldBinding` for the current value and callbacks. Typed text
+  fields can use values/callbacks without controllers; controller-based legacy
+  forms remain supported. Numeric draft callbacks receive clear actions too.
 - `showRitualPage`: optional associated `RitualReference` items, read-only
-  `RitualContextGroup`s, questions/checklist, optional host footer and draft or
-  final save. `onSave` is the only persistence boundary. Return true only after
-  saving; false or a thrown exception retains input and presents an error.
+  `RitualContextGroup`s, typed questions/checklist, optional host footer and
+  draft or final save. Set `guided: true` for visible-step progress with back
+  and next controls; `fieldBuilder` lets a host retain its own input style.
+  `onSave` is the only persistence boundary. Return true only after saving;
+  false or a thrown exception retains input and presents an error.
 - `showRitualTemplateEditor`: title, purpose, daily/weekly cadence and one
-  question/checkbox per line, with 1–40 prompts and the same save boundary.
+  question/checkbox per line for simple templates, with 1–40 prompts and the
+  same save boundary. Existing simple prompt IDs are retained where possible.
+  Rich templates keep their app-defined prompts, choices, conditions and bounds
+  intact while title, purpose and cadence remain editable.
 - `RitualStrings.en` / `.fr`: default copy selected from the app's locale;
   `copyWith(overrides: {RitualText.references: 'Projects'})` customizes language
   and product vocabulary. Question content is supplied by the host.
@@ -48,6 +59,9 @@ discard choice; saving disables controls and closing until the callback ends.
 Do not use a background scheduler's "ignore store errors" policy for responses.
 Each host must enforce its own revision or concurrency checks before returning
 success. Completing a checklist never changes the host's tasks or health data.
+Invalid numeric drafts stay visible with a field error and block saving; optional
+number and choice responses can be cleared, and an untouched scale has no
+persisted response.
 
 ## Consumers and boundaries
 
@@ -65,6 +79,7 @@ on DreamGlows, ContentGlows or their backends. The package contains no medical
 questionnaire, score or interpretation. Adding a remote backend remains an
 explicit integration owned by that application.
 
-Proof: source review and format; no automated tests, analyze or release build.
-Visual and interactive acceptance remain pending because the native Computer
-Use transport was unavailable in the first DreamGlows integration session.
+Proof: source review and format, followed by a successful managed Windows debug
+restart/reload of the DreamGlows consumer. No automated tests, analyze or release
+build. Visual and interactive acceptance remain pending because the native
+Computer Use transport was unavailable in this integration session.
