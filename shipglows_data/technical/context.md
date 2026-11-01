@@ -1,10 +1,10 @@
 ---
 artifact: technical_context
 metadata_schema_version: "1.0"
-artifact_version: "1.8.0"
+artifact_version: "1.9.0"
 project: ShipGlows UI Engine
 created: "2026-10-22"
-updated: "2026-10-31"
+updated: "2026-11-01"
 status: active
 source_skill: sg-docs
 scope: package-map
@@ -48,6 +48,8 @@ do nothing or fall back to plain Flutter.
 
 | Package | Role | Native | Consumers (2026-10-22) |
 | --- | --- | --- | --- |
+| `shipglows_rituals_core` | Pure Dart human-ritual templates, snapshot pages, generic references, civil periods and JSON v1; no SDK or storage dependency | no | DreamGlows `path_flutter` |
+| `shipglows_rituals` | Reusable ritual cards, embeddable question/checklist fields, page/model dialogs, FR/EN copy, app theme and host save callbacks | no | DreamGlows `path_flutter`; ContentGlows inspected only |
 | `shipglows_theme` | Semantic roles (`ShipglowsTheme`), bundled fonts (Inter, Cal Sans, JetBrains Mono) as `fontSans`/`fontDisplay`/`fontMono`, shared `TextTheme` and scrollbars, `applyTo(themeData)` to set them in one call; keycap components | no | every shared package; apps with `ShipglowsTheme` in their theme (fonts and scrollbars not adopted yet, 2026-10-24) |
 | `shipglows_icons` | Base icons by meaning (`ShipglowsIcons.settings`, `byName`), drawn from Lucide (`lucide_icons_flutter`); apps swap any with a `ShipglowsIconSet` theme extension (`ShipglowsIcons.of`, `ShipglowsIcon`); same names as the menu model and the Astro engine `icons` | no | command bar, diagnostics, feedback, guide, menu, onboarding, sync, tray, undo_trash (2026-10-24); no app yet |
 | `shipglows_command_bar` | Command palette widget (`CommandBarView`, sections, filters, recents) | no | BeatGlows, CommandGlows, ContentGlows, DreamGlows, ReplayGlows |
@@ -81,6 +83,18 @@ do nothing or fall back to plain Flutter.
 | `shipglows_menu` | Action menu model shared by the tray and in-app menus (`ShipglowsMenu`, items, submenus, separators) and an anchored, searchable action list (`showShipglowsMenu`) | no | command bar, command bar window, tray; CommandGlows |
 
 ## Cross-Package Contracts
+
+`shipglows_rituals_core` and `shipglows_rituals` (2026-11-01) share human
+rituals, separate from the background-job `shipglows_routines` scheduler.
+The core is pure Dart with no dependencies: templates, snapshot pages,
+questions/checklists, generic reference IDs, civil periods and JSON v1. Flutter
+adds embeddable fields, cards, model/page dialogs, locale copy and shared-theme
+spacing. DreamGlows is the first consumer; its Path adapter preserves existing
+v1 reflection metadata and owns all storage, revisions, goals and Journal
+behavior. Each app supplies content and persistence; no network or AI is
+introduced. ContentGlows was inspected (five narrative categories plus synthesis
+and approval) but is not migrated. Other apps are potential consumers, not
+implemented integrations. See the two package READMEs for APIs and proof limits.
 
 - Foreground handoff: `shipglows_tray` and `shipglows_hotkeys` events carry
   `previousForeground` (HWND), read natively before Dart runs;

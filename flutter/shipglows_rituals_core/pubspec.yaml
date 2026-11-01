@@ -1,0 +1,7 @@
+name: shipglows_rituals_core
+description: Storage-independent ritual templates, answers, checklists and civil periods for ShipGlows apps and Dart services.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3

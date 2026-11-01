@@ -1,0 +1,70 @@
+# shipglows_rituals
+
+Reusable Flutter UI for human routines and reflection templates, backed by
+`shipglows_rituals_core` (re-exported). Each host supplies its own content,
+persistence callbacks and associated items. No data leaves the app through this
+package; there is no automatic AI processing or shared user-data store.
+
+```yaml
+dependencies:
+  shipglows_rituals:
+    path: ../../shipglows-ui-engine/flutter/shipglows_rituals
+```
+
+## Public API
+
+- `RitualTemplateCard`: a model's period, start/resume/read action, customizer
+  and caller-supplied saved/completed state.
+- `RitualFields`: text questions and checkboxes embedded in any existing screen.
+  The caller owns/disposes its question controllers, checked set and callbacks.
+- `showRitualPage`: optional associated `RitualReference` items, read-only
+  `RitualContextGroup`s, questions/checklist, optional host footer and draft or
+  final save. `onSave` is the only persistence boundary. Return true only after
+  saving; false or a thrown exception retains input and presents an error.
+- `showRitualTemplateEditor`: title, purpose, daily/weekly cadence and one
+  question/checkbox per line, with 1–40 prompts and the same save boundary.
+- `RitualStrings.en` / `.fr`: default copy selected from the app's locale;
+  `copyWith(overrides: {RitualText.references: 'Projects'})` customizes language
+  and product vocabulary. Question content is supplied by the host.
+- `RitualThemeData(dialogMaxWidth:)`: optional component geometry in
+  `ThemeData.extensions`. Type and Material controls follow the active app
+  theme; spacing follows `ShipglowsTheme`.
+
+```dart
+await showRitualPage(
+  context,
+  page: draft, // RitualPage from this app's store, including its recordId
+  references: const [RitualReference(id: 'project-1', label: 'My project')],
+  referencesLabel: 'Projects',
+  onSave: (page) async {
+    await appStore.save(page.toJson()); // app-owned adapter, local or remote
+    return true;
+  },
+);
+```
+
+Opening a dialog writes nothing. Closing modified input requires an explicit
+discard choice; saving disables controls and closing until the callback ends.
+Do not use a background scheduler's "ignore store errors" policy for responses.
+Each host must enforce its own revision or concurrency checks before returning
+success. Completing a checklist never changes the host's tasks or health data.
+
+## Consumers and boundaries
+
+DreamGlows consumes the cards and both editors. Its five product templates,
+goals, actions, Path commands, Journal and exports remain local adapters.
+
+ContentGlows currently has five fixed narrative categories (reflection, win,
+struggle, idea, pivot), a two-filled-entry submission rule, AI synthesis and a
+separate approval/rejection step. Its existing API and approval flow remain
+app-owned; `RitualFields` can support a future UI migration. ContentGlows has
+not been migrated to these packages in this change.
+
+A tracking app can supply its own questions and persistence without depending
+on DreamGlows, ContentGlows or their backends. The package contains no medical
+questionnaire, score or interpretation. Adding a remote backend remains an
+explicit integration owned by that application.
+
+Proof: source review and format; no automated tests, analyze or release build.
+Visual and interactive acceptance remain pending because the native Computer
+Use transport was unavailable in the first DreamGlows integration session.

@@ -2,6 +2,14 @@
 
 ## Open
 
+- [ ] 2026-11-01: `shipglows_rituals_core` (pure Dart) and `shipglows_rituals`
+  extracted from DreamGlows, which consumes the shared models and editors.
+  Reusable fields, JSON v1, template snapshots, FR/EN and host-owned save
+  callbacks are implemented. No tests/analyze or release build run. Visual and
+  save/resume acceptance remains pending (native Computer Use unavailable).
+  ContentGlows' five-category narrative ritual is inspected only; a future
+  migration must retain its API, AI guard and explicit proposal approval.
+
 - [ ] Fonts, icons, scrollbars (ui-engine f906ca2, b18a584, not pushed): in each Flutter app, call `ShipglowsTheme(...).applyTo(theme)` (or `ShipglowsFonts.textTheme` + `shipglowsScrollbarTheme`), drop its own Inter/Cal Sans assets and `fontFamily` strings, and replace Material icons with `ShipglowsIcons`; check on screen.
 - [ ] Flutter apps with no shared package yet: CommunityGlows (`communityglows/flutter`), Claiire (`claiire/app_flutter`), DreamGlows Android (`dreamglows/android_app`); BestFriedChicken and GoCharbon not assessed.
 - [ ] `shipglows_window` frame theme: in BeatGlows, CommandGlows, ContentGlows and the ShipGlows app, drop the template `UpdateTheme` on `WM_DWMCOLORIZATIONCOLORCHANGED` in `win32_window.cpp` (the frame already follows the app theme through `ShipglowsWindowFrame`).
