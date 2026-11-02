@@ -1,5 +1,5 @@
 name: shipglows_convex
-description: Small Convex HTTP client for native ShipGlows Flutter apps (queries, mutations, actions, file upload), without the Convex SDK.
+description: Small Convex HTTP client for ShipGlows Flutter apps (queries, mutations, actions, file upload), without the Convex SDK.
 version: 0.1.0
 publish_to: "none"
 
