@@ -2,6 +2,14 @@
 
 ## Open
 
+- [ ] 2026-11-02: generic TypeScript command synchronization engine
+  `typescript/shipglows_sync` added for DreamGlows; product domain execution and
+  authenticated wrappers stay in its backend. Shared Flutter Convex transport
+  now supports web imports through a conditional network-error classifier.
+  Focused DreamGlows regression proof is tracked in
+  `dreamglows/shipglows_data/technical/continuity-sync.md`; hosted activation,
+  native sign-in and cross-device acceptance remain separate gates.
+
 - [ ] 2026-11-01: `shipglows_rituals_core` (pure Dart) and `shipglows_rituals`
   extracted from DreamGlows, which consumes the shared models and editors.
   Reusable typed/conditional fields, compatible JSON v1/v2, template snapshots,

@@ -12,6 +12,21 @@ dependencies:
 Each package keeps its own dependencies: an app that uses only the command bar
 never pulls `window_manager`.
 
+## `typescript/shipglows_sync`
+
+`@shipglows/sync` is the reusable command synchronization engine. It supplies
+strict request validation, canonical SHA-256 intent fingerprints, durable
+receipt replay, remote revisions, deterministic field-conflict checks and
+injectable schema factories. The host supplies one atomic transaction,
+authenticated ownership and its domain executor. It has no Path or identity
+provider dependency. See the [package contract](typescript/shipglows_sync/README.md).
+
+DreamGlows uses this engine in its Convex backend and keeps Path commands in
+`@dreamglows/path-core`. Its Flutter adapter reuses `shipglows_sync` for status,
+`shipglows_clerk_auth` for PKCE and `shipglows_convex` for transport. Source
+integration and synthetic regression proof do not establish hosted activation
+or authentication for a consuming application.
+
 ## `flutter/shipglows_theme`
 
 One theme for every app and package. `ShipglowsTheme` (a `ThemeExtension`)

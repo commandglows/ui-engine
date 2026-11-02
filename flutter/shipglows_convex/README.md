@@ -1,6 +1,6 @@
 # shipglows_convex
 
-Small Convex HTTP client for the ShipGlows Flutter apps (Android, Windows).
+Small Convex HTTP client for the ShipGlows Flutter apps (Android, Windows, web).
 Queries, mutations, actions and file uploads over the deployment's HTTP API,
 with a bearer token. It replaces Firestore where an app uses Convex. No Convex
 SDK, no code generation, no Firebase.
@@ -8,7 +8,8 @@ SDK, no code generation, no Firebase.
 ## Usage
 
 Token from `shipglows_clerk_auth`. The deployment's auth config must accept
-the same Clerk issuer.
+the same Clerk issuer and token audience. For an OIDC client audience, use
+`clerk.idToken`; session access tokens require their own matching server config.
 
 ```dart
 final clerk = ClerkAuthClient(
@@ -21,7 +22,7 @@ await clerk.restore();
 
 final convex = ConvexHttpClient(
   deploymentUrl: Uri.parse('https://<deployment>.convex.cloud'),
-  token: clerk.accessToken, // read before each call, refreshed when needed
+  token: clerk.idToken, // read before each call, refreshed when needed
 );
 
 final notes = await convex.query('notes:list', {'limit': 20});

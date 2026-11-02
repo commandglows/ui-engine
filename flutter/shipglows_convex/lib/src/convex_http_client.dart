@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import 'convex_exception.dart';
+import 'network_error.dart';
 
 /// Client identifier sent in the `Convex-Client` header.
 const _clientId = 'shipglows-dart-0.1.0';
@@ -19,7 +19,7 @@ final _authFailure = RegExp(
 /// Calls a Convex deployment over its HTTP API with a bearer token.
 ///
 /// [token] runs before each call and returns the token the deployment accepts
-/// (for Clerk, `ClerkAuthClient.accessToken`), or `null` when signed out. A
+/// (for a Clerk OIDC audience, `ClerkAuthClient.idToken`), or `null` when signed out. A
 /// call that fails as `unauthenticated` is retried once, after [token] runs
 /// again, so an expired token refreshes by itself.
 ///
@@ -220,10 +220,13 @@ class ConvexHttpClient {
         'network',
         'Timed out after ${timeout.inSeconds} s.',
       );
-    } on SocketException {
-      throw const ConvexException('network', 'No connection.');
     } on http.ClientException {
       throw const ConvexException('network', 'Request failed.');
+    } catch (error) {
+      if (isSocketFailure(error)) {
+        throw const ConvexException('network', 'No connection.');
+      }
+      rethrow;
     }
   }
 
