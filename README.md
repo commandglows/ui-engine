@@ -1063,6 +1063,13 @@ Device-to-account sync, ported from CommunityGlows (`cloudReconciliation.ts`,
 `NativeSyncReview.vue`, `postAuthSyncFeedback.ts`). No dependency beyond
 Flutter; `shipglows_settings` builds on it, and business-data stores can too.
 
+This is the shared client-side contract and experience layer, not a cloud
+transport or backend. Each app supplies its authenticated remote, durable
+storage/queue, account binding and domain-specific conflict policy. Snapshot
+reconciliation compares whole records by stable id and asks the user to choose
+the device or account copy; it is not a command/event log merger and does not
+provide Convex schemas, mutations or server authorization.
+
 - `SyncStatus` / `SyncHealth`: localOnly, synced, pending, syncing,
   needsReview, unreachable, failed. `SyncSource`: anything with a `status`
   and `sync()`.
