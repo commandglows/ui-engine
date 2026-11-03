@@ -53,6 +53,21 @@ Widget row({
 );
 
 void main() {
+  testWidgets('Escape closes after long press without clicking an action', (
+    tester,
+  ) async {
+    var calls = 0;
+    await tester.pumpWidget(row(action: () => calls++));
+    await tester.longPress(find.text('Message'));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Copy'), findsNothing);
+    expect(calls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('long press reveals without invoking or activating the child', (
     tester,
   ) async {

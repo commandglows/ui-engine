@@ -105,6 +105,8 @@ class ShipglowsSwipeActions extends StatefulWidget {
 class _SwipeActionsState extends State<ShipglowsSwipeActions>
     with SingleTickerProviderStateMixin {
   late final AnimationController _motion;
+  final _focus = FocusNode(debugLabel: 'Swipe actions', skipTraversal: true);
+  FocusNode? _previousFocus;
   double _offset = 0, _width = 0, _dragOffset = 0;
   bool _busy = false, _armed = false;
   SwipeRowAction? _pending;
@@ -170,6 +172,7 @@ class _SwipeActionsState extends State<ShipglowsSwipeActions>
     _motion.stop();
     if (_reducedMotion) {
       _motion.value = target;
+      if (target == 0) _restoreFocus();
       return true;
     }
     try {
@@ -185,6 +188,7 @@ class _SwipeActionsState extends State<ShipglowsSwipeActions>
           )
           .orCancel;
       if (mounted) _motion.value = target;
+      if (mounted && target == 0) _restoreFocus();
       return mounted;
     } on TickerCanceled {
       // A new gesture takes over at the current visual position.
@@ -220,11 +224,26 @@ class _SwipeActionsState extends State<ShipglowsSwipeActions>
 
   void _reveal(SwipeActionSide side, {double velocity = 0}) {
     if (!_busy && widget.enabled && _actions(side).isNotEmpty) {
+      if (!_focus.hasFocus) {
+        _previousFocus = FocusManager.instance.primaryFocus;
+        _focus.requestFocus();
+      }
       _animate(
         _extent(side) * (side == SwipeActionSide.start ? 1 : -1),
         velocity: velocity,
       );
     }
+  }
+
+  void _restoreFocus() {
+    if (!_focus.hasFocus) return;
+    final previous = _previousFocus;
+    if (previous?.context != null && previous!.canRequestFocus) {
+      previous.requestFocus();
+    } else {
+      _focus.unfocus(disposition: UnfocusDisposition.previouslyFocusedChild);
+    }
+    _previousFocus = null;
   }
 
   SwipeClickBinding? _binding() {
@@ -307,6 +326,7 @@ class _SwipeActionsState extends State<ShipglowsSwipeActions>
   @override
   void dispose() {
     widget.controller?.removeListener(_controllerChanged);
+    _focus.dispose();
     _motion.dispose();
     super.dispose();
   }
@@ -465,6 +485,7 @@ class _SwipeActionsState extends State<ShipglowsSwipeActions>
         final actions = _actions(side);
         final extent = _extent(side);
         return Focus(
+          focusNode: _focus,
           onKeyEvent: (_, event) {
             if (event is KeyDownEvent &&
                 event.logicalKey == LogicalKeyboardKey.escape &&

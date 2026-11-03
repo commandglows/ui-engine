@@ -68,8 +68,10 @@ The email engine can supply email-specific callbacks through the same API.
 - Full-swipe animates the foreground away before invoking the callback. The
   busy lock stays held until the callback and closing animation finish.
 - Reduced motion removes the spring, parallax, scale emphasis and haptics;
-  direct manipulation and readable action state remain. Escape closes an open
-  row when keyboard focus is inside it. Colors and short feedback durations
+  direct manipulation and readable action state remain. Revealing a row gives
+  it keyboard focus, so Escape closes it immediately after swipe, long press,
+  modified click or controller reveal. Closing restores the previous mounted
+  focus target unless focus has already moved elsewhere. Colors and short feedback durations
   come from the shared theme and `ShipglowsScale`.
 - The foreground gesture detector keeps a stable key as background controls
   appear, so rendering a reveal cannot dispose an in-progress gesture.
@@ -85,7 +87,8 @@ References discovered through Parallel and checked on their primary pages:
 
 ## Validation
 
-Five targeted Flutter widget tests pass: long-press reveal without execution,
+Six targeted Flutter widget tests pass: Escape after long press without clicking
+an action, long-press reveal without execution,
 exact modifier-click matching without activating the child, reverse-gesture
 cancellation, full-swipe execution with an async lock, and failure recovery.
 They were added after the dev launch found a missing semantics import and
