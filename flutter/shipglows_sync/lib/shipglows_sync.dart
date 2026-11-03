@@ -6,6 +6,8 @@
 /// - [reconcileSnapshots]: the first sync of an account on a device unites
 ///   both copies; each value set differently on both sides is a
 ///   [SyncConflict] the user resolves ([SyncChoices]).
+/// - [indexSyncCollection]: safely indexes JSON-safe business records by stable
+///   id, reporting contradictory duplicates before reconciliation.
 /// - [SyncReviewHost] / [SyncRecoveryHost]: a store that asks before its
 ///   first sync and keeps [SyncRecovery] copies of both sides.
 /// - [SyncProgress]: the steps of a first sync after sign-in.
@@ -17,6 +19,7 @@
 library;
 
 export 'src/reconciliation.dart';
+export 'src/sync_collection.dart';
 export 'src/sync_ids.dart';
 export 'src/sync_progress.dart';
 export 'src/sync_progress_view.dart';
