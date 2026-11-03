@@ -12,6 +12,12 @@ dependencies:
 Each package keeps its own dependencies: an app that uses only the command bar
 never pulls `window_manager`.
 
+## `flutter/shipglows_swipe_actions`
+
+Shared bidirectional action rows: swipe, long press, exact modifier-click
+bindings, programmatic reveal, optional full-swipe action and async callback
+locking. See the [package contract](flutter/shipglows_swipe_actions/README.md).
+
 ## `typescript/shipglows_sync`
 
 `@shipglows/sync` is the reusable command synchronization engine. It supplies
