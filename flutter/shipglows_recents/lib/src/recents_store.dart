@@ -17,17 +17,25 @@ abstract interface class RecentsStore implements Listenable {
 
 /// The [items] (an app's known items) whose id is in [recent], in that order:
 /// a recent id never shows an item that is gone or archived.
+///
+/// With [fill], the other items follow in their given order, so the quick
+/// picks are never empty before the first use (a new account, a new device).
 List<T> pickRecent<T>(
   List<String> recent,
   Iterable<T> items,
   String Function(T item) idOf, {
   int? limit,
+  bool fill = false,
 }) {
   final byId = {for (final item in items) idOf(item): item};
   final picked = <T>[
     for (final id in recent)
       if (byId[id] case final item?) item,
   ];
+  if (fill) {
+    final taken = {for (final item in picked) idOf(item)};
+    picked.addAll(items.where((item) => !taken.contains(idOf(item))));
+  }
   return limit == null || picked.length <= limit
       ? picked
       : picked.sublist(0, limit);

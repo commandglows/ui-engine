@@ -1347,8 +1347,10 @@ chips shown under it. A scope groups the ids that compete together:
   sent as `null` (the remote deep-merges and drops them). A use is always
   stamped after the latest one, so a late device clock still puts it first.
   `MemoryRecentsStore` for tests.
-- `pickRecent(recent, items, idOf, limit:)` keeps only the items the app
-  still offers (deleted or archived ones disappear), in recent order.
+- `pickRecent(recent, items, idOf, limit:, fill:)` keeps only the items the
+  app still offers (deleted or archived ones disappear), in recent order;
+  with `fill`, the other items follow in their given order so the chips are
+  never empty before the first use.
 - `RecentChips(choices, onSelected, selectedId, maxLines)`: chips measured
   before layout, as many as fit on `maxLines` lines without breaking the
   order; long labels shortened with a tooltip; the selected chip is filled
