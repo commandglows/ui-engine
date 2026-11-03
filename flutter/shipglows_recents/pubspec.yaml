@@ -1,0 +1,19 @@
+name: shipglows_recents
+description: Recently used items (projects, ideas, tasks) synced per account, and the quick-pick chips shown under a picker.
+version: 0.1.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_settings:
+    path: ../shipglows_settings
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
