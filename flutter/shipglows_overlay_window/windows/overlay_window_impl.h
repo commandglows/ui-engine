@@ -5,12 +5,14 @@
 #include <flutter/method_channel.h>
 
 #include <chrono>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "include/shipglows_overlay_window/overlay_window.h"
+#include "overlay_store.h"
 
 namespace shipglows_overlay {
 
@@ -50,6 +52,8 @@ class OverlayWindowImpl : public OverlayWindow {
   bool ShowFrame(int width, int height, bool activate) override;
   void SetViewVisible(bool shown, bool focus) override;
   RECT BoundsAround(int width, int height) override;
+  void SetSizedView(const std::string& view) override;
+  std::optional<SIZE> ViewSize(const std::string& view) override;
   bool Activate() override;
   void StartDrag() override;
   HWND window() const override { return window_; }
@@ -141,6 +145,17 @@ class OverlayWindowImpl : public OverlayWindow {
   // is ready, otherwise the window just hides.
   void RequestClose();
   void SaveBounds(bool size_changed);
+  // Keeps the current size for |sized_view_|, after the user resized.
+  void SaveViewSize();
+  // Host "readValue" / "writeValue": small integers the overlay keeps for
+  // itself (a splitter position), beside its bounds.
+  std::optional<int64_t> ReadValue(const std::string& key);
+  void WriteValue(const std::string& key, std::optional<int64_t> value);
+  // Fields of this overlay's entry: from the JSON file with an app folder,
+  // else from memory until the app quits.
+  StoredFields LoadFields();
+  void SaveFields(
+      const std::map<std::string, std::optional<long long>>& changes);
   void StartResize(const std::string& edge);
   // Second half of a drag that starts on a maximized overlay.
   void DragRestored();
@@ -188,6 +203,8 @@ class OverlayWindowImpl : public OverlayWindow {
   std::optional<POINT> position_;
   std::optional<SIZE> size_;
   SIZE size_before_move_{};
+  // View whose size a user resize keeps (SetSizedView); empty: none.
+  std::string sized_view_;
   // Eased move or resize in progress (resetSize), stepped by a timer.
   struct Animation {
     RECT from;

@@ -179,6 +179,14 @@ class OverlayWindow {
   // Bounds of a |width| x |height| logical window centered on the current
   // one, kept inside the monitor's work area.
   virtual RECT BoundsAround(int width, int height) = 0;
+  // Sizes per view, for a window that presents several views (a fixed-size
+  // chooser, then a resizable editor). While |view| is set, the size the
+  // user gives the window by dragging its edges is kept for that view: in
+  // the JSON file with |app_folder|, else until the app quits. Empty: no
+  // view, nothing kept. |config.size_memory| is about the default size only.
+  virtual void SetSizedView(const std::string& view) = 0;
+  // Logical size last kept for |view| (at least the minimum size), if any.
+  virtual std::optional<SIZE> ViewSize(const std::string& view) = 0;
   // Brings the visible overlay to the front with the keyboard.
   virtual bool Activate() = 0;
   virtual void StartDrag() = 0;

@@ -11,7 +11,7 @@
 namespace shipglows_overlay {
 namespace {
 
-using Fields = std::map<std::string, long long>;
+using Fields = StoredFields;
 using Document = std::map<std::string, Fields>;
 
 // Coordinates outside this range come from a corrupt file.
@@ -140,37 +140,23 @@ bool ValidId(const std::string& id) {
 
 }  // namespace
 
-StoredBounds LoadStoredBounds(const std::wstring& app_folder,
+StoredFields LoadStoredFields(const std::wstring& app_folder,
                               const std::string& id) {
-  StoredBounds bounds;
   const std::wstring path = StorePath(app_folder);
-  if (path.empty() || !ValidId(id)) return bounds;
+  if (path.empty() || !ValidId(id)) return {};
   const Document document = Load(path);
   const auto entry = document.find(id);
-  if (entry == document.end()) return bounds;
-  const Fields& fields = entry->second;
-  const auto x = fields.find("x");
-  const auto y = fields.find("y");
-  if (x != fields.end() && y != fields.end() && InRange(x->second) &&
-      InRange(y->second)) {
-    bounds.position = POINT{static_cast<LONG>(x->second),
-                            static_cast<LONG>(y->second)};
-  }
-  const auto width = fields.find("width");
-  const auto height = fields.find("height");
-  if (width != fields.end() && height != fields.end() && width->second > 0 &&
-      height->second > 0 && width->second <= kCoordinateLimit &&
-      height->second <= kCoordinateLimit) {
-    bounds.size = SIZE{static_cast<LONG>(width->second),
-                       static_cast<LONG>(height->second)};
-  }
-  return bounds;
+  return entry == document.end() ? StoredFields{} : entry->second;
 }
 
-bool SaveStoredBounds(const std::wstring& app_folder, const std::string& id,
-                      const StoredBounds& bounds) {
+bool SaveStoredFields(
+    const std::wstring& app_folder, const std::string& id,
+    const std::map<std::string, std::optional<long long>>& changes) {
   const std::wstring path = StorePath(app_folder);
   if (path.empty() || !ValidId(id)) return false;
+  for (const auto& [name, value] : changes) {
+    if (!ValidId(name)) return false;
+  }
   const std::wstring folder = path.substr(0, path.find_last_of(L'\\'));
   if (SHCreateDirectoryExW(nullptr, folder.c_str(), nullptr) != ERROR_SUCCESS &&
       GetLastError() != ERROR_ALREADY_EXISTS &&
@@ -178,15 +164,16 @@ bool SaveStoredBounds(const std::wstring& app_folder, const std::string& id,
     return false;
   }
 
+  // Only the fields named change: the bounds and the values an overlay keeps
+  // for itself live side by side in its entry.
   Document document = Load(path);
-  Fields fields;
-  if (bounds.position) {
-    fields["x"] = bounds.position->x;
-    fields["y"] = bounds.position->y;
-  }
-  if (bounds.size) {
-    fields["width"] = bounds.size->cx;
-    fields["height"] = bounds.size->cy;
+  Fields fields = document[id];
+  for (const auto& [name, value] : changes) {
+    if (value) {
+      fields[name] = *value;
+    } else {
+      fields.erase(name);
+    }
   }
   if (fields.empty()) {
     document.erase(id);
@@ -219,6 +206,50 @@ bool SaveStoredBounds(const std::wstring& app_folder, const std::string& id,
   }
   return MoveFileExW(temporary.c_str(), path.c_str(),
                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+}
+
+std::optional<SIZE> StoredSize(const StoredFields& fields,
+                               const std::string& prefix) {
+  const auto width = fields.find(prefix + "width");
+  const auto height = fields.find(prefix + "height");
+  if (width == fields.end() || height == fields.end() || width->second <= 0 ||
+      height->second <= 0 || width->second > kCoordinateLimit ||
+      height->second > kCoordinateLimit) {
+    return std::nullopt;
+  }
+  return SIZE{static_cast<LONG>(width->second),
+              static_cast<LONG>(height->second)};
+}
+
+StoredBounds LoadStoredBounds(const std::wstring& app_folder,
+                              const std::string& id) {
+  StoredBounds bounds;
+  const StoredFields fields = LoadStoredFields(app_folder, id);
+  const auto x = fields.find("x");
+  const auto y = fields.find("y");
+  if (x != fields.end() && y != fields.end() && InRange(x->second) &&
+      InRange(y->second)) {
+    bounds.position = POINT{static_cast<LONG>(x->second),
+                            static_cast<LONG>(y->second)};
+  }
+  bounds.size = StoredSize(fields, "");
+  return bounds;
+}
+
+bool SaveStoredBounds(const std::wstring& app_folder, const std::string& id,
+                      const StoredBounds& bounds) {
+  const auto at = [](const auto& value, auto get) -> std::optional<long long> {
+    if (!value) return std::nullopt;
+    return get(*value);
+  };
+  return SaveStoredFields(
+      app_folder, id,
+      {
+          {"x", at(bounds.position, [](POINT p) { return p.x; })},
+          {"y", at(bounds.position, [](POINT p) { return p.y; })},
+          {"width", at(bounds.size, [](SIZE s) { return s.cx; })},
+          {"height", at(bounds.size, [](SIZE s) { return s.cy; })},
+      });
 }
 
 }  // namespace shipglows_overlay

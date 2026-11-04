@@ -50,6 +50,25 @@ std::map<std::string, SIZE>& SessionSizes() {
   return sizes;
 }
 
+// View sizes and kept values of overlays without an app folder, by id, for
+// the life of the process.
+std::map<std::string, StoredFields>& SessionFields() {
+  static std::map<std::string, StoredFields> fields;
+  return fields;
+}
+
+// Names of views and kept values: short, plain, safe as JSON keys.
+bool ValidName(const std::string& name) {
+  if (name.empty() || name.size() > 64) return false;
+  return std::all_of(name.begin(), name.end(), [](char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+  });
+}
+
+std::string ValueField(const std::string& key) { return "value:" + key; }
+std::string ViewPrefix(const std::string& view) { return view + ":"; }
+
 const flutter::EncodableValue* Field(const flutter::EncodableValue* value,
                                      const char* key) {
   const auto* map =
@@ -379,6 +398,31 @@ void OverlayWindowImpl::HandleHostCall(
   if (method == "toggleMaximize") {
     result->Success();
     ToggleMaximize();
+    return;
+  }
+  if (method == "readValue") {
+    const auto* key = call.arguments()
+                          ? std::get_if<std::string>(call.arguments())
+                          : nullptr;
+    if (key == nullptr || !ValidName(*key)) {
+      result->Error("invalid_key", "A key is 1 to 64 letters, digits, . _ -");
+      return;
+    }
+    const auto value = ReadValue(*key);
+    result->Success(value ? flutter::EncodableValue(*value)
+                          : flutter::EncodableValue());
+    return;
+  }
+  if (method == "writeValue") {
+    const auto* key_value = Field(call.arguments(), "key");
+    const auto* key =
+        key_value ? std::get_if<std::string>(key_value) : nullptr;
+    if (key == nullptr || !ValidName(*key)) {
+      result->Error("invalid_key", "A key is 1 to 64 letters, digits, . _ -");
+      return;
+    }
+    WriteValue(*key, IntOf(Field(call.arguments(), "value")));
+    result->Success();
     return;
   }
   if (method == "send") {
@@ -744,10 +788,80 @@ void OverlayWindowImpl::ResetSize() {
   if (!window_ || !config_.resizable) return;
   size_.reset();
   SessionSizes().erase(config_.id);
+  // The view shown forgets its size too: it opens at the default next time.
+  if (!sized_view_.empty()) {
+    const std::string prefix = ViewPrefix(sized_view_);
+    SaveFields({{prefix + "width", std::nullopt},
+                {prefix + "height", std::nullopt}});
+  }
   restore_bounds_.reset();
   NotifyMaximized();
   if (IsZoomed(window_)) ShowWindow(window_, SW_RESTORE);
   MoveTo(BoundsAround(default_width_, default_height_));
+}
+
+void OverlayWindowImpl::SetSizedView(const std::string& view) {
+  sized_view_ = ValidName(view) ? view : std::string();
+}
+
+std::optional<SIZE> OverlayWindowImpl::ViewSize(const std::string& view) {
+  if (!ValidName(view)) return std::nullopt;
+  const auto size = StoredSize(LoadFields(), ViewPrefix(view));
+  if (!size) return std::nullopt;
+  return SIZE{std::max<LONG>(size->cx, config_.min_width),
+              std::max<LONG>(size->cy, config_.min_height)};
+}
+
+void OverlayWindowImpl::SaveViewSize() {
+  if (sized_view_.empty() || !window_ || !IsWindowVisible(window_) ||
+      IsIconic(window_) || Maximized()) {
+    return;
+  }
+  RECT bounds{};
+  if (!GetWindowRect(window_, &bounds)) return;
+  const UINT dpi = DpiOf(window_);
+  const std::string prefix = ViewPrefix(sized_view_);
+  SaveFields({
+      {prefix + "width", MulDiv(bounds.right - bounds.left, 96, dpi)},
+      {prefix + "height", MulDiv(bounds.bottom - bounds.top, 96, dpi)},
+  });
+}
+
+std::optional<int64_t> OverlayWindowImpl::ReadValue(const std::string& key) {
+  const StoredFields fields = LoadFields();
+  const auto found = fields.find(ValueField(key));
+  if (found == fields.end()) return std::nullopt;
+  return found->second;
+}
+
+void OverlayWindowImpl::WriteValue(const std::string& key,
+                                   std::optional<int64_t> value) {
+  SaveFields({{ValueField(key), value ? std::optional<long long>(*value)
+                                      : std::nullopt}});
+}
+
+StoredFields OverlayWindowImpl::LoadFields() {
+  if (!config_.app_folder.empty()) {
+    return LoadStoredFields(config_.app_folder, config_.id);
+  }
+  const auto found = SessionFields().find(config_.id);
+  return found == SessionFields().end() ? StoredFields{} : found->second;
+}
+
+void OverlayWindowImpl::SaveFields(
+    const std::map<std::string, std::optional<long long>>& changes) {
+  if (!config_.app_folder.empty()) {
+    SaveStoredFields(config_.app_folder, config_.id, changes);
+    return;
+  }
+  StoredFields& fields = SessionFields()[config_.id];
+  for (const auto& [name, value] : changes) {
+    if (value) {
+      fields[name] = *value;
+    } else {
+      fields.erase(name);
+    }
+  }
 }
 
 void OverlayWindowImpl::MoveTo(const RECT& bounds) {
@@ -1412,8 +1526,10 @@ LRESULT OverlayWindowImpl::HandleMessage(HWND hwnd, UINT message,
     case WM_EXITSIZEMOVE: {
       RECT bounds{};
       GetWindowRect(hwnd, &bounds);
-      SaveBounds(bounds.right - bounds.left != size_before_move_.cx ||
-                 bounds.bottom - bounds.top != size_before_move_.cy);
+      const bool resized = bounds.right - bounds.left != size_before_move_.cx ||
+                           bounds.bottom - bounds.top != size_before_move_.cy;
+      SaveBounds(resized);
+      if (resized) SaveViewSize();
       NotifyPlacement();
       break;
     }

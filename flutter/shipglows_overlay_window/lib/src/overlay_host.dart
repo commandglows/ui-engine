@@ -218,6 +218,16 @@ class ShipglowsOverlayHost extends ChangeNotifier {
   /// Maximizes the overlay, or restores it.
   Future<void> toggleMaximize() => _call<void>('toggleMaximize');
 
+  /// The integer kept under [key] by [writeValue] (a splitter position, a
+  /// tab), or null. Kept beside the overlay's bounds: across launches when
+  /// the overlay has an app folder, else until the app quits. A [key] is 1
+  /// to 64 letters, digits, `.`, `_` or `-`.
+  Future<int?> readValue(String key) => _call<int>('readValue', key);
+
+  /// Keeps [value] under [key] (see [readValue]); null forgets it.
+  Future<void> writeValue(String key, int? value) =>
+      _call<void>('writeValue', {'key': key, 'value': value});
+
   Future<Object?> _handle(MethodCall call) async {
     final arguments = call.arguments;
     switch (call.method) {

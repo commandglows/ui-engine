@@ -3,6 +3,7 @@
 
 #include <windows.h>
 
+#include <map>
 #include <optional>
 #include <string>
 
@@ -14,6 +15,21 @@ struct StoredBounds {
   std::optional<POINT> position;
   std::optional<SIZE> size;
 };
+
+// The integer fields of one overlay's entry: its bounds, the sizes of its
+// views ("<view>:width") and the values it keeps ("value:<key>").
+using StoredFields = std::map<std::string, long long>;
+
+StoredFields LoadStoredFields(const std::wstring& app_folder,
+                              const std::string& id);
+// Sets the fields given, removes those given without a value, and keeps the
+// others. Names may not hold quotes, backslashes or control characters.
+bool SaveStoredFields(
+    const std::wstring& app_folder, const std::string& id,
+    const std::map<std::string, std::optional<long long>>& changes);
+// The size saved as "<prefix>width" and "<prefix>height", if valid.
+std::optional<SIZE> StoredSize(const StoredFields& fields,
+                               const std::string& prefix);
 
 // Bounds of every overlay of an app, in
 // %APPDATA%\<app_folder>\overlay_windows.json. Unreadable content counts as

@@ -407,6 +407,17 @@ own Flutter engine in its own window.
 - Position and size remembered (`sizeMemory`: none, session, persistent) in
   `%APPDATA%\<appFolder>\overlay_windows.json`, clamped to the screen;
   per-monitor DPI.
+- Views of one window (native runners): `SetSizedView("text")` keeps the
+  size the user gives the window while that view shows, read back with
+  `ViewSize("text")` before presenting it, so a resizable editor keeps its
+  size while a fixed chooser in the same window keeps its own. Stored as
+  `<view>:width`/`<view>:height` beside the bounds (in memory without an app
+  folder); `resetSize` forgets the current view's size too.
+- Kept values: `ShipglowsOverlayHost.readValue(key)` /
+  `writeValue(key, int?)` keep small integers for the overlay (a splitter
+  position, a tab) beside its bounds, as `value:<key>`: across launches with
+  an app folder, else until the app quits. Writes only change their own
+  fields, so bounds, view sizes and values never erase one another.
 - Windows 11 rounded corners, border color and shadow (DWM).
   `ShipglowsOverlayHost.setFrame` changes the dark frame, border and
   background colors while the overlay runs (theme changes).
@@ -1332,6 +1343,17 @@ ShipGlows app (command palette ranking, GitHub repository picker) and
 DreamGlows (`path_core_dart`: parent rules and checks, next action
 ancestors, progress roll-up, manual action order). Not yet: tag colours,
 UI widgets.
+
+## `flutter/shipglows_split`
+
+Two panes split by a handle the user drags: `ShipglowsSplitView(first:,
+second:, axis:)`. Mouse, touch, or the arrow keys once the handle is focused
+(`keyboardStep`); the grip brightens under the pointer, while dragged and
+when focused, and screen readers get a slider. `minFirst` and `minSecond`
+always hold. The app keeps the position: `initialFraction` (a new value read
+late from storage is taken while not dragging) and `onChangeEnd` (end of a
+drag or key press). ContentGlows' capture overlay splits its text and files
+with it and keeps the share through `ShipglowsOverlayHost.writeValue`.
 
 ## `flutter/shipglows_recents`
 
