@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:window_manager/legacy.dart';
+import 'window_backend/window_backend.dart';
 
 import 'dwm/dwm_frame_stub.dart'
     if (dart.library.ffi) 'dwm/dwm_frame_windows.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:window_manager/legacy.dart';
+import 'window_backend/window_backend.dart';
 
 import 'shipglows_title_bar.dart';
 import 'shipglows_title_bar_style.dart';

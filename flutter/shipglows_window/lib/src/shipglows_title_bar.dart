@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:window_manager/legacy.dart';
+import 'window_backend/window_backend.dart';
 
 import 'shipglows_title_bar_style.dart';
 import 'shipglows_window.dart';

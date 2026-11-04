@@ -4,8 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:screen_retriever/legacy.dart';
-import 'package:window_manager/legacy.dart';
+import 'window_backend/window_backend.dart';
 
 import 'shipglows_window.dart';
 
