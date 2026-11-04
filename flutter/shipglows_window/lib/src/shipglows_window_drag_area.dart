@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/legacy.dart';
 
 /// Moves the window when [child] is dragged, through the native move loop.
 ///
