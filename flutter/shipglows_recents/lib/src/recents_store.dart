@@ -18,6 +18,10 @@ abstract interface class RecentsStore implements Listenable {
 /// The [items] (an app's known items) whose id is in [recent], in that order:
 /// a recent id never shows an item that is gone or archived.
 ///
+/// Each id yields at most one item, so a chip never shows twice: the first
+/// occurrence in [recent] wins, and the first item with a given id in [items]
+/// stands for it. [limit] caps the result length.
+///
 /// With [fill], the other items follow in their given order, so the quick
 /// picks are never empty before the first use (a new account, a new device).
 List<T> pickRecent<T>(
@@ -27,14 +31,20 @@ List<T> pickRecent<T>(
   int? limit,
   bool fill = false,
 }) {
-  final byId = {for (final item in items) idOf(item): item};
-  final picked = <T>[
-    for (final id in recent)
-      if (byId[id] case final item?) item,
-  ];
+  final byId = <String, T>{};
+  for (final item in items) {
+    byId.putIfAbsent(idOf(item), () => item);
+  }
+  final taken = <String>{};
+  final picked = <T>[];
+  for (final id in recent) {
+    final item = byId[id];
+    if (item != null && taken.add(id)) picked.add(item);
+  }
   if (fill) {
-    final taken = {for (final item in picked) idOf(item)};
-    picked.addAll(items.where((item) => !taken.contains(idOf(item))));
+    for (final entry in byId.entries) {
+      if (taken.add(entry.key)) picked.add(entry.value);
+    }
   }
   return limit == null || picked.length <= limit
       ? picked
