@@ -2,7 +2,9 @@
 
 #include <windows.h>
 
+#include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
+#include <flutter/standard_method_codec.h>
 
 #include <memory>
 #include <optional>
@@ -31,6 +33,10 @@ constexpr UINT kRestoreDelayMs = 80;
 // Once the size settles, the Flutter view is shrunk by one pixel and then
 // given its size back: two real size changes that force the surface to
 // match the window.
+//
+// Dart asks for the same rebuild after turning the window transparent: the
+// surface otherwise stays frozen on its last frame until the next resize,
+// while the app goes on behind it.
 class ShipglowsWindowPlugin : public flutter::Plugin {
  public:
   explicit ShipglowsWindowPlugin(flutter::PluginRegistrarWindows* registrar)
@@ -39,6 +45,17 @@ class ShipglowsWindowPlugin : public flutter::Plugin {
         [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
           return HandleTopLevelMessage(hwnd, message, wparam, lparam);
         });
+    channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+        registrar_->messenger(), "shipglows_window",
+        &flutter::StandardMethodCodec::GetInstance());
+    channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+      if (call.method_name() != "rebuildSurface") {
+        result->NotImplemented();
+        return;
+      }
+      RebuildSurface();
+      result->Success();
+    });
   }
 
   ~ShipglowsWindowPlugin() override {
@@ -70,6 +87,16 @@ class ShipglowsWindowPlugin : public flutter::Plugin {
     return std::nullopt;
   }
 
+  void RebuildSurface() {
+    flutter::FlutterView* view = registrar_->GetView();
+    HWND child = view ? view->GetNativeWindow() : nullptr;
+    HWND root = child ? GetAncestor(child, GA_ROOT) : nullptr;
+    if (root == nullptr) return;
+    window_ = root;
+    KillTimer(root, kRestoreTimer);
+    SetTimer(root, kSettleTimer, kSettleDelayMs, nullptr);
+  }
+
   // Sizes the Flutter view to the app window's client area, its height
   // changed by [delta] pixels; false when there is no view to size.
   bool ResizeView(HWND hwnd, int delta) {
@@ -88,6 +115,7 @@ class ShipglowsWindowPlugin : public flutter::Plugin {
   }
 
   flutter::PluginRegistrarWindows* registrar_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
   int window_proc_id_ = 0;
   HWND window_ = nullptr;
 };

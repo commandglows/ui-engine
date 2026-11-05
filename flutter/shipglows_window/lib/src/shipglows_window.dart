@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'window_backend/window_backend.dart';
 
@@ -40,6 +43,8 @@ abstract final class ShipglowsWindow {
       await windowManager.setMinimumSize(minimumSize);
     }
   }
+
+  static const _surfaceChannel = MethodChannel('shipglows_window');
 
   static bool _frameApplied = false;
   static Color? _frameBorderColor;
@@ -106,9 +111,20 @@ abstract final class ShipglowsWindow {
       // rounded corners; ShipglowsWindowFrame brings the resize edges back.
       await windowManager.setAsFrameless();
       await windowManager.setBackgroundColor(const Color(0x00000000));
+      unawaited(_rebuildSurfaceOnceSettled());
     } else if (!wasSystemCorners) {
       await windowManager.setBackgroundColor(const Color(0xFF000000));
     }
+  }
+
+  /// A frameless transparent window stays frozen on one of its first frames
+  /// until its render surface is recreated, while the app goes on behind it.
+  /// Recreating it during the slow first frames does not help: at the first
+  /// frame it stayed frozen, 3 s later it recovered (debug, Flutter 3.47).
+  static Future<void> _rebuildSurfaceOnceSettled() async {
+    await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+    await Future<void>.delayed(const Duration(seconds: 3));
+    await _surfaceChannel.invokeMethod<void>('rebuildSurface');
   }
 
   /// Win32 `COLORREF` (`0x00BBGGRR`); DWM colors have no alpha.

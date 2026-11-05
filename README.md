@@ -285,7 +285,12 @@ on top of [`window_manager`](https://pub.dev/packages/window_manager).
   one pixel then restored. Two sizes back to back (a `Win` + arrow snap,
   quarter to half especially) can otherwise leave the engine's render
   surface at the old size, every frame stretched and cropped into it until
-  the next resize. Native plugin (`windows/`), no Dart API.
+  the next resize. Native plugin (`windows/`), no Dart API. A frameless
+  transparent window also gets this rebuild 3 s after its first frame: it
+  otherwise stays frozen on an early frame until the next resize.
+- Stays on `window_manager` 0.5: from 0.6 its calls are synchronous FFI, and a
+  resize from Dart then re-enters Dart through Flutter's message pump and
+  crashes the app (`Dart_InvokeClosure`, Windows, Flutter 3.47).
 - Double-click toggles maximize; top edge and corners stay resizable.
 - Windows/Linux: our minimize/maximize/close buttons. macOS: native traffic lights.
 - Windows 11: native rounded corners and a 1 px border in the app color

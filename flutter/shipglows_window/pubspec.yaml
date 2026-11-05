@@ -12,9 +12,10 @@ dependencies:
     sdk: flutter
   shipglows_theme:
     path: ../shipglows_theme
-  window_manager: ^0.6.0
+  # Not 0.6: its synchronous FFI crashes on resize, see window_backend_native.dart.
+  window_manager: ^0.5.2
   ffi: ^2.1.0
-  screen_retriever: ^0.3.1
+  screen_retriever: ^0.2.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

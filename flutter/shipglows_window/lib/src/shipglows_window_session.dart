@@ -131,9 +131,12 @@ class ShipglowsWindowSession with WindowListener, WidgetsBindingObserver {
         await windowManager.setBounds(bounds);
       }
       if (_state['maximized'] == true) {
-        // Maximizing shows the window: wait for the first frame to be ready.
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => unawaited(windowManager.maximize()),
+        // Wait for the first frame on screen: the runner then shows the window
+        // in its normal state, which would undo an earlier maximize.
+        unawaited(
+          WidgetsBinding.instance.waitUntilFirstFrameRasterized.then(
+            (_) => windowManager.maximize(),
+          ),
         );
       }
     } catch (error) {
