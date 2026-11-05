@@ -1,6 +1,6 @@
 name: shipglows_hotkeys
-description: System-wide hotkeys (work while the app is in the background) with conflict reporting and saved user choices, for ShipGlows desktop Flutter apps.
-version: 0.1.0
+description: System-wide triggers (key combinations, a key pressed twice, mouse gestures with or without modifier keys) tied to actions, with conflict reporting and saved user choices, for ShipGlows desktop Flutter apps.
+version: 0.2.0
 publish_to: "none"
 
 environment:

@@ -1,9 +1,13 @@
-/// System-wide hotkeys for ShipGlows desktop Flutter apps (Windows; no-op
-/// elsewhere): they fire while the app is in the background or hidden in the
-/// tray. One combination per action: one another app owns is reported, never
-/// swapped for another, and the user's choices are kept.
+/// System-wide triggers for ShipGlows desktop Flutter apps (Windows; no-op
+/// elsewhere): key combinations, a key pressed twice, and mouse gestures
+/// (alone or with modifier keys). They fire while the app is in the
+/// background or hidden in the tray, each one is tied to an action id, and the
+/// user's choices are kept. One trigger per action: one another app owns is
+/// reported, never swapped for another.
 library;
 
+export 'src/action.dart';
 export 'src/hotkey.dart';
 export 'src/hotkeys.dart';
 export 'src/store.dart';
+export 'src/trigger.dart';
