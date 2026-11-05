@@ -1,6 +1,7 @@
 /// Undo, redo and trash for ShipGlows Flutter apps.
 ///
 /// - [UndoRedoHistory]: undo/redo stacks of snapshots for an editor.
+/// - [UndoJournal]: immutable ordered edits with an undo/redo cursor.
 /// - [UndoCommandStack]: a bounded stack of compensating commands (each
 ///   change kept with the command that reverts it), undo of the latest or
 ///   of a specific entry; the caller runs the commands.
@@ -17,6 +18,7 @@ export 'src/strings.dart';
 export 'src/trash_view.dart';
 export 'src/undo_command_stack.dart';
 export 'src/undo_history.dart';
+export 'src/undo_journal.dart';
 export 'src/undo_shortcuts.dart';
 export 'src/undo_registry.dart';
 export 'src/undo_snack_bar.dart';

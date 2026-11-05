@@ -20,7 +20,7 @@ locking. See the [package contract](flutter/shipglows_swipe_actions/README.md).
 
 ## `flutter/shipglows_undo_trash`
 
-Shared in-memory undo/redo history, active-editor routing, undo snack bars,
+Shared in-memory undo/redo history, immutable edit journals, active-editor routing, undo snack bars,
 shortcuts, and the reusable trash list. The host supplies editor snapshots,
 domain commands, persistence, stale-state checks, and retention policy. See the
 [package contract](flutter/shipglows_undo_trash/README.md).
