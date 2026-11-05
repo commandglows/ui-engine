@@ -1035,6 +1035,21 @@ plugin, nothing to route in the runner.
 - `hookFallback: true`: a hotkey Windows refuses for another reason than an
   owner is caught with a low-level keyboard hook instead.
 - `ShipglowsHotkey.label(ShipglowsHotkeyLabels.fr)` → « Ctrl+Alt+Espace ».
+- **0.2 — triggers.** A binding's trigger is no longer only a key
+  combination: `ShipglowsTrigger` is a key combination, a key pressed twice
+  (`ShipglowsDoubleKeyTrigger`, `Esc ×2`) or a mouse gesture
+  (`ShipglowsMouseTrigger`: click, hold, drag, wheel, screen corner, in a
+  zone — title bar, taskbar, window buttons, corners — alone or with
+  modifier keys). `set`/`setAll` keep working for keys; `setTrigger` and
+  `setAllTriggers` take any trigger. Mouse gestures use a low-level mouse
+  hook installed only while one is active; `click` and the wheel are
+  swallowed, `hold`, `drag` and `touch` are not; injected input is ignored.
+  A binding can declare a `ShipglowsWindowAction` (minimize, close, always
+  on top, snap, volume…) that the package runs on the window under the
+  pointer (mouse) or in front (keys); `excludeProcesses` lets a trigger pass
+  through in given programs. `ShipglowsTriggers` is an alias of
+  `ShipglowsHotkeys`. A 0.1 `hotkeys.json` is read as is. See the package
+  README.
 - After an Alt+key hotkey pressed in the app, releasing Alt no longer opens
   the main window's menu mode (which swallowed the next key).
 
