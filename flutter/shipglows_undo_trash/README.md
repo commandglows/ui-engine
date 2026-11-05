@@ -49,6 +49,9 @@ revision checks. This in-memory cursor does not change backend authority.
 
 - BeatGlows: snapshot history, active-editor routing and undo snack bars.
 - ContentGlows: timeline snapshots, pending actions, trash UI and image journal.
+- CommandGlows: deferred deletions in clipboard, snippets, dictionary, voice
+  transcriptions and custom action buttons through `PendingUndo` and the shared
+  undo snack bar. The host awaits settlement before its storage commit.
 - ReplayGlows: hide/unhide undo snack bars.
 - DreamGlows: compensating command stack and shell shortcuts.
 - ShipGlows app: immutable Studio command journal.
