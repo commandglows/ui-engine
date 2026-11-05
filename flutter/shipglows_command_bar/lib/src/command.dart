@@ -128,7 +128,7 @@ class CommandBarEntryAction {
 
   /// Localized title of the group the action is listed under in the panel
   /// (« Open », « Share »). Actions without a group come first, right after
-  /// Enter and Shift+Enter.
+  /// Enter and Ctrl/⌘+Enter.
   final String? group;
 
   /// Whether the action destroys something, such as « Delete »: listed last
@@ -271,7 +271,7 @@ class CommandBarEntry {
   /// Why the entry is disabled, shown on its second line and read aloud.
   final String? disabledReason;
 
-  /// Label of the secondary action (Shift+Enter), when there is one.
+  /// Label of the secondary action (Ctrl/⌘+Enter), when there is one.
   final String? secondaryLabel;
 
   /// Whether a secondary action exists. It runs even when the entry is
@@ -301,7 +301,7 @@ class CommandBarEntry {
   final bool usesQuery;
 
   /// More things to do with the entry, listed in its actions panel after
-  /// Enter and Shift+Enter. They run even when the entry is disabled, like
+  /// Enter and Ctrl/⌘+Enter. They run even when the entry is disabled, like
   /// the secondary action.
   final List<CommandBarEntryAction> actions;
 
@@ -494,7 +494,7 @@ class CommandBarCommand {
   /// See [CommandBarEntry.secondaryLabel].
   final String? secondaryLabel;
 
-  /// Secondary action, run with Shift+Enter or Ctrl/⌘+Enter. Null when there
+  /// Secondary action, run with Ctrl/⌘+Enter. Null when there
   /// is none.
   final CommandBarRun? runSecondary;
 

@@ -90,6 +90,15 @@ only what is specific to it. Rule: a new shared component takes its colors,
 radii, spacing and keys from `ShipglowsTheme`, never from raw values or its
 own palette.
 
+## `flutter/shipglows_rich_text`
+
+Shared Markdown text field for apps and the command bar. It stores normal
+Markdown, styles headings and common inline marks while editing, and provides
+toolbar actions for bold, italic, underline, strikethrough, code, links, block
+styles, bullet and numbered lists, checklists, undo and redo. Set
+`showToolbar: false` for compact multiline inputs. See the
+[package contract](flutter/shipglows_rich_text/README.md).
+
 ## `flutter/shipglows_command_bar`
 
 Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
@@ -115,8 +124,8 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   `CallbackCommandBarRecents`).
 - One-letter filters (`CommandBarFilter`): `n idea` becomes a « Notes » chip;
   Backspace on an empty field removes it.
-- Keys: ↑/↓, Enter, Shift+Enter or Ctrl/⌘+Enter (secondary action, also on
-  disabled rows), Ctrl/⌘+1…9 (hidden under 600 px), Esc (filter first, then
+- Keys: ↑/↓, Enter, Shift+Enter for a newline, Ctrl/⌘+Enter for the secondary
+  action (also on disabled rows), Ctrl/⌘+1…9 (hidden under 600 px), Esc (filter first, then
   close). `primaryLabel` names what Enter does on a row in the footer.
 - Rows: `badge` shows a short state in a pill after the label;
   `CommandBarSection.limit` caps a section while no filter is active.
@@ -161,14 +170,14 @@ Ctrl/⌘+K command bar, extracted from the ContentGlows bar.
   (Ctrl+K stays the hotkey), a right-click or the « … » button shown on the
   hovered or highlighted row opens it, anchored to the end of the row: a
   header with the entry's label and a muted « section · badge · subtitle »
-  line, then Enter (`primaryLabel`), Shift+Enter (`secondaryLabel`) and the
+  line, then Enter (`primaryLabel`), Ctrl/⌘+Enter (`secondaryLabel`) and the
   actions, numbered 1–9 in keycaps. ↑/↓ and Enter choose, a digit runs its
   line, Escape, ← or Alt+Enter close it; scrolling the list closes it too.
   A `confirm` action asks for a second press first, its label replaced by
   `CommandBarStrings.confirmAction` (« Press again to confirm »). The footer
   shows « Alt Enter actions » when the row has any. An action's `shortcut` also
   runs it straight from the list. The choice carries
-  `CommandBarChoice.action` (null for Enter and Shift+Enter, which keep
+  `CommandBarChoice.action` (null for Enter and Ctrl/⌘+Enter, which keep
   working as before); actions run on a disabled row like the secondary
   action. In a `CommandBarScope`, `CommandBarCommand(actions: …, runAction:
   (context, actionId) …)`.

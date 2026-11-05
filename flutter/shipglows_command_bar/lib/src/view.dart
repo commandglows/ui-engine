@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:shipglows_menu/shipglows_menu.dart';
 import 'package:shipglows_icons/shipglows_icons.dart';
+import 'package:shipglows_rich_text/shipglows_rich_text.dart';
 
 import 'actions_panel.dart';
 import 'behavior.dart';
@@ -18,7 +19,7 @@ import 'strings.dart';
 import 'theme.dart';
 
 /// What the user chose in the bar: an entry, whether its secondary action
-/// (Shift+Enter) or one of its [CommandBarEntry.actions] was asked for, and
+/// (Ctrl/⌘+Enter) or one of its [CommandBarEntry.actions] was asked for, and
 /// the typed text it works on. The owner of the bar runs it.
 @immutable
 class CommandBarChoice {
@@ -46,7 +47,7 @@ class CommandBarChoice {
   final String? query;
 
   /// Id of the [CommandBarEntryAction] chosen in the actions panel, or with
-  /// its shortcut; null for Enter and Shift+Enter.
+  /// its shortcut; null for Enter and Ctrl/⌘+Enter.
   final String? action;
 }
 
@@ -55,7 +56,7 @@ class CommandBarChoice {
 /// is up to the owner, so the same widget serves the in-app dialog and a
 /// floating bar.
 ///
-/// Keys: ↑/↓ move, Enter chooses, Shift+Enter or Ctrl/⌘+Enter chooses the
+/// Keys: ↑/↓ move, Enter chooses, Ctrl/⌘+Enter chooses the
 /// secondary action, Alt+Enter (or a right-click on a row) opens the actions
 /// panel of the row, the shortcut of one of its [CommandBarEntry.actions]
 /// chooses it, Ctrl/⌘+1…9 chooses row n, Backspace on an empty field removes
@@ -209,7 +210,7 @@ class _BarLayout {
 }
 
 class _CommandBarViewState extends State<CommandBarView> {
-  final TextEditingController _controller = TextEditingController();
+  final ShipglowsMarkdownController _controller = ShipglowsMarkdownController();
 
   /// The search field, which gets the keyboard back when the actions panel
   /// closes.
@@ -543,7 +544,7 @@ class _CommandBarViewState extends State<CommandBarView> {
     );
   }
 
-  /// What the actions panel of [entry] lists: Enter when it runs, Shift+Enter
+  /// What the actions panel of [entry] lists: Enter when it runs, Ctrl/⌘+Enter
   /// when there is one, then the entry's own actions, those without a group
   /// first, then each group in the order it first appears.
   List<CommandBarPanelLine> _panelActions(CommandBarEntry entry) {
@@ -709,6 +710,8 @@ class _CommandBarViewState extends State<CommandBarView> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.enter ||
+      // Shift+Enter belongs to the multiline text field: insert a line break.
+      if (keyboard.isShiftPressed) return KeyEventResult.ignored;
         key == LogicalKeyboardKey.numpadEnter) {
       // Holding Enter must not run a command again and again.
       if (event is KeyRepeatEvent) return KeyEventResult.handled;
@@ -718,7 +721,7 @@ class _CommandBarViewState extends State<CommandBarView> {
       }
       _chooseItem(
         _effectiveHighlight,
-        secondary: keyboard.isShiftPressed || hasCommandModifier,
+        secondary: hasCommandModifier,
       );
       return KeyEventResult.handled;
     }
@@ -1054,11 +1057,14 @@ class _CommandBarViewState extends State<CommandBarView> {
                   onPointerMove: _onSearchPointerMove,
                   onPointerUp: _onSearchPointerEnd,
                   onPointerCancel: _onSearchPointerEnd,
-                  child: TextField(
+                  child: ShipglowsRichTextField(
                     controller: _controller,
                     focusNode: _searchFocus,
                     autofocus: widget.autofocus,
                     onChanged: _onChanged,
+                    showToolbar: false,
+                    minLines: 1,
+                    maxLines: 5,
                     style: textTheme.bodyLarge?.copyWith(
                       color: style.textColor,
                     ),
@@ -1184,7 +1190,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                           ),
                           if (highlighted != null && highlighted.hasSecondary)
                             _FooterHint(
-                              keys: const ['Shift', 'Enter'],
+                              keys: const ['Ctrl', 'Enter'],
                               label:
                                   highlighted.secondaryLabel ??
                                   strings.secondary,

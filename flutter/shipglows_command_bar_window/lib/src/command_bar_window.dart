@@ -23,7 +23,7 @@ class ShipglowsCommandBarSelection {
   /// Id of the chosen entry, as in `CommandBarEntry.id`.
   final String id;
 
-  /// Whether the secondary action (Shift+Enter) was chosen.
+  /// Whether the secondary action (Ctrl/⌘+Enter) was chosen.
   final bool secondary;
 
   /// Handle (HWND) of the window that was in front before the bar opened,
@@ -36,7 +36,7 @@ class ShipglowsCommandBarSelection {
   final String? query;
 
   /// Id of the `CommandBarEntryAction` chosen in the actions panel (or with
-  /// its shortcut); null for Enter and Shift+Enter.
+  /// its shortcut); null for Enter and Ctrl/⌘+Enter.
   final String? action;
 
   /// Whether [id] is an action of [ShipglowsCommandBarSnapshot.appMenu]

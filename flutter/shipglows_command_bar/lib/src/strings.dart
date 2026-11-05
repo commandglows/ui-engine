@@ -193,7 +193,7 @@ class CommandBarStrings {
   /// Footer: Enter.
   final String open;
 
-  /// Footer: Shift+Enter, when the highlighted row has no label of its own.
+  /// Footer: Ctrl/⌘+Enter, when the highlighted row has no label of its own.
   final String secondary;
 
   /// Footer: Escape.

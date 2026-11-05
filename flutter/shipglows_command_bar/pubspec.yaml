@@ -16,6 +16,8 @@ dependencies:
     path: ../shipglows_theme
   shipglows_menu:
     path: ../shipglows_menu
+  shipglows_rich_text:
+    path: ../shipglows_rich_text
   web: ^1.1.0
 
 dev_dependencies:

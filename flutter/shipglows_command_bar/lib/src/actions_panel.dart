@@ -3,7 +3,7 @@ import 'package:shipglows_menu/shipglows_menu.dart';
 
 import 'command.dart';
 
-/// One line of the actions panel: Enter, Shift+Enter or one of the
+/// One line of the actions panel: Enter, Ctrl/⌘+Enter or one of the
 /// [CommandBarEntry.actions].
 @immutable
 class CommandBarPanelLine {
@@ -25,13 +25,13 @@ class CommandBarPanelLine {
   /// ([CommandBarEntryAction.group]); lines without one come first.
   final String? group;
 
-  /// Keys shown on the right (`Shift+↵`, `Ctrl+Shift+C`).
+  /// Keys shown on the right (`Ctrl+↵`, `Ctrl+Shift+C`).
   final String? shortcut;
 
-  /// Whether the line is Shift+Enter.
+  /// Whether the line is Ctrl/⌘+Enter.
   final bool secondary;
 
-  /// Id of the [CommandBarEntryAction]; null for Enter and Shift+Enter.
+  /// Id of the [CommandBarEntryAction]; null for Enter and Ctrl/⌘+Enter.
   final String? action;
 
   /// Whether the line is listed last, after a separator, in the error color
