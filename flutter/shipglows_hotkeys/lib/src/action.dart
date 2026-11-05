@@ -67,10 +67,37 @@ class ShipglowsActionEvent {
 
   final ShipglowsWindowAction action;
 
-  /// `ok`, `topmostOn`, `topmostOff`, `noWindow` (nothing to act on, or a
-  /// window that must not be touched) or `failed`.
+  /// One of [ShipglowsOutcome].
   final String outcome;
 
   bool get succeeded =>
-      outcome == 'ok' || outcome == 'topmostOn' || outcome == 'topmostOff';
+      outcome == ShipglowsOutcome.ok ||
+      outcome == ShipglowsOutcome.topmostOn ||
+      outcome == ShipglowsOutcome.topmostOff;
+
+  /// The window belongs to a program running with more rights than the app
+  /// (« Run as administrator »): Windows refuses to let the app act on it.
+  bool get accessDenied => outcome == ShipglowsOutcome.accessDenied;
+}
+
+/// How an action ended ([ShipglowsActionEvent.outcome],
+/// [ShipglowsHotkeys.run]).
+abstract final class ShipglowsOutcome {
+  static const ok = 'ok';
+
+  /// [ShipglowsWindowAction.toggleAlwaysOnTop] put the window in front.
+  static const topmostOn = 'topmostOn';
+
+  /// [ShipglowsWindowAction.toggleAlwaysOnTop] let the window go back.
+  static const topmostOff = 'topmostOff';
+
+  /// Nothing to act on, or a window that must not be touched (the desktop,
+  /// the taskbar).
+  static const noWindow = 'noWindow';
+
+  /// A window of an elevated program: only an app running as administrator
+  /// can act on it.
+  static const accessDenied = 'accessDenied';
+
+  static const failed = 'failed';
 }

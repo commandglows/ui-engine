@@ -7,7 +7,10 @@
 library;
 
 export 'src/action.dart';
+export 'src/diagnostics.dart';
 export 'src/hotkey.dart';
 export 'src/hotkeys.dart';
+export 'src/picker.dart';
+export 'src/settings.dart';
 export 'src/store.dart';
 export 'src/trigger.dart';

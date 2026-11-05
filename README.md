@@ -1050,6 +1050,13 @@ plugin, nothing to route in the runner.
   through in given programs. `ShipglowsTriggers` is an alias of
   `ShipglowsHotkeys`. A 0.1 `hotkeys.json` is read as is. See the package
   README.
+- 0.3: master switch and per-program lists (`setEnabled`, `updateSettings`,
+  saved in `hotkeys.json`), `suspend()` / `resume()` / `whileSuspended` so a
+  shortcut being recorded is not fired or swallowed, the ready-made
+  `showShipglowsTriggerPicker` dialog (`ShipglowsTriggerPicker` widget),
+  `ShipglowsOutcome.accessDenied` for windows of elevated programs, a hook
+  watchdog (reinstall after sleep / unlock / every 30 s), `pauseInFullscreen`,
+  `hookStatus()` and `inspectPointer()` for diagnostics.
 - After an Alt+key hotkey pressed in the app, releasing Alt no longer opens
   the main window's menu mode (which swallowed the next key).
 

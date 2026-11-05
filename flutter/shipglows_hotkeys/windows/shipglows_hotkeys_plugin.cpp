@@ -2,6 +2,8 @@
 
 #include <windows.h>
 #include <dwmapi.h>
+#include <shellapi.h>
+#include <wtsapi32.h>
 
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
@@ -32,6 +34,12 @@ constexpr UINT kHookHotkeyMessage = WM_APP + 0x5B1;
 constexpr UINT kHookMouseMessage = WM_APP + 0x5B2;
 // Timer ids: one for the corner dwell, one per slot for a hold.
 constexpr UINT_PTR kTouchTimer = 1;
+// Every few seconds: refreshes the full-screen state and, every
+// kReinstallTicks ticks, puts the hooks back (Windows drops a hook silently
+// after a sleep, a session lock or a callback that took too long).
+constexpr UINT_PTR kWatchdogTimer = 2;
+constexpr UINT kWatchdogMs = 2000;
+constexpr int kReinstallTicks = 15;
 constexpr UINT_PTR kHoldTimerBase = 0x10000;
 // Alt released right after an Alt+key hotkey pressed in the app: within this
 // delay the main window ignores the menu-bar request it triggers.
@@ -92,6 +100,18 @@ std::wstring Widen(const std::string& text) {
   MultiByteToWideChar(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()),
                       wide.data(), size);
   return wide;
+}
+
+std::string Narrow(const std::wstring& text) {
+  if (text.empty()) return std::string();
+  const int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(),
+                                       static_cast<int>(text.size()), nullptr, 0,
+                                       nullptr, nullptr);
+  if (size <= 0) return std::string();
+  std::string narrow(static_cast<size_t>(size), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()),
+                      narrow.data(), size, nullptr, nullptr);
+  return narrow;
 }
 
 std::wstring Lower(std::wstring text) {
@@ -176,6 +196,40 @@ std::wstring ProcessNameOf(HWND window) {
   }
   CloseHandle(handle);
   return Lower(name);
+}
+
+// Title of |window|, read with a time limit: a hung program must not block.
+std::wstring TitleOf(HWND window) {
+  wchar_t text[256] = {};
+  DWORD_PTR length = 0;
+  if (SendMessageTimeoutW(window, WM_GETTEXT, 255,
+                          reinterpret_cast<LPARAM>(text),
+                          SMTO_ABORTIFHUNG | SMTO_BLOCK, 100, &length) == 0) {
+    return std::wstring();
+  }
+  return std::wstring(text);
+}
+
+// True when |window| belongs to a program with more rights than this one
+// (« Run as administrator »): Windows then refuses the actions on it.
+bool IsHigherIntegrity(HWND window) {
+  DWORD process = 0;
+  GetWindowThreadProcessId(window, &process);
+  if (process == 0 || process == GetCurrentProcessId()) return false;
+  HANDLE handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process);
+  if (handle == nullptr) return GetLastError() == ERROR_ACCESS_DENIED;
+  HANDLE token = nullptr;
+  const bool opened = OpenProcessToken(handle, TOKEN_QUERY, &token) != FALSE;
+  const bool denied = !opened && GetLastError() == ERROR_ACCESS_DENIED;
+  if (token != nullptr) CloseHandle(token);
+  CloseHandle(handle);
+  return denied;
+}
+
+// "accessDenied" when the last failed call was refused for lack of rights,
+// else "failed". Call it right after the failing call.
+std::string Failure() {
+  return GetLastError() == ERROR_ACCESS_DENIED ? "accessDenied" : "failed";
 }
 
 // The desktop, the taskbar and other shell windows: never closed, hidden,
@@ -324,6 +378,10 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
   ~ShipglowsHotkeysPlugin() override {
     UnregisterAll();
     ShowHiddenWindows();
+    if (power_notify_ != nullptr) UnregisterSuspendResumeNotification(power_notify_);
+    if (session_notified_ && window_ != nullptr) {
+      WTSUnRegisterSessionNotification(window_);
+    }
     if (window_proc_id_) {
       registrar_->UnregisterTopLevelWindowProcDelegate(*window_proc_id_);
     }
@@ -351,6 +409,8 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
     int distance = 0;
     // Executable names in which the trigger passes through.
     std::set<std::wstring> excluded;
+    // When not empty, the only executables the trigger works in.
+    std::set<std::wstring> only;
   };
 
   // A press waiting for a hold to elapse or a drag to end.
@@ -396,6 +456,14 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
     } else if (method == "unregisterAll") {
       UnregisterAll();
       result->Success();
+    } else if (method == "setOptions") {
+      pause_fullscreen_ = BoolField(arguments, "pauseInFullscreen");
+      if (!pause_fullscreen_) fullscreen_ = false;
+      result->Success();
+    } else if (method == "status") {
+      result->Success(Status());
+    } else if (method == "inspect") {
+      result->Success(Inspect());
     } else if (method == "windowAction") {
       const auto window = IntField(arguments, "window");
       const auto x = IntField(arguments, "x");
@@ -427,6 +495,7 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
       return "alreadyRegistered";
     }
     if (hook_fallback && InstallKeyboardHook()) {
+      EnsureWatchdog();
       Binding binding;
       binding.kind = Kind::kHookHotkey;
       binding.modifiers = modifiers;
@@ -446,15 +515,8 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
     const int slot = static_cast<int>(*slot_value);
     const std::string type = StringField(arguments, "type");
     Binding binding;
-    if (const auto* list = Field(arguments, "exclude")) {
-      if (const auto* names = std::get_if<flutter::EncodableList>(list)) {
-        for (const auto& name : *names) {
-          if (const auto* text = std::get_if<std::string>(&name)) {
-            binding.excluded.insert(Lower(Widen(*text)));
-          }
-        }
-      }
-    }
+    ReadNames(Field(arguments, "exclude"), &binding.excluded);
+    ReadNames(Field(arguments, "only"), &binding.only);
     if (type == "doubleKey") {
       const auto key = IntField(arguments, "key");
       const auto within = IntField(arguments, "withinMs");
@@ -474,11 +536,25 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
                                ? InstallKeyboardHook()
                                : InstallMouseHook();
     if (!installed) return "failed";
+    EnsureWatchdog();
     if (binding.kind == Kind::kMouse && binding.gesture == Gesture::kTouch) {
       has_touch_ = true;
     }
     bindings_[slot] = binding;
     return "registered";
+  }
+
+  static void ReadNames(const flutter::EncodableValue* list,
+                        std::set<std::wstring>* names) {
+    const auto* values =
+        list ? std::get_if<flutter::EncodableList>(list) : nullptr;
+    if (values == nullptr) return;
+    for (const auto& value : *values) {
+      if (const auto* text = std::get_if<std::string>(&value)) {
+        const std::wstring name = Lower(Widen(*text));
+        if (!name.empty()) names->insert(name);
+      }
+    }
   }
 
   static bool ParseMouse(const flutter::EncodableValue* arguments,
@@ -566,6 +642,13 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
             return HandleTopLevelMessage(message, wparam, lparam);
           });
     }
+    if (window_ != nullptr && !session_notified_) {
+      session_notified_ =
+          WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) !=
+          FALSE;
+      power_notify_ =
+          RegisterSuspendResumeNotification(window_, DEVICE_NOTIFY_WINDOW_HANDLE);
+    }
     return window_ != nullptr;
   }
 
@@ -620,6 +703,136 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
       events_.clear();
     }
     if (!has_touch_) StopTouch();
+    if (!keyboard && !mouse && watchdog_on_ && window_ != nullptr) {
+      KillTimer(window_, kWatchdogTimer);
+      watchdog_on_ = false;
+      fullscreen_ = false;
+      ticks_ = 0;
+    }
+  }
+
+  // ---- Watchdog ---------------------------------------------------------
+
+  void EnsureWatchdog() {
+    if (watchdog_on_ || window_ == nullptr) return;
+    watchdog_on_ = SetTimer(window_, kWatchdogTimer, kWatchdogMs, nullptr) != 0;
+    ticks_ = 0;
+  }
+
+  // Whether a full-screen program (a game, a presentation) is in front.
+  static bool FullscreenInFront() {
+    QUERY_USER_NOTIFICATION_STATE state = QUNS_ACCEPTS_NOTIFICATIONS;
+    if (FAILED(SHQueryUserNotificationState(&state))) return false;
+    return state == QUNS_BUSY || state == QUNS_RUNNING_D3D_FULL_SCREEN ||
+           state == QUNS_PRESENTATION_MODE;
+  }
+
+  // Triggers of the hooks rest while a full-screen program is in front.
+  bool Resting() const { return pause_fullscreen_ && fullscreen_; }
+
+  void UpdateFullscreen() {
+    const bool now = pause_fullscreen_ && FullscreenInFront();
+    if (now == fullscreen_) return;
+    fullscreen_ = now;
+    if (fullscreen_) {
+      // Whatever was under way is dropped: a press seen before the program
+      // took the screen must not fire after.
+      while (!pending_.empty()) DropPending(pending_.front().slot);
+      swallowed_up_.clear();
+      events_.clear();
+      held_.clear();
+      StopTouch();
+    }
+  }
+
+  void OnWatchdog() {
+    UpdateFullscreen();
+    if (++ticks_ < kReinstallTicks) return;
+    ticks_ = 0;
+    // Never in the middle of a gesture.
+    if (pending_.empty() && swallowed_up_.empty() && held_.empty()) {
+      ReinstallHooks();
+    }
+  }
+
+  // Puts the hooks back: the new one is in place before the old one goes, so
+  // no input is missed. Cheap, and the only cure for a hook Windows dropped.
+  void ReinstallHooks() {
+    if (mouse_owner == this && mouse_hook != nullptr) {
+      const HHOOK fresh = SetWindowsHookExW(WH_MOUSE_LL, LowLevelMouseProc,
+                                            ModuleInstance(), 0);
+      if (fresh != nullptr) {
+        UnhookWindowsHookEx(mouse_hook);
+        mouse_hook = fresh;
+        ++reinstalls_;
+      }
+    }
+    if (hook_owner == this && keyboard_hook != nullptr) {
+      const HHOOK fresh = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc,
+                                            ModuleInstance(), 0);
+      if (fresh != nullptr) {
+        UnhookWindowsHookEx(keyboard_hook);
+        keyboard_hook = fresh;
+        ++reinstalls_;
+      }
+    }
+  }
+
+  // After a sleep or an unlocked session whatever was in progress is stale.
+  void ReinstallAfterInterruption() {
+    while (!pending_.empty()) DropPending(pending_.front().slot);
+    swallowed_up_.clear();
+    events_.clear();
+    held_.clear();
+    StopTouch();
+    ReinstallHooks();
+  }
+
+  flutter::EncodableValue Status() const {
+    return flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue("mouseHook"),
+         flutter::EncodableValue(mouse_owner == this && mouse_hook != nullptr)},
+        {flutter::EncodableValue("keyboardHook"),
+         flutter::EncodableValue(hook_owner == this && keyboard_hook != nullptr)},
+        {flutter::EncodableValue("reinstalls"),
+         flutter::EncodableValue(reinstalls_)},
+        {flutter::EncodableValue("fullscreen"),
+         flutter::EncodableValue(fullscreen_)},
+    });
+  }
+
+  // What is under the pointer, as the mouse triggers see it.
+  flutter::EncodableValue Inspect() const {
+    POINT point{};
+    if (!GetCursorPos(&point)) return flutter::EncodableValue();
+    ZoneProbe probe(point);
+    static const char* const names[] = {
+        "anywhere",       "titleBar",         "taskbar",
+        "minimizeButton", "maximizeButton",   "closeButton",
+        "cornerTopLeft",  "cornerTopRight",   "cornerBottomLeft",
+        "cornerBottomRight"};
+    flutter::EncodableList zones;
+    for (int zone = 0; zone < 10; ++zone) {
+      if (probe.Matches(zone)) zones.emplace_back(names[zone]);
+    }
+    flutter::EncodableMap info{
+        {flutter::EncodableValue("x"),
+         flutter::EncodableValue(static_cast<int32_t>(point.x))},
+        {flutter::EncodableValue("y"),
+         flutter::EncodableValue(static_cast<int32_t>(point.y))},
+        {flutter::EncodableValue("zones"), flutter::EncodableValue(zones)},
+    };
+    const HWND root = probe.Root();
+    if (root != nullptr) {
+      info[flutter::EncodableValue("window")] = HandleValue(root);
+      info[flutter::EncodableValue("process")] =
+          flutter::EncodableValue(Narrow(ProcessNameOf(root)));
+      info[flutter::EncodableValue("className")] =
+          flutter::EncodableValue(Narrow(ClassNameOf(root)));
+      info[flutter::EncodableValue("title")] =
+          flutter::EncodableValue(Narrow(TitleOf(root)));
+    }
+    return flutter::EncodableValue(info);
   }
 
   // ---- Keyboard hook ----------------------------------------------------
@@ -633,13 +846,18 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
   }
 
   bool IsExcluded(const Binding& binding, HWND window) const {
-    if (binding.excluded.empty() || window == nullptr) return false;
-    return binding.excluded.count(ProcessNameOf(window)) > 0;
+    if ((binding.excluded.empty() && binding.only.empty()) || window == nullptr) {
+      return false;
+    }
+    const std::wstring process = ProcessNameOf(window);
+    if (binding.excluded.count(process) > 0) return true;
+    return !binding.only.empty() && binding.only.count(process) == 0;
   }
 
   // Never swallows the key: the hook only stands in for a hotkey Windows
   // refused for another reason than an owner, and sees a key pressed twice.
   void OnHookKey(WPARAM wparam, const KBDLLHOOKSTRUCT& event) {
+    if (Resting()) return;
     if (wparam == WM_KEYUP || wparam == WM_SYSKEYUP) {
       held_.erase(std::remove(held_.begin(), held_.end(), event.vkCode),
                   held_.end());
@@ -703,6 +921,7 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
 
   // True swallows the event.
   bool OnMouse(WPARAM message, const MSLLHOOKSTRUCT& event) {
+    if (Resting()) return false;
     switch (message) {
       case WM_MOUSEMOVE:
         OnMove(PointOf(event));
@@ -855,6 +1074,10 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
   }
 
   void OnTimer(UINT_PTR id) {
+    if (id == kWatchdogTimer) {
+      OnWatchdog();
+      return;
+    }
     if (id == kTouchTimer) {
       KillTimer(window_, kTouchTimer);
       POINT point{};
@@ -920,6 +1143,18 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
         plugin->OnTimer(static_cast<UINT_PTR>(wparam));
         return 0;
       }
+      if (message == WM_WTSSESSION_CHANGE &&
+          (wparam == WTS_SESSION_UNLOCK || wparam == WTS_CONSOLE_CONNECT ||
+           wparam == WTS_REMOTE_CONNECT)) {
+        plugin->ReinstallAfterInterruption();
+        return 0;
+      }
+      if (message == WM_POWERBROADCAST &&
+          (wparam == PBT_APMRESUMEAUTOMATIC ||
+           wparam == PBT_APMRESUMESUSPEND)) {
+        plugin->ReinstallAfterInterruption();
+        return TRUE;
+      }
     }
     return DefWindowProcW(window, message, wparam, lparam);
   }
@@ -929,6 +1164,11 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
   void OnTrigger(int slot, HWND target, const POINT* point, const POINT* start) {
     const auto found = bindings_.find(slot);
     if (found == bindings_.end()) return;
+    if ((found->second.kind == Kind::kMouse ||
+         found->second.kind == Kind::kDoubleKey) &&
+        Resting()) {
+      return;
+    }
     if (found->second.kind != Kind::kMouse) hotkey_tick_ = GetTickCount64();
     const HWND foreground = GetForegroundWindow();
     const char* kind = ForegroundKind(foreground);
@@ -993,7 +1233,8 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
 
   // ---- Window actions ---------------------------------------------------
 
-  // "ok", "topmostOn", "topmostOff", "noWindow" or "failed".
+  // "ok", "topmostOn", "topmostOff", "noWindow", "accessDenied" (a window of
+  // an elevated program) or "failed".
   std::string RunWindowAction(const std::string& action, HWND window,
                               std::optional<int64_t> x,
                               std::optional<int64_t> y) {
@@ -1012,7 +1253,7 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
       return Post(window, IsZoomed(window) ? SC_RESTORE : SC_MAXIMIZE);
     }
     if (action == "close") {
-      return PostMessageW(window, WM_CLOSE, 0, 0) ? "ok" : "failed";
+      return PostMessageW(window, WM_CLOSE, 0, 0) ? "ok" : Failure();
     }
     if (action == "toggleAlwaysOnTop") return ToggleTopmost(window);
     if (action == "hide") return Hide(window);
@@ -1033,7 +1274,7 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
   }
 
   static std::string Post(HWND window, WPARAM command) {
-    return PostMessageW(window, WM_SYSCOMMAND, command, 0) ? "ok" : "failed";
+    return PostMessageW(window, WM_SYSCOMMAND, command, 0) ? "ok" : Failure();
   }
 
   static std::string Key(WORD key) {
@@ -1049,7 +1290,7 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
     const bool on = (GetWindowLongW(window, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
     if (!SetWindowPos(window, on ? HWND_NOTOPMOST : HWND_TOPMOST, 0, 0, 0, 0,
                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)) {
-      return "failed";
+      return Failure();
     }
     return on ? "topmostOff" : "topmostOn";
   }
@@ -1057,6 +1298,10 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
   std::string Hide(HWND window) {
     if (!IsWindowVisible(window)) return "noWindow";
     ShowWindow(window, SW_HIDE);
+    // ShowWindow reports nothing: a window of an elevated program just stays.
+    if (IsWindowVisible(window)) {
+      return IsHigherIntegrity(window) ? "accessDenied" : "failed";
+    }
     hidden_.push_back(window);
     return "ok";
   }
@@ -1125,7 +1370,7 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
                         target.bottom - target.top + margins.top + margins.bottom,
                         SWP_NOZORDER | SWP_NOACTIVATE)
                ? "ok"
-               : "failed";
+               : Failure();
   }
 
   // The part of the screen the pointer ended in; the middle maximizes.
@@ -1154,7 +1399,7 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
                         before.right - before.left, before.bottom - before.top,
                         SWP_NOZORDER | SWP_NOACTIVATE)
                ? "ok"
-               : "failed";
+               : Failure();
   }
 
   flutter::PluginRegistrarWindows* registrar_;
@@ -1170,6 +1415,14 @@ class ShipglowsHotkeysPlugin : public flutter::Plugin {
   std::set<Button> swallowed_up_;
   bool has_touch_ = false;
   int touch_corner_ = -1;
+  // Watchdog and full-screen rest.
+  bool watchdog_on_ = false;
+  int ticks_ = 0;
+  int reinstalls_ = 0;
+  bool pause_fullscreen_ = false;
+  bool fullscreen_ = false;
+  bool session_notified_ = false;
+  HPOWERNOTIFY power_notify_ = nullptr;
   // Window actions.
   std::vector<HWND> hidden_;
   std::map<HWND, RECT> snapped_;

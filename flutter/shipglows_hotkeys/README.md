@@ -67,3 +67,36 @@ a mouse trigger, the one in front for a key trigger. `actionEvents` reports
 what ran (`topmostOn` / `topmostOff`, `noWindow`…).
 
 `ShipglowsTriggers` is an alias of `ShipglowsHotkeys`.
+
+## Settings, rest and diagnostics (0.3)
+
+- **Master switch and exceptions.** `setEnabled(false)` unregisters everything
+  (the key combinations are free for other apps again) and is remembered.
+  `updateSettings` edits the programs left alone: `excludedProcesses` (all
+  bindings) and, per binding, `ShipglowsBindingFilter.excluded` /
+  `only` (a white list). They add to the binding's own
+  `excludeProcesses`, apply to mouse triggers and double keys, and are saved in
+  `hotkeys.json` (`settings`). `state.value.customized` / `isCustomized(id)`
+  tell whether the user chose a trigger; `reset(id)` / `resetAll()` bring the
+  defaults back.
+- **Rest while recording.** `suspend()` / `resume()` (counted) or
+  `whileSuspended(body)` unregister every trigger, so a shortcut being recorded
+  is not fired or swallowed by Windows. Changes made meanwhile are saved and
+  take effect on `resume()`.
+- **Picker.** `showShipglowsTriggerPicker(context, title:, current:, hotkeys:,
+  labels: ShipglowsTriggerPickerLabels.fr)` asks for a shortcut, a key pressed
+  twice or a mouse gesture (+ modifiers), and rests `hotkeys` meanwhile.
+  `ShipglowsTriggerPicker` is the same without the dialog.
+- **Outcomes.** `ShipglowsOutcome`: `ok`, `topmostOn/Off`, `noWindow`,
+  `accessDenied` (the window belongs to an elevated program: only an app run
+  as administrator can act on it), `failed`.
+- **Hook watchdog.** Windows silently drops a low-level hook after a sleep, a
+  session lock or a callback that took too long. The hooks are put back after
+  a resume or an unlock and every 30 seconds while idle; `hookStatus()` reports
+  them (`mouseHook`, `keyboardHook`, `reinstalls`, `fullscreen`).
+- **Full screen.** `ShipglowsHotkeys(pauseInFullscreen: true)`: mouse triggers
+  and double keys rest while a full-screen program (a game, a presentation)
+  is in front. Key combinations are not concerned.
+- **Why did it not fire?** `inspectPointer()` returns the window, program and
+  every `ShipglowsZone` under the pointer right now.
+

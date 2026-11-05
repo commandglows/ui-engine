@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'action.dart';
+import 'diagnostics.dart';
 import 'hotkey.dart';
+import 'settings.dart';
 import 'store.dart';
 import 'trigger.dart';
 
@@ -172,6 +174,9 @@ class ShipglowsHotkeyState {
   const ShipglowsHotkeyState({
     this.triggers = const {},
     this.conflicts = const {},
+    this.customized = const {},
+    this.settings = const ShipglowsHotkeySettings(),
+    this.suspended = false,
   });
 
   /// Registered triggers by id.
@@ -180,6 +185,25 @@ class ShipglowsHotkeyState {
   /// Triggers that are not active, and why. An id the user left unassigned
   /// is in neither map.
   final Map<String, ShipglowsHotkeyConflict> conflicts;
+
+  /// Ids whose trigger the user chose (or switched off), as opposed to the
+  /// default of the binding: the ones [ShipglowsHotkeys.reset] can bring back
+  /// to the default.
+  final Set<String> customized;
+
+  /// The master switch and the programs left alone.
+  final ShipglowsHotkeySettings settings;
+
+  /// Whether [ShipglowsHotkeys.suspend] is in force, for instance while the
+  /// user records a new trigger.
+  final bool suspended;
+
+  /// Whether the master switch is on.
+  bool get enabled => settings.enabled;
+
+  /// Whether triggers are really registered with Windows: on and not
+  /// suspended. Otherwise [triggers] is what they will be.
+  bool get isLive => enabled && !suspended;
 
   /// Registered key combinations by id (the key triggers of [triggers]).
   Map<String, ShipglowsHotkey> get active => {
@@ -237,10 +261,16 @@ class ShipglowsHotkeys {
   /// With [hookFallback], a hotkey Windows refuses for another reason than
   /// an owner is caught with a low-level keyboard hook. Never used against
   /// another app's hotkey.
+  ///
+  /// With [pauseInFullscreen], mouse triggers and double keys rest while a
+  /// full-screen program (a game, a presentation) is in front, so a wheel turn
+  /// or a double Esc in a game is left alone. Key combinations are not
+  /// concerned: Windows takes them first.
   ShipglowsHotkeys({
     String? appFolder,
     ShipglowsHotkeyStore? store,
     this.hookFallback = false,
+    this.pauseInFullscreen = false,
   }) : store =
            store ??
            (appFolder == null
@@ -255,6 +285,7 @@ class ShipglowsHotkeys {
 
   final ShipglowsHotkeyStore store;
   final bool hookFallback;
+  final bool pauseInFullscreen;
 
   final _events = StreamController<ShipglowsHotkeyEvent>.broadcast();
   final _actionEvents = StreamController<ShipglowsActionEvent>.broadcast();
@@ -264,6 +295,8 @@ class ShipglowsHotkeys {
 
   List<ShipglowsHotkeyBinding> _bindings = const [];
   Map<String, ShipglowsTrigger?> _choices = {};
+  ShipglowsHotkeySettings _settings = const ShipglowsHotkeySettings();
+  int _suspensions = 0;
   bool _loaded = false;
   final Map<String, int> _slots = {};
   final Map<int, String> _ids = {};
@@ -284,6 +317,62 @@ class ShipglowsHotkeys {
 
   /// The declared bindings.
   List<ShipglowsHotkeyBinding> get bindings => List.unmodifiable(_bindings);
+
+  /// The master switch and the programs left alone.
+  ShipglowsHotkeySettings get settings => _settings;
+
+  /// Whether the user chose (or switched off) the trigger of [id], rather than
+  /// leaving the default of its binding.
+  bool isCustomized(String id) => _choices.containsKey(id);
+
+  /// Switches every trigger on or off, and remembers it. Off, nothing is
+  /// registered with Windows: the key combinations are free for the other
+  /// applications. False when the choice could not be saved.
+  Future<bool> setEnabled(bool enabled) =>
+      updateSettings((settings) => settings.copyWith(enabled: enabled));
+
+  /// Changes the settings (master switch, programs to leave alone), saves
+  /// them and registers the triggers again. False when they could not be
+  /// saved; nothing changed then.
+  Future<bool> updateSettings(
+    ShipglowsHotkeySettings Function(ShipglowsHotkeySettings current) update,
+  ) => _serial(() async {
+    await _ensureLoaded();
+    final next = update(_settings);
+    if (next == _settings) return true;
+    if (!await store.saveSettings(next)) return false;
+    _settings = next;
+    await _refresh();
+    return true;
+  });
+
+  /// Puts every trigger to rest: unregistered from Windows, so a key
+  /// combination the app uses reaches the focused application again, and none
+  /// fires. Counted: each call needs its [resume]. Meant for the moment the
+  /// user records a new trigger, otherwise the existing ones would fire or
+  /// swallow the keys being recorded; see [whileSuspended].
+  Future<void> suspend() => _serial(() async {
+    _suspensions++;
+    await _refresh();
+  });
+
+  /// Ends one [suspend]. The triggers are registered again when the last one
+  /// ends.
+  Future<void> resume() => _serial(() async {
+    if (_suspensions == 0) return;
+    _suspensions--;
+    await _refresh();
+  });
+
+  /// Runs [body] with the triggers at rest.
+  Future<T> whileSuspended<T>(Future<T> Function() body) async {
+    await suspend();
+    try {
+      return await body();
+    } finally {
+      await resume();
+    }
+  }
 
   /// Registers [bindings], replacing any declared before: each id gets the
   /// user's saved choice, else its default. A combination another
@@ -344,6 +433,31 @@ class ShipglowsHotkeys {
     return outcome ?? 'failed';
   }
 
+  /// Forgets every choice of the user: all the defaults apply again.
+  Future<ShipglowsHotkeyState> resetAll() => _serial(() async {
+    if (_choices.isEmpty) return _state.value;
+    if (!await store.save({})) return _state.value;
+    _choices = {};
+    return _apply(_bindings);
+  });
+
+  /// The hooks behind the mouse triggers and the double keys: installed or
+  /// not, and how often the watchdog had to put them back.
+  Future<ShipglowsHookStatus> hookStatus() async =>
+      ShipglowsHookStatus.fromJson(
+        await _invoke<Map<Object?, Object?>>('status'),
+      );
+
+  /// What is under the pointer right now, as the mouse triggers see it: the
+  /// window, its program, and every [ShipglowsZone] the pointer is in. Null
+  /// when it cannot be read. To show the user why a gesture did not fire.
+  Future<ShipglowsPointerInfo?> inspectPointer() async {
+    if (!isSupported) return null;
+    return ShipglowsPointerInfo.fromJson(
+      await _invoke<Map<Object?, Object?>>('inspect'),
+    );
+  }
+
   /// Unregisters every trigger and stops [events].
   Future<void> dispose() => _serial(() async {
     if (isSupported) await _invoke<void>('unregisterAll');
@@ -356,16 +470,48 @@ class ShipglowsHotkeys {
     _state.dispose();
   });
 
+  Future<void> _ensureLoaded() async {
+    if (_loaded) return;
+    _choices = await store.load();
+    _settings = await store.loadSettings();
+    _loaded = true;
+  }
+
+  /// Whether triggers are registered with Windows: supported, switched on and
+  /// not suspended.
+  bool get _live => isSupported && _settings.enabled && _suspensions == 0;
+
+  /// The state after a change of settings or suspension.
+  Future<void> _refresh() async {
+    if (isSupported && _loaded) {
+      await _apply(_bindings);
+    } else {
+      _publish();
+    }
+  }
+
+  ShipglowsHotkeyState _publish({
+    Map<String, ShipglowsTrigger>? triggers,
+    Map<String, ShipglowsHotkeyConflict>? conflicts,
+  }) => _state.value = ShipglowsHotkeyState(
+    triggers: triggers ?? _state.value.triggers,
+    conflicts: conflicts ?? _state.value.conflicts,
+    customized: Set.unmodifiable(_choices.keys),
+    settings: _settings,
+    suspended: _suspensions > 0,
+  );
+
   Future<ShipglowsHotkeyState> _apply(
     List<ShipglowsHotkeyBinding> bindings,
   ) async {
     _bindings = List.of(bindings);
     if (!isSupported) return _state.value;
-    if (!_loaded) {
-      _choices = await store.load();
-      _loaded = true;
-    }
+    await _ensureLoaded();
     await _invoke<void>('unregisterAll');
+    await _invoke<void>('setOptions', {
+      'pauseInFullscreen': pauseInFullscreen,
+    });
+    final live = _live;
     final active = <String, ShipglowsTrigger>{};
     final conflicts = <String, ShipglowsHotkeyConflict>{};
     for (final binding in bindings) {
@@ -373,21 +519,21 @@ class ShipglowsHotkeys {
           ? _choices[binding.id]
           : binding.defaultTrigger;
       if (trigger == null) continue;
+      // At rest, the triggers are what they will be, not registered.
       final conflict = !trigger.isValid
           ? ShipglowsHotkeyConflict.invalid
           : active.containsValue(trigger)
           ? ShipglowsHotkeyConflict.duplicate
-          : await _register(binding, trigger);
+          : live
+          ? await _register(binding, trigger)
+          : null;
       if (conflict == null) {
         active[binding.id] = trigger;
       } else {
         conflicts[binding.id] = conflict;
       }
     }
-    return _state.value = ShipglowsHotkeyState(
-      triggers: active,
-      conflicts: conflicts,
-    );
+    return _publish(triggers: active, conflicts: conflicts);
   }
 
   Future<ShipglowsHotkeyResult> _setAll(
@@ -414,6 +560,28 @@ class ShipglowsHotkeys {
       return ShipglowsHotkeyResult(applied: false, conflicts: conflicts);
     }
 
+    // At rest (switched off or suspended): nothing to register, the choice is
+    // only saved and takes effect when the triggers come back.
+    if (!_live) {
+      final choices = {..._choices, ...triggers};
+      if (!await store.save(choices)) {
+        return ShipglowsHotkeyResult(
+          applied: false,
+          conflicts: {
+            for (final id in triggers.keys)
+              id: ShipglowsHotkeyConflict.persistFailed,
+          },
+        );
+      }
+      _choices = choices;
+      _publish(
+        triggers: next,
+        conflicts: {...previous.conflicts}
+          ..removeWhere((id, _) => triggers.containsKey(id)),
+      );
+      return const ShipglowsHotkeyResult(applied: true);
+    }
+
     // The old triggers go first, so two bindings can swap.
     for (final id in triggers.keys) {
       if (previous.triggers.containsKey(id)) await _unregister(id);
@@ -432,7 +600,7 @@ class ShipglowsHotkeys {
       final choices = {..._choices, ...triggers};
       if (await store.save(choices)) {
         _choices = choices;
-        _state.value = ShipglowsHotkeyState(
+        _publish(
           triggers: next,
           conflicts: {...previous.conflicts}
             ..removeWhere((id, _) => triggers.containsKey(id)),
@@ -460,10 +628,7 @@ class ShipglowsHotkeys {
       }
     }
     if (lost.isNotEmpty) {
-      _state.value = ShipglowsHotkeyState(
-        triggers: active,
-        conflicts: {...previous.conflicts, ...lost},
-      );
+      _publish(triggers: active, conflicts: {...previous.conflicts, ...lost});
     }
     return ShipglowsHotkeyResult(
       applied: false,
@@ -488,12 +653,19 @@ class ShipglowsHotkeys {
           'hookFallback': hookFallback,
         });
       case ShipglowsDoubleKeyTrigger() || ShipglowsMouseTrigger():
+        final filter = _settings.filterOf(binding.id);
         outcome = await _invoke<String>('registerTrigger', {
           'slot': slot,
           ...trigger.toJson(),
-          'exclude': [
-            for (final name in binding.excludeProcesses) name.toLowerCase(),
-          ],
+          // The app's own exceptions, the user's for every binding and the
+          // user's for this one.
+          'exclude': {
+            for (final name in binding.excludeProcesses)
+              shipglowsProcessName(name),
+            ..._settings.excludedProcesses,
+            ...filter.excluded,
+          }.toList(),
+          'only': filter.only.toList(),
         });
     }
     return switch (outcome) {
