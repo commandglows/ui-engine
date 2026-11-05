@@ -18,14 +18,32 @@ class UndoStep<T> {
 /// stacks keep at most [limit] steps, dropping the oldest. Snapshots must be
 /// immutable (or copied by the caller): the history stores them as given.
 class UndoRedoHistory<T> extends ChangeNotifier {
-  UndoRedoHistory({this.limit = 50}) : assert(limit > 0);
+  UndoRedoHistory({
+    this.limit = 50,
+    this.coalesceWindow = Duration.zero,
+    Duration Function()? clock,
+  }) : assert(limit > 0),
+       _clock = clock ?? _stopwatchClock();
 
   /// Maximum number of steps kept on each stack.
   final int limit;
 
+  /// Consecutive [record] calls inside this window form one undo step.
+  ///
+  /// The default keeps every recorded change as its own step.
+  final Duration coalesceWindow;
+
+  final Duration Function() _clock;
+
   final List<UndoStep<T>> _undo = [];
   final List<UndoStep<T>> _redo = [];
   bool _grouping = false;
+  Duration? _lastRecord;
+
+  static Duration Function() _stopwatchClock() {
+    final watch = Stopwatch()..start();
+    return () => watch.elapsed;
+  }
 
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
@@ -42,11 +60,28 @@ class UndoRedoHistory<T> extends ChangeNotifier {
   bool get isGrouping => _grouping;
 
   /// Records [before] as the state an undo goes back to, and clears redo:
-  /// a new change forks the timeline. Ignored inside a [group].
+  /// a new change forks the timeline. Nearby changes can share one step when
+  /// [coalesceWindow] is positive. Ignored inside a [group].
   void record(T before, {String? label}) {
     if (_grouping) return;
-    _push(_undo, UndoStep<T>(before, label: label));
+    _record(before, label: label);
+  }
+
+  void _record(T before, {String? label, bool coalesce = true}) {
+    final now = _clock();
+    final last = _lastRecord;
+    _lastRecord = now;
+    final hadRedo = _redo.isNotEmpty;
     _redo.clear();
+    if (coalesce &&
+        coalesceWindow > Duration.zero &&
+        last != null &&
+        now - last < coalesceWindow &&
+        _undo.isNotEmpty) {
+      if (hadRedo) notifyListeners();
+      return;
+    }
+    _push(_undo, UndoStep<T>(before, label: label));
     notifyListeners();
   }
 
@@ -72,7 +107,7 @@ class UndoRedoHistory<T> extends ChangeNotifier {
       _grouping = false;
     }
     if (changed != null && !changed()) return false;
-    record(before, label: label);
+    _record(before, label: label, coalesce: false);
     return true;
   }
 
@@ -82,6 +117,7 @@ class UndoRedoHistory<T> extends ChangeNotifier {
     if (_undo.isEmpty) return null;
     final step = _undo.removeLast();
     _push(_redo, UndoStep<T>(current, label: step.label));
+    _lastRecord = null;
     notifyListeners();
     return step;
   }
@@ -92,6 +128,7 @@ class UndoRedoHistory<T> extends ChangeNotifier {
     if (_redo.isEmpty) return null;
     final step = _redo.removeLast();
     _push(_undo, UndoStep<T>(current, label: step.label));
+    _lastRecord = null;
     notifyListeners();
     return step;
   }
@@ -101,6 +138,7 @@ class UndoRedoHistory<T> extends ChangeNotifier {
   UndoStep<T>? pop() {
     if (_undo.isEmpty) return null;
     final step = _undo.removeLast();
+    _lastRecord = null;
     notifyListeners();
     return step;
   }
@@ -110,6 +148,7 @@ class UndoRedoHistory<T> extends ChangeNotifier {
     if (_undo.isEmpty && _redo.isEmpty) return;
     _undo.clear();
     _redo.clear();
+    _lastRecord = null;
     notifyListeners();
   }
 

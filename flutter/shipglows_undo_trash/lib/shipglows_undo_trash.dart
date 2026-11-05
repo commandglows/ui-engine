@@ -18,4 +18,5 @@ export 'src/trash_view.dart';
 export 'src/undo_command_stack.dart';
 export 'src/undo_history.dart';
 export 'src/undo_shortcuts.dart';
+export 'src/undo_registry.dart';
 export 'src/undo_snack_bar.dart';
