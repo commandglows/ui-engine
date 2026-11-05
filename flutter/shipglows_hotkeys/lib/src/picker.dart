@@ -457,7 +457,15 @@ class _TriggerPickerState extends State<ShipglowsTriggerPicker> {
           label: Text(_labels.doubleKey),
         ),
     ];
-    return RawKeyboardListener(
+    // Recording a key: the keys are the answer, not commands. Without this,
+    // Esc would close the dialog, and Tab or Enter would move the focus.
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: (node, event) => _mode == _Mode.mouse
+          ? KeyEventResult.ignored
+          : KeyEventResult.handled,
+      child: RawKeyboardListener(
       focusNode: _focus,
       autofocus: true,
       onKey: _onKey,
@@ -502,6 +510,7 @@ class _TriggerPickerState extends State<ShipglowsTriggerPicker> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
