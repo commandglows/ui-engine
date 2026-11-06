@@ -241,8 +241,11 @@ class ShipglowsOverlayHost extends ChangeNotifier {
         await onShow?.call(arguments['data']);
         _setVisible(true);
         // The window appears only after a frame with this data was drawn.
+        // Taken before drawing: a frame drawn at once would leave a paused
+        // binding waiting on one that is never scheduled.
+        final drawn = WidgetsBinding.instance.endOfFrame;
         _renderFrame();
-        await WidgetsBinding.instance.endOfFrame;
+        await drawn;
         await _call<void>('presented', arguments['generation']);
         // The window has armed its reveal on the next frame.
         _renderFrame();
