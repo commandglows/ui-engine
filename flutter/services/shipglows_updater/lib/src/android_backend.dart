@@ -250,7 +250,7 @@ final class AndroidUpdaterBackend
         );
       }
       if (await target.exists()) await target.delete();
-      return part.rename(target.path);
+      return await part.rename(target.path);
     } catch (_) {
       if (await part.exists()) await part.delete();
       rethrow;

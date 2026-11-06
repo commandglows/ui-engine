@@ -409,6 +409,8 @@ class _FlutterZoomViewportState extends State<FlutterZoomViewport> {
         child: Focus(
           autofocus: true,
           child: Listener(
+            // Empty areas of the app zoom too.
+            behavior: HitTestBehavior.translucent,
             onPointerSignal: _handlePointerSignal,
             child: LayoutBuilder(
               builder: (context, constraints) {

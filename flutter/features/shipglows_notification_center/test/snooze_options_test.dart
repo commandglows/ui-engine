@@ -138,7 +138,10 @@ void main() {
 
     testWidgets('adds an option', (tester) async {
       final changes = await pump(tester, SnoozeOptions());
-      await tester.tap(find.byKey(const ValueKey('snooze-option-add')));
+      final add = find.byKey(const ValueKey('snooze-option-add'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
       expect(changes.single.options, hasLength(6));
     });
   });

@@ -349,7 +349,7 @@ class _ShipglowsMenuPanelState extends State<ShipglowsMenuPanel> {
   Widget _row(int index, _Row row, ResolvedShipglowsMenuTheme style) {
     final icons = widget.icons == null
         ? style.icons
-        : {...?style.icons, ...widget.icons!};
+        : {...style.icons, ...widget.icons!};
     switch (row) {
       case _SeparatorRow():
         return Padding(

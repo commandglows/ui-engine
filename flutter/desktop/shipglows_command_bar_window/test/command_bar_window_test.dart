@@ -119,8 +119,20 @@ void main() {
       );
       await controller.choose(const CommandBarChoice(id: 'unknown'));
       expect(host.sent, [
-        {'id': 'screen:/feed', 'secondary': false, 'previousForeground': 7},
-        {'id': 'project:old', 'secondary': true, 'previousForeground': 7},
+        {
+          'id': 'screen:/feed',
+          'secondary': false,
+          'previousForeground': 7,
+          'query': null,
+          'action': null,
+        },
+        {
+          'id': 'project:old',
+          'secondary': true,
+          'previousForeground': 7,
+          'query': null,
+          'action': null,
+        },
       ]);
     });
 

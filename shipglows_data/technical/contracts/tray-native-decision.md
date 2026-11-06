@@ -14,7 +14,7 @@ risk_level: medium
 security_impact: none
 docs_impact: yes
 linked_systems:
-  - ../../../flutter/shipglows_tray/
+  - ../../../flutter/desktop/shipglows_tray/
   - ../../../README.md
   - ../context.md
   - ../../workflow/TASKS.md

@@ -70,7 +70,7 @@ while [[ -n "$queue" ]]; do
   seen="$seen|$directory|"
   while IFS= read -r relative; do
     [[ -z "$relative" ]] && continue
-    target="$(resolve "$directory" "$relative")"
+    target="$(resolve "$directory" "$relative")" || target=""
     if [[ -z "$target" || ! -f "$target/pubspec.yaml" ]]; then
       echo "ERROR: $directory/pubspec.yaml depends on $relative, which has no pubspec.yaml" >&2
       exit 1

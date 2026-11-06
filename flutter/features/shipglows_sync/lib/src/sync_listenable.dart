@@ -5,7 +5,7 @@ import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 extension SyncObservableListenable on SyncObservable {
   Listenable get asListenable {
     final self = this;
-    return self is Listenable ? self as Listenable : _ObservableListenable(self);
+    return self is Listenable ? self : _ObservableListenable(self);
   }
 }
 

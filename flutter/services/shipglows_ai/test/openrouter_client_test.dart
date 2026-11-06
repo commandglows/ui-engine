@@ -391,6 +391,8 @@ void main() {
     final answer = await client.complete(
       const AiRequest(model: 'm', messages: [AiMessage.user('x')]),
     );
+    // A broadcast stream delivers on a later microtask.
+    await Future<void>.delayed(Duration.zero);
     await subscription.cancel();
 
     expect(answer.truncated, isTrue);
@@ -414,6 +416,8 @@ void main() {
       ),
       throwsA(isA<AiInvalidKey>()),
     );
+    // A broadcast stream delivers on a later microtask.
+    await Future<void>.delayed(Duration.zero);
     await subscription.cancel();
 
     expect(events, hasLength(2));
@@ -444,6 +448,8 @@ void main() {
       ),
       throwsA(isA<TypeError>()),
     );
+    // A broadcast stream delivers on a later microtask.
+    await Future<void>.delayed(Duration.zero);
     await subscription.cancel();
 
     expect(events, hasLength(2));

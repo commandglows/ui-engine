@@ -816,6 +816,7 @@ class _RitualPageEditorState extends State<_RitualPageEditor> {
                         ),
                       ))
                         ListTile(
+                          key: ValueKey(id),
                           title: Text(
                             _strings(RitualText.unavailableReference),
                           ),

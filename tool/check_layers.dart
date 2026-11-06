@@ -1,5 +1,7 @@
 // Checks the layers of flutter/: each package only depends on the layers its own
-// layer may use, core stays free of Flutter, and every folder is a known layer.
+// layer may use, core stays free of Flutter (dart:ui and flutter_* packages
+// included), and every folder is a known layer. A third-party package that only
+// needs Flutter under another name is not detected.
 //
 //   dart tool/check_layers.dart
 //
@@ -18,6 +20,10 @@ const allowed = <String, Set<String>>{
 final _dependencySection = RegExp(r'^dependencies:\s*$');
 final _topLevelKey = RegExp(r'^\S');
 final _dependencyName = RegExp(r'^  ([a-zA-Z_]\w*):');
+final _flutterImport = RegExp(
+  r'''^\s*(import|export)\s+['"](package:flutter[/_]|dart:ui['"])''',
+  multiLine: true,
+);
 
 void main() {
   final root = Directory.fromUri(
@@ -47,7 +53,8 @@ void main() {
   pubspecs.forEach((name, pubspec) {
     final layer = layerOf[name]!;
     for (final dependency in _dependencies(pubspec)) {
-      if (dependency == 'flutter' && layer == 'core') {
+      if (layer == 'core' &&
+          (dependency == 'flutter' || dependency.startsWith('flutter_'))) {
         problems.add('$name (core) declares Flutter');
       }
       final other = layerOf[dependency];
@@ -59,7 +66,7 @@ void main() {
       final lib = Directory('${pubspec.parent.path}/lib');
       for (final file in lib.listSync(recursive: true).whereType<File>()) {
         if (file.path.endsWith('.dart') &&
-            file.readAsStringSync().contains('package:flutter/')) {
+            _flutterImport.hasMatch(file.readAsStringSync())) {
           problems.add('$name (core) imports Flutter in ${file.path}');
         }
       }
