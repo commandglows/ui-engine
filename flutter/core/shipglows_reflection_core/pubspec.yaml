@@ -1,0 +1,14 @@
+name: shipglows_reflection_core
+description: A bank of questions that shift a person's perspective, picked one at a time without repeating, and answers that can be reread later.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
