@@ -2,13 +2,13 @@ import 'package:flutter/widgets.dart';
 
 /// Where a node stands on the journey.
 enum JourneyNodeState {
-  /// Reached or completed.
+  /// Reached or completed; drawn with a check badge.
   done,
 
-  /// The place the person is at now; drawn with a highlighted ring.
+  /// The place the person is at now; drawn with a thick ring and a soft pulse.
   current,
 
-  /// Not reached yet.
+  /// Not reached yet; drawn as an outlined node.
   upcoming,
 
   /// No progression meaning (for example a past life event).
@@ -18,6 +18,10 @@ enum JourneyNodeState {
 /// One stop on the path.
 @immutable
 class JourneyNode {
+  /// Creates a stop.
+  ///
+  /// [id] should be unique within the map: a repeated id still renders, but
+  /// every node sharing it reads as selected together.
   const JourneyNode({
     required this.id,
     required this.label,
@@ -27,14 +31,20 @@ class JourneyNode {
     this.caption,
     this.progress,
     this.semanticLabel,
-  }) : assert(progress == null || (progress >= 0 && progress <= 1));
+  }) : assert(
+         progress == null || (progress >= 0 && progress <= 1),
+         'progress must be between 0 and 1',
+       );
 
-  /// Stable identity handed back to [JourneyMap.onSelect].
+  /// Stable identity handed back to `onSelect`.
   final String id;
 
-  /// Name shown under the node.
+  /// Name shown under the node. Long labels are cut visually after two lines;
+  /// the full text always stays in the semantics label.
   final String label;
 
+  /// Progression state; carried by a mark and a spoken label, never by colour
+  /// alone.
   final JourneyNodeState state;
 
   /// Short text inside the node (a number, a year). Falls back to [icon].
@@ -49,13 +59,14 @@ class JourneyNode {
   /// Optional 0..1 ring drawn around the node.
   final double? progress;
 
-  /// Replaces the default spoken label (`label, state`).
+  /// Replaces the default spoken label (`label, caption, state, position`).
   final String? semanticLabel;
 }
 
 /// A titled group of nodes drawn on one path.
 @immutable
 class JourneyChapter {
+  /// Creates a chapter.
   const JourneyChapter({
     required this.id,
     required this.title,
@@ -64,34 +75,18 @@ class JourneyChapter {
     this.trailing,
   });
 
+  /// Stable identity of the chapter.
   final String id;
+
+  /// Header text.
   final String title;
+
+  /// Stops of this chapter, in path order.
   final List<JourneyNode> nodes;
+
+  /// Icon before the title.
   final IconData? icon;
 
   /// Right-aligned summary in the chapter header (for example `3/8`).
   final String? trailing;
-}
-
-/// Spoken names for [JourneyNodeState]; override to localise.
-@immutable
-class JourneyStateLabels {
-  const JourneyStateLabels({
-    this.done = 'terminé',
-    this.current = 'en cours',
-    this.upcoming = 'à venir',
-    this.neutral = '',
-  });
-
-  final String done;
-  final String current;
-  final String upcoming;
-  final String neutral;
-
-  String of(JourneyNodeState state) => switch (state) {
-    JourneyNodeState.done => done,
-    JourneyNodeState.current => current,
-    JourneyNodeState.upcoming => upcoming,
-    JourneyNodeState.neutral => neutral,
-  };
 }

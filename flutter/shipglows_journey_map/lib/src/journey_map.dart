@@ -1,374 +1,397 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:shipglows_theme/shipglows_theme.dart';
 
-import 'journey_layout.dart';
+import 'journey_controller.dart';
+import 'journey_labels.dart';
 import 'journey_model.dart';
+import 'journey_row_view.dart';
+import 'journey_rows.dart';
+import 'journey_theme.dart';
 
-/// Colours of a [JourneyMap]; every null falls back to the ambient
-/// [ColorScheme], so an app only overrides what its brand needs.
-@immutable
-class JourneyMapStyle {
-  const JourneyMapStyle({
-    this.pathColor,
-    this.doneColor,
-    this.currentColor,
-    this.neutralColor,
-    this.upcomingColor,
-    this.ringColor,
-    this.onNodeColor,
-    this.labelColor,
-    this.pathWidth = 14,
-    this.nodeRadius = 28,
-  });
-
-  final Color? pathColor;
-  final Color? doneColor;
-  final Color? currentColor;
-  final Color? neutralColor;
-  final Color? upcomingColor;
-
-  /// Ring of the current or selected node.
-  final Color? ringColor;
-
-  /// Text/icon colour inside filled nodes.
-  final Color? onNodeColor;
-
-  /// Colour of node captions and chapter titles.
-  final Color? labelColor;
-
-  final double pathWidth;
-  final double nodeRadius;
+/// Widget shown instead of the map while loading, on error or when empty;
+/// null when the map itself should be drawn.
+Widget? _statusWidget(
+  BuildContext context, {
+  required JourneyMapLabels labels,
+  required bool loading,
+  required Object? error,
+  required VoidCallback? onRetry,
+  required WidgetBuilder? emptyBuilder,
+  required bool isEmpty,
+}) {
+  if (loading) {
+    return Padding(
+      padding: const EdgeInsets.all(ShipglowsScale.spaceXl),
+      child: Center(
+        child: Semantics(
+          liveRegion: true,
+          label: labels.loading,
+          child: const CircularProgressIndicator(),
+        ),
+      ),
+    );
+  }
+  if (error != null) {
+    return Padding(
+      padding: const EdgeInsets.all(ShipglowsScale.spaceXl),
+      child: Semantics(
+        liveRegion: true,
+        container: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline),
+            const SizedBox(height: ShipglowsScale.spaceMd),
+            Text(labels.error, textAlign: TextAlign.center),
+            if (onRetry != null) ...[
+              const SizedBox(height: ShipglowsScale.spaceLg),
+              FilledButton(onPressed: onRetry, child: Text(labels.retry)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  if (isEmpty) {
+    return emptyBuilder?.call(context) ??
+        Padding(
+          padding: const EdgeInsets.all(ShipglowsScale.spaceXl),
+          child: Center(child: Text(labels.empty, textAlign: TextAlign.center)),
+        );
+  }
+  return null;
 }
 
-/// Chapters of nodes drawn along winding paths. Non-scrolling: place it in a
-/// scrollable of your choice.
-class JourneyMap extends StatelessWidget {
+/// Chapters of nodes drawn along winding paths, as a non-scrolling column.
+///
+/// Fine for a handful of chapters inside an existing list. For long journeys
+/// use [SliverJourneyMap] or [JourneyMapView], which build only the rows on
+/// screen.
+class JourneyMap extends StatefulWidget {
+  /// Creates a map.
   const JourneyMap({
-    super.key,
     required this.chapters,
+    super.key,
     this.onSelect,
     this.selectedId,
-    this.style = const JourneyMapStyle(),
-    this.stateLabels = const JourneyStateLabels(),
-    this.emptyChapterLabel = 'Rien ici pour le moment.',
+    this.theme,
+    this.labels,
+    this.nodeBuilder,
+    this.animateCurrent = true,
+    this.loading = false,
+    this.error,
+    this.onRetry,
+    this.emptyBuilder,
   });
 
+  /// Chapters, in order.
   final List<JourneyChapter> chapters;
 
   /// Called with the node id; nodes are inert when null.
   final ValueChanged<String>? onSelect;
+
+  /// Id of the selected node.
   final String? selectedId;
-  final JourneyMapStyle style;
-  final JourneyStateLabels stateLabels;
-  final String emptyChapterLabel;
+
+  /// Overrides on top of the ambient [JourneyMapTheme].
+  final JourneyMapTheme? theme;
+
+  /// Strings; defaults to the ambient locale (English or French).
+  final JourneyMapLabels? labels;
+
+  /// Replaces the default node cell.
+  final JourneyNodeBuilder? nodeBuilder;
+
+  /// Lets the current node pulse (still off when the platform reduces motion).
+  final bool animateCurrent;
+
+  /// Shows a spinner instead of the map.
+  final bool loading;
+
+  /// When non-null, shows the error notice instead of the map.
+  final Object? error;
+
+  /// Retry action of the error notice.
+  final VoidCallback? onRetry;
+
+  /// Replaces the notice shown when there are no chapters.
+  final WidgetBuilder? emptyBuilder;
+
+  @override
+  State<JourneyMap> createState() => _JourneyMapState();
+}
+
+class _JourneyMapState extends State<JourneyMap> {
+  late JourneyRows _rows = JourneyRows.from(widget.chapters);
+
+  @override
+  void didUpdateWidget(JourneyMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.chapters, widget.chapters)) {
+      _rows = JourneyRows.from(widget.chapters);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final scope = JourneyRowScope.resolve(
+      context,
+      theme: widget.theme,
+      labels: widget.labels,
+      selectedId: widget.selectedId,
+      onSelect: widget.onSelect,
+      nodeBuilder: widget.nodeBuilder,
+      animateCurrent: widget.animateCurrent,
+    );
+    final status = _statusWidget(
+      context,
+      labels: scope.labels,
+      loading: widget.loading,
+      error: widget.error,
+      onRetry: widget.onRetry,
+      emptyBuilder: widget.emptyBuilder,
+      isEmpty: widget.chapters.isEmpty,
+    );
+    if (status != null) return status;
+    final metrics = scope.metrics;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final chapter in chapters)
-          _ChapterView(
-            key: ValueKey('journey-chapter-${chapter.id}'),
-            chapter: chapter,
-            onSelect: onSelect,
-            selectedId: selectedId,
-            style: style,
-            emptyLabel: emptyChapterLabel,
-            stateLabels: stateLabels,
+        for (var i = 0; i < _rows.length; i++)
+          SizedBox(
+            height: _rows.extentOf(i, metrics.headerExtent, metrics.rowExtent),
+            child: JourneyRowView(row: _rows.rows[i], scope: scope),
           ),
       ],
     );
   }
 }
 
-class _ChapterView extends StatelessWidget {
-  const _ChapterView({
+/// The same map as a sliver: only rows near the viewport are built, so a
+/// hundred thousand nodes scroll like ten.
+///
+/// Use it inside a [CustomScrollView], or take [JourneyMapView] which wraps
+/// one. Pass a [JourneyMapController] to scroll to a node.
+class SliverJourneyMap extends StatefulWidget {
+  /// Creates a sliver map.
+  const SliverJourneyMap({
+    required this.chapters,
     super.key,
-    required this.chapter,
-    required this.onSelect,
-    required this.selectedId,
-    required this.style,
-    required this.stateLabels,
-    required this.emptyLabel,
+    this.onSelect,
+    this.selectedId,
+    this.theme,
+    this.labels,
+    this.nodeBuilder,
+    this.controller,
+    this.animateCurrent = true,
+    this.loading = false,
+    this.error,
+    this.onRetry,
+    this.emptyBuilder,
   });
 
-  final JourneyChapter chapter;
+  /// Chapters, in order. Keep the same list instance between builds when
+  /// nothing changed: the flattened model is rebuilt only when it changes.
+  final List<JourneyChapter> chapters;
+
+  /// Called with the node id; nodes are inert when null.
   final ValueChanged<String>? onSelect;
+
+  /// Id of the selected node.
   final String? selectedId;
-  final JourneyMapStyle style;
-  final JourneyStateLabels stateLabels;
-  final String emptyLabel;
+
+  /// Overrides on top of the ambient [JourneyMapTheme].
+  final JourneyMapTheme? theme;
+
+  /// Strings; defaults to the ambient locale (English or French).
+  final JourneyMapLabels? labels;
+
+  /// Replaces the default node cell.
+  final JourneyNodeBuilder? nodeBuilder;
+
+  /// Lets the app scroll to a node.
+  final JourneyMapController? controller;
+
+  /// Lets the current node pulse (still off when the platform reduces motion).
+  final bool animateCurrent;
+
+  /// Shows a spinner instead of the map.
+  final bool loading;
+
+  /// When non-null, shows the error notice instead of the map.
+  final Object? error;
+
+  /// Retry action of the error notice.
+  final VoidCallback? onRetry;
+
+  /// Replaces the notice shown when there are no chapters.
+  final WidgetBuilder? emptyBuilder;
+
+  @override
+  State<SliverJourneyMap> createState() => _SliverJourneyMapState();
+}
+
+class _SliverJourneyMapState extends State<SliverJourneyMap> {
+  late JourneyRows _rows = JourneyRows.from(widget.chapters);
+
+  @override
+  void didUpdateWidget(SliverJourneyMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.chapters, widget.chapters)) {
+      _rows = JourneyRows.from(widget.chapters);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final labelColor = style.labelColor ?? theme.colorScheme.onSurface;
-    final scale = math
-        .max(1.0, MediaQuery.textScalerOf(context).scale(16) / 16)
-        .clamp(1.0, 2.0)
-        .toDouble();
-    final radius = style.nodeRadius;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: ShipglowsScale.spaceMd),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Semantics(
-            header: true,
-            child: Row(
-              children: [
-                if (chapter.icon != null) ...[
-                  Icon(chapter.icon, color: labelColor),
-                  const SizedBox(width: ShipglowsScale.spaceMd),
-                ],
-                Expanded(
-                  child: Text(
-                    chapter.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: labelColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (chapter.trailing != null)
-                  Text(
-                    chapter.trailing!,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: labelColor,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (chapter.nodes.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(ShipglowsScale.spaceLg),
-              child: Text(emptyLabel, style: TextStyle(color: labelColor)),
-            )
-          else
-            LayoutBuilder(
-              builder: (context, box) {
-                final layout = JourneyLayout.winding(
-                  count: chapter.nodes.length,
-                  width: box.maxWidth,
-                  nodeRadius: radius,
-                  rowHeight: (radius * 2 + 62) * scale,
-                );
-                final cell = math.min(box.maxWidth, 136.0 + 24 * (scale - 1));
-                return SizedBox(
-                  height: layout.height,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned.fill(
-                        child: ExcludeSemantics(
-                          child: CustomPaint(
-                            painter: _PathPainter(
-                              layout.path,
-                              style.pathColor ??
-                                  theme.colorScheme.outlineVariant,
-                              style.pathWidth,
-                            ),
-                          ),
-                        ),
-                      ),
-                      for (var i = 0; i < chapter.nodes.length; i++)
-                        Positioned(
-                          left: (layout.centers[i].dx - cell / 2).clamp(
-                            0.0,
-                            math.max(0.0, box.maxWidth - cell),
-                          ),
-                          top: layout.centers[i].dy - radius,
-                          width: cell,
-                          child: _NodeView(
-                            node: chapter.nodes[i],
-                            selected: chapter.nodes[i].id == selectedId,
-                            onSelect: onSelect,
-                            style: style,
-                            stateLabels: stateLabels,
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
+    final scope = JourneyRowScope.resolve(
+      context,
+      theme: widget.theme,
+      labels: widget.labels,
+      selectedId: widget.selectedId,
+      onSelect: widget.onSelect,
+      nodeBuilder: widget.nodeBuilder,
+      animateCurrent: widget.animateCurrent,
+    );
+    final status = _statusWidget(
+      context,
+      labels: scope.labels,
+      loading: widget.loading,
+      error: widget.error,
+      onRetry: widget.onRetry,
+      emptyBuilder: widget.emptyBuilder,
+      isEmpty: widget.chapters.isEmpty,
+    );
+    if (status != null) return SliverToBoxAdapter(child: status);
+    final metrics = scope.metrics;
+    widget.controller?.bind(
+      _rows,
+      metrics,
+      reduceMotion: MediaQuery.disableAnimationsOf(context),
+    );
+    return SliverVariedExtentList.builder(
+      itemCount: _rows.length,
+      itemExtentBuilder: (index, _) =>
+          _rows.extentOf(index, metrics.headerExtent, metrics.rowExtent),
+      itemBuilder: (context, index) =>
+          JourneyRowView(row: _rows.rows[index], scope: scope),
     );
   }
 }
 
-class _PathPainter extends CustomPainter {
-  const _PathPainter(this.path, this.color, this.width);
-
-  final Path path;
-  final Color color;
-  final double width;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color.withValues(alpha: 0.55)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = width
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_PathPainter old) =>
-      old.color != color || old.width != width || old.path != path;
-}
-
-class _NodeView extends StatelessWidget {
-  const _NodeView({
-    required this.node,
-    required this.selected,
-    required this.onSelect,
-    required this.style,
-    required this.stateLabels,
+/// A ready-made scroll view around [SliverJourneyMap].
+class JourneyMapView extends StatefulWidget {
+  /// Creates a scrolling map.
+  const JourneyMapView({
+    required this.chapters,
+    super.key,
+    this.onSelect,
+    this.selectedId,
+    this.theme,
+    this.labels,
+    this.nodeBuilder,
+    this.controller,
+    this.padding = const EdgeInsets.all(ShipglowsScale.spaceLg),
+    this.initialScrollToCurrent = false,
+    this.animateCurrent = true,
+    this.loading = false,
+    this.error,
+    this.onRetry,
+    this.emptyBuilder,
   });
 
-  final JourneyNode node;
-  final bool selected;
+  /// Chapters, in order.
+  final List<JourneyChapter> chapters;
+
+  /// Called with the node id; nodes are inert when null.
   final ValueChanged<String>? onSelect;
-  final JourneyMapStyle style;
-  final JourneyStateLabels stateLabels;
+
+  /// Id of the selected node.
+  final String? selectedId;
+
+  /// Overrides on top of the ambient [JourneyMapTheme].
+  final JourneyMapTheme? theme;
+
+  /// Strings; defaults to the ambient locale (English or French).
+  final JourneyMapLabels? labels;
+
+  /// Replaces the default node cell.
+  final JourneyNodeBuilder? nodeBuilder;
+
+  /// Scroll control; one is created when null.
+  final JourneyMapController? controller;
+
+  /// Space around the map.
+  final EdgeInsets padding;
+
+  /// Opens already scrolled to the current node.
+  final bool initialScrollToCurrent;
+
+  /// Lets the current node pulse (still off when the platform reduces motion).
+  final bool animateCurrent;
+
+  /// Shows a spinner instead of the map.
+  final bool loading;
+
+  /// When non-null, shows the error notice instead of the map.
+  final Object? error;
+
+  /// Retry action of the error notice.
+  final VoidCallback? onRetry;
+
+  /// Replaces the notice shown when there are no chapters.
+  final WidgetBuilder? emptyBuilder;
+
+  @override
+  State<JourneyMapView> createState() => _JourneyMapViewState();
+}
+
+class _JourneyMapViewState extends State<JourneyMapView> {
+  JourneyMapController? _owned;
+
+  JourneyMapController get _controller =>
+      widget.controller ?? (_owned ??= JourneyMapController());
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialScrollToCurrent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _controller.scrollToCurrent(duration: Duration.zero);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _owned?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final radius = style.nodeRadius;
-    final labelColor = style.labelColor ?? scheme.onSurface;
-    final fill = switch (node.state) {
-      JourneyNodeState.done => style.doneColor ?? scheme.primary,
-      JourneyNodeState.current => style.currentColor ?? scheme.primary,
-      JourneyNodeState.neutral => style.neutralColor ?? scheme.secondary,
-      JourneyNodeState.upcoming => style.upcomingColor ?? scheme.surface,
-    };
-    final filled = node.state != JourneyNodeState.upcoming;
-    final onFill = filled
-        ? (style.onNodeColor ??
-              (ThemeData.estimateBrightnessForColor(fill) == Brightness.dark
-                  ? Colors.white
-                  : Colors.black87))
-        : scheme.onSurface;
-    final ring = node.state == JourneyNodeState.current || selected;
-    final stateText = stateLabels.of(node.state);
-    final spoken =
-        node.semanticLabel ??
-        [
-          node.label,
-          if (node.caption != null) node.caption!,
-          if (stateText.isNotEmpty) stateText,
-        ].join(', ');
-
-    final Widget inner = node.marker != null
-        ? Text(
-            node.marker!,
-            style: textTheme.titleMedium?.copyWith(
-              color: onFill,
-              fontWeight: FontWeight.w800,
-            ),
-          )
-        : Icon(node.icon ?? Icons.circle, color: onFill, size: radius * 0.8);
-
-    final circle = SizedBox(
-      width: radius * 2,
-      height: radius * 2,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: radius * 2,
-            height: radius * 2,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: fill,
-              border: Border.all(
-                color: ring
-                    ? (style.ringColor ?? scheme.tertiary)
-                    : (filled ? Colors.white70 : scheme.outline),
-                width: ring ? 4 : 2,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: inner,
+    final controller = _controller..leadingExtent = widget.padding.top;
+    return CustomScrollView(
+      controller: controller.scrollController,
+      slivers: [
+        SliverPadding(
+          padding: widget.padding,
+          sliver: SliverJourneyMap(
+            chapters: widget.chapters,
+            onSelect: widget.onSelect,
+            selectedId: widget.selectedId,
+            theme: widget.theme,
+            labels: widget.labels,
+            nodeBuilder: widget.nodeBuilder,
+            controller: controller,
+            animateCurrent: widget.animateCurrent,
+            loading: widget.loading,
+            error: widget.error,
+            onRetry: widget.onRetry,
+            emptyBuilder: widget.emptyBuilder,
           ),
-          if (node.progress != null)
-            SizedBox.expand(
-              child: CircularProgressIndicator(
-                value: node.progress,
-                strokeWidth: 3,
-                color: onFill,
-                backgroundColor: Colors.transparent,
-              ),
-            ),
-          if (node.state == JourneyNodeState.done)
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: scheme.surface,
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  size: radius * 0.7,
-                  color: style.doneColor ?? scheme.primary,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-
-    return Semantics(
-      container: true,
-      button: onSelect != null,
-      selected: selected,
-      label: spoken,
-      excludeSemantics: true,
-      onTap: onSelect == null ? null : () => onSelect!(node.id),
-      child: InkWell(
-        onTap: onSelect == null ? null : () => onSelect!(node.id),
-        borderRadius: BorderRadius.circular(ShipglowsScale.radiusMd),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            circle,
-            const SizedBox(height: ShipglowsScale.spaceXs),
-            Text(
-              node.label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.labelLarge?.copyWith(
-                color: labelColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            if (node.caption != null)
-              Text(
-                node.caption!,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(color: labelColor),
-              ),
-          ],
         ),
-      ),
+      ],
     );
   }
 }
