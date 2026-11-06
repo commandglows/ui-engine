@@ -1,0 +1,29 @@
+name: shipglows_tray
+description: Notification area (tray) icon, standard menu, close-to-tray, launch at sign-in and single instance for ShipGlows desktop Flutter apps.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_icons:
+    path: ../../foundation/shipglows_icons
+  shipglows_menu:
+    path: ../../components/shipglows_menu
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      windows:
+        pluginClass: ShipglowsTrayPluginCApi

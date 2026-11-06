@@ -1,0 +1,31 @@
+name: shipglows_window
+description: Shared custom desktop title bar and window chrome for ShipGlows Flutter apps.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_theme:
+    path: ../../foundation/shipglows_theme
+  # Not 0.6: its synchronous FFI crashes on resize, see window_backend_native.dart.
+  window_manager: ^0.5.2
+  ffi: ^2.1.0
+  screen_retriever: ^0.2.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      windows:
+        pluginClass: ShipglowsWindowPluginCApi

@@ -1,0 +1,14 @@
+name: shipglows_settings_core
+description: Typed settings keys, schema and migrations, storage and remote ports in pure Dart. The controller and widgets live in shipglows_settings.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

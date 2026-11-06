@@ -1,0 +1,24 @@
+name: shipglows_menu
+description: Action menu model shared by the tray and in-app menus, and an anchored, searchable action list for ShipGlows Flutter apps.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_icons:
+    path: ../../foundation/shipglows_icons
+  shipglows_theme:
+    path: ../../foundation/shipglows_theme
+  meta: any
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

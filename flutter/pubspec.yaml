@@ -1,0 +1,17 @@
+# Workspace of the shared Flutter packages: one resolution and one analysis
+# context while working here. Apps are other repositories: they keep depending
+# on members by path, and ignore this file.
+name: _app_engine_flutter
+publish_to: none
+
+environment:
+  sdk: ^3.11.3
+
+workspace:
+  - foundation/*
+  - core/*
+  - services/*
+  - components/*
+  - features/*
+  - features/shipglows_reviews/example
+  - desktop/*
