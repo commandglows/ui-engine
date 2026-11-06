@@ -1,0 +1,20 @@
+name: shipglows_lifeline_core
+description: Decides when to offer help from what a person notes, level by level and without nagging, with verified French helplines, in pure Dart. The page lives in shipglows_lifeline.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+
+dependencies:
+  shipglows_organize:
+    path: ../shipglows_organize
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  shipglows_feelings:
+    path: ../shipglows_feelings

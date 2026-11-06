@@ -1,0 +1,23 @@
+name: shipglows_lifeline
+description: Full-page progressive lifeline for ShipGlows Flutter apps, offering suggestions more or less firmly, from a breathing exercise to calling a helpline, and always easy to leave.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_lifeline_core:
+    path: ../../core/shipglows_lifeline_core
+  shipglows_theme:
+    path: ../../foundation/shipglows_theme
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
