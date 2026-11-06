@@ -41,6 +41,9 @@ audit, item 12).
 - `FeedbackStringsScope(strings: FeedbackStrings.fr, child:)` in
   `MaterialApp.builder` sets the texts for the whole app (French apps
   without `flutter_localizations` read as English otherwise).
+- `FeedbackAppearanceScope(appearance: FeedbackAppearance(…), child:)` in
+  `MaterialApp.builder` gives an app its own snack bar colors and placement
+  (`margin`, read as each message is built); unset, the shared look stays.
 - `feedbackSnackBar(context, …, wrapContent:)` builds the same snack bar for
   code that shows it itself; `FeedbackContent` is the icon and text alone,
   for an app's own surface.

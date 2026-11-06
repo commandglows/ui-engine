@@ -18,6 +18,8 @@ class FeedbackContent extends StatelessWidget {
     this.kind = FeedbackKind.info,
     this.strings,
     this.liveRegion = false,
+    this.textColor,
+    this.iconColor,
   });
 
   final String message;
@@ -29,6 +31,12 @@ class FeedbackContent extends StatelessWidget {
   /// Whether a screen reader announces it when it appears or changes.
   final bool liveRegion;
 
+  /// Defaults to the theme's text color.
+  final Color? textColor;
+
+  /// Defaults to the kind's color.
+  final Color? iconColor;
+
   @override
   Widget build(BuildContext context) {
     final theme = ShipglowsTheme.of(context);
@@ -39,10 +47,13 @@ class FeedbackContent extends StatelessWidget {
       excludeSemantics: true,
       child: Row(
         children: [
-          Icon(kind.icon, color: kind.colorOf(theme), size: 20),
+          Icon(kind.icon, color: iconColor ?? kind.colorOf(theme), size: 20),
           SizedBox(width: theme.spaceMd),
           Expanded(
-            child: Text(message, style: TextStyle(color: theme.text)),
+            child: Text(
+              message,
+              style: TextStyle(color: textColor ?? theme.text),
+            ),
           ),
         ],
       ),

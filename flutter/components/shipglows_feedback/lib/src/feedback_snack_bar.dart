@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shipglows_theme/shipglows_theme.dart';
 
+import 'feedback_appearance.dart';
 import 'feedback_content.dart';
 import 'feedback_kind.dart';
 import 'feedback_log.dart';
@@ -14,7 +15,8 @@ const double kFeedbackMaxWidth = 480;
 
 /// The message snack bar, for code that shows it itself: floating, on
 /// `surfaceRaised` with a `border` outline, its action in `accent`,
-/// [kFeedbackMaxWidth] wide on large windows.
+/// [kFeedbackMaxWidth] wide on large windows. A [FeedbackAppearanceScope]
+/// above [context] can change those colors and where it floats.
 ///
 /// - [duration] defaults to the kind's ([FeedbackKind.duration]).
 /// - [showCloseIcon] defaults to errors only.
@@ -82,6 +84,7 @@ class FeedbackMessenger {
     this._strings,
     this._width,
     this._accessibleNavigation,
+    this._appearance,
   );
 
   static FeedbackMessenger _read(
@@ -93,6 +96,7 @@ class FeedbackMessenger {
     FeedbackStrings.of(context),
     MediaQuery.sizeOf(context).width,
     MediaQuery.accessibleNavigationOf(context),
+    FeedbackAppearanceScope.maybeOf(context),
   );
 
   /// The messenger of [context]. Without a [ScaffoldMessenger], its messages
@@ -107,6 +111,7 @@ class FeedbackMessenger {
   final FeedbackStrings _strings;
   final double _width;
   final bool _accessibleNavigation;
+  final FeedbackAppearance? _appearance;
 
   /// [feedbackSnackBar], from the values read with this messenger.
   SnackBar snackBar({
@@ -122,6 +127,9 @@ class FeedbackMessenger {
     Widget Function(Widget content)? wrapContent,
   }) {
     final theme = _theme;
+    final appearance = _appearance;
+    final actionColor = appearance?.action ?? theme.accent;
+    final margin = appearance?.margin?.call();
     final secondaryLabel = secondaryActionLabel;
     final onSecondary = onSecondaryAction;
     final hasSecondary = secondaryLabel != null && onSecondary != null;
@@ -129,6 +137,8 @@ class FeedbackMessenger {
       message: message,
       kind: kind,
       strings: strings ?? _strings,
+      textColor: appearance?.foreground,
+      iconColor: appearance?.iconColorOf?.call(kind),
     );
     if (secondaryLabel != null && onSecondary != null) {
       content = Row(
@@ -137,7 +147,7 @@ class FeedbackMessenger {
           SizedBox(width: theme.spaceSm),
           Builder(
             builder: (context) => TextButton(
-              style: TextButton.styleFrom(foregroundColor: theme.accent),
+              style: TextButton.styleFrom(foregroundColor: actionColor),
               onPressed: () {
                 ScaffoldMessenger.maybeOf(
                   context,
@@ -154,23 +164,27 @@ class FeedbackMessenger {
     return SnackBar(
       content: wrapContent?.call(content) ?? content,
       behavior: SnackBarBehavior.floating,
-      width: wide ? kFeedbackMaxWidth : null,
-      backgroundColor: theme.surfaceRaised,
+      width: margin == null && wide ? kFeedbackMaxWidth : null,
+      margin: margin,
+      backgroundColor: appearance?.background ?? theme.surfaceRaised,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(theme.radiusMd),
-        side: BorderSide(color: theme.border, width: theme.lineWidth),
+        side: BorderSide(
+          color: appearance?.border ?? theme.border,
+          width: theme.lineWidth,
+        ),
       ),
       duration: duration ?? kind.duration,
       persist:
           ((actionLabel != null && onAction != null) || hasSecondary) &&
           _accessibleNavigation,
       showCloseIcon: showCloseIcon ?? kind == FeedbackKind.error,
-      closeIconColor: theme.icon,
+      closeIconColor: appearance?.foreground ?? theme.icon,
       action: actionLabel != null && onAction != null
           ? SnackBarAction(
               label: actionLabel,
               onPressed: onAction,
-              textColor: theme.accent,
+              textColor: actionColor,
             )
           : null,
     );

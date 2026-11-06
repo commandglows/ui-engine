@@ -147,6 +147,48 @@ void main() {
     expect(retried, 1);
   });
 
+  testWidgets('an appearance scope sets the colors and the placement', (
+    tester,
+  ) async {
+    late BuildContext context;
+    const margin = EdgeInsets.fromLTRB(8, 0, 300, 120);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FeedbackAppearanceScope(
+          appearance: FeedbackAppearance(
+            background: const Color(0xFF000001),
+            foreground: const Color(0xFF000002),
+            iconColorOf: (_) => const Color(0xFF000003),
+            margin: () => margin,
+          ),
+          child: Scaffold(
+            body: Builder(
+              builder: (c) {
+                context = c;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    context.showInfo('Moved');
+    await tester.pumpAndSettle();
+
+    final bar = tester.widget<SnackBar>(find.byType(SnackBar));
+    expect(bar.margin, margin);
+    expect(bar.width, isNull);
+    expect(bar.backgroundColor, const Color(0xFF000001));
+    expect(
+      tester.widget<Text>(find.text('Moved')).style?.color,
+      const Color(0xFF000002),
+    );
+    expect(
+      tester.widget<Icon>(find.byIcon(ShipglowsIcons.info)).color,
+      const Color(0xFF000003),
+    );
+  });
+
   test('French texts', () {
     expect(FeedbackStrings.fr.labelOf(FeedbackKind.warning), 'Avertissement');
   });
