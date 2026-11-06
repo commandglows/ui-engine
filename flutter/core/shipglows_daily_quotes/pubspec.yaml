@@ -1,0 +1,15 @@
+name: shipglows_daily_quotes
+description: A vetted bank of short daily quotes in French and English, chosen per context and stable for a given date, offline and without any API, in pure Dart.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+
+dev_dependencies:
+  shipglows_lints:
+    path: ../../foundation/shipglows_lints
+  flutter_test:
+    sdk: flutter
