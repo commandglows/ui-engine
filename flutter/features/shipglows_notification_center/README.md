@@ -130,3 +130,22 @@ final reminders = DailyReminders(
 
 DailyReminderSettings(reminders: reminders, strings: ReminderStrings.fr);
 ```
+
+### Snooze options
+
+The choices of every snooze menu of an app, chosen by the person. Storage and
+what comes back stay with the app.
+
+- `SnoozeOption`: `SnoozeAfter(3, SnoozeUnit.hours)` or
+  `SnoozeAt(SnoozeDay.monday, ReminderTime(9, 0))`. `nextAt(from)` gives the
+  moment in local time, `null` once « today at 18:00 » has passed; a weekday
+  is the next one after today.
+- `SnoozeOptions`: one to eight rows, `SnoozeOptions.defaults` to start;
+  `menu(from)` is soonest first, without what has passed, each minute once;
+  `toJson` / `fromJson` for the app's settings.
+- `SnoozeOptionsEditor(value:, onChanged:, strings: SnoozeStrings.fr)`: one
+  row per option with its moment now, the menu as it reads now, « Add option ».
+- `SnoozeButton(options:, onSelected:)`: the menu; `onSelected` gets the
+  `DateTime` chosen. Planning it is up to the app: `DailyReminders` owns the
+  ids of its own scheduler through `replaceAll`, so a snoozed notification
+  needs a `LocalReminderScheduler` with another `firstId`.

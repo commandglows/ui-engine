@@ -18,6 +18,8 @@
 ///   ([DailyReminderPlan]), planned by a [ReminderScheduler]
 ///   ([LocalReminderScheduler] on Windows and Android), set in
 ///   [DailyReminderSettings].
+/// - [SnoozeOptions]: the choices of a snooze menu, delays or a day and a
+///   time, set in [SnoozeOptionsEditor] and offered by [SnoozeButton].
 library;
 
 export 'src/feedback_history.dart';
@@ -31,4 +33,6 @@ export 'src/reminders/daily_reminder_settings.dart';
 export 'src/reminders/daily_reminders.dart';
 export 'src/reminders/local_reminder_scheduler.dart';
 export 'src/reminders/reminder_scheduler.dart';
+export 'src/reminders/snooze_options.dart';
+export 'src/reminders/snooze_widgets.dart';
 export 'src/strings.dart';

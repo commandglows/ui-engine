@@ -1,5 +1,5 @@
 name: shipglows_notification_center
-description: Shared notification center (latest notifications, read state, mark all read, delete) and daily system reminders (Windows, Android) for ShipGlows Flutter apps.
+description: Shared notification center (latest notifications, read state, mark all read, delete), daily system reminders (Windows, Android) and snooze options for ShipGlows Flutter apps.
 version: 0.1.0
 publish_to: "none"
 
