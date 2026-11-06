@@ -2,8 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shipglows_icons/shipglows_icons.dart';
+import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 
-import 'sync_progress.dart';
+import 'sync_listenable.dart';
 import 'sync_strings.dart';
 
 /// Shows [progress] above [child] while an account's data first reaches the
@@ -23,7 +24,7 @@ class SyncProgressOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: progress,
+    listenable: progress.asListenable,
     child: child,
     builder: (context, child) {
       final stage = progress.stage;
@@ -60,7 +61,7 @@ class SyncProgressView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: progress,
+    listenable: progress.asListenable,
     builder: (context, _) {
       final stage = progress.stage;
       if (stage == null) return const SizedBox.shrink();

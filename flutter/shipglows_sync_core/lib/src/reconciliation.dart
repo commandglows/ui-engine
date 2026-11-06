@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 /// One of the two copies compared before the first sync of an account.
 enum SyncSide {

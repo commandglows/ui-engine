@@ -10,8 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  shipglows_sync:
-    path: ../shipglows_sync
+  shipglows_settings_core:
+    path: ../shipglows_settings_core
+  shipglows_sync_core:
+    path: ../shipglows_sync_core
 
 dev_dependencies:
   flutter_lints: ^6.0.0

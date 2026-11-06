@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:shipglows_settings/shipglows_settings.dart';
+import 'package:shipglows_settings_core/shipglows_settings_core.dart';
 import 'package:web/web.dart' as web;
 
 /// The browser's `localStorage`, one `shipglows.<bucket>` key per bucket.

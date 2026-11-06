@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 
-import 'reconciliation.dart';
-import 'sync_review.dart';
+import 'sync_listenable.dart';
 import 'sync_status_widgets.dart';
 import 'sync_strings.dart';
 
@@ -19,7 +19,7 @@ class SyncRecoveryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: host,
+    listenable: host.asListenable,
     builder: (context, _) {
       final recovery = host.recovery;
       if (recovery == null) return const SizedBox.shrink();

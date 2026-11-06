@@ -1,19 +1,16 @@
 name: shipglows_settings_convex
-description: Convex remote for shipglows_settings, one settings row per account.
+description: Convex remote for shipglows_settings_core, one settings row per account.
 version: 0.1.0
 publish_to: "none"
 
 environment:
   sdk: ^3.11.3
-  flutter: ">=3.41.0"
 
 dependencies:
-  flutter:
-    sdk: flutter
   shipglows_convex:
     path: ../shipglows_convex
-  shipglows_settings:
-    path: ../shipglows_settings
+  shipglows_settings_core:
+    path: ../shipglows_settings_core
 
 dev_dependencies:
   flutter_lints: ^6.0.0

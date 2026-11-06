@@ -17,8 +17,8 @@ dependencies:
     path: ../shipglows_feedback
   shipglows_icons:
     path: ../shipglows_icons
-  shipglows_settings:
-    path: ../shipglows_settings
+  shipglows_settings_core:
+    path: ../shipglows_settings_core
   shipglows_theme:
     path: ../shipglows_theme
   url_launcher: ^6.3.2

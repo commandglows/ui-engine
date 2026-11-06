@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shipglows_feedback/shipglows_feedback.dart';
-import 'package:shipglows_settings/shipglows_settings.dart';
+import 'package:shipglows_settings_core/shipglows_settings_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'customer_review.dart';

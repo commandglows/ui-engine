@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shipglows_settings_core/shipglows_settings_core.dart';
 
-import 'setting_key.dart';
 import 'settings_controller.dart';
 
 /// Rebuilds only when [setting] changes value.

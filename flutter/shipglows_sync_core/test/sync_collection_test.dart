@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shipglows_sync/shipglows_sync.dart';
+import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 
 void main() {
   SyncCollectionIndex<Map<String, Object?>> index(

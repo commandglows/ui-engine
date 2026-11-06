@@ -4,12 +4,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:shipglows_sync/shipglows_sync.dart';
-
-import 'setting_key.dart';
-import 'settings_remote.dart';
-import 'settings_schema.dart';
-import 'settings_storage.dart';
+import 'package:shipglows_settings_core/shipglows_settings_core.dart';
+import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 
 /// Reads settings saved by an older version of the app (one secure-storage
 /// key per field, a SharedPreferences prefix...), field id to raw value.

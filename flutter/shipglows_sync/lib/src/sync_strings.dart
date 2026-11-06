@@ -1,9 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
-
-import 'sync_progress.dart';
-import 'sync_status.dart';
+import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 
 /// Texts of the sync widgets. The app picks the language: use [fr], [en],
 /// [forLocale], or its own values for other words ("données" instead of

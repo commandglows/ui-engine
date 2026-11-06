@@ -1,31 +1,14 @@
-/// Device-to-account sync for ShipGlows Flutter apps, ported from
-/// CommunityGlows.
-///
-/// - [SyncStatus] / [SyncSource]: where a synced store stands (synced,
-///   pending, needs review, unreachable, failed).
-/// - [reconcileSnapshots]: the first sync of an account on a device unites
-///   both copies; each value set differently on both sides is a
-///   [SyncConflict] the user resolves ([SyncChoices]).
-/// - [indexSyncCollection]: safely indexes JSON-safe business records by stable
-///   id, reporting contradictory duplicates before reconciliation.
-/// - [SyncReviewHost] / [SyncRecoveryHost]: a store that asks before its
-///   first sync and keeps [SyncRecovery] copies of both sides.
-/// - [SyncProgress]: the steps of a first sync after sign-in.
-/// - [rewriteSyncIds] / [holdsTemporaryId]: values pointing at a record
-///   created offline wait for its server id, then are rewritten with it.
-/// - Widgets: [SyncStatusChip], [SyncIssueBanner], [SyncReviewPrompt] and
-///   [showSyncReviewDialog], [SyncProgressOverlay], [SyncRecoveryPanel],
-///   worded by [SyncStrings] (French and English).
+/// Widgets and texts of the device-to-account sync: [SyncStatusChip],
+/// [SyncIssueBanner], [SyncReviewPrompt] and [showSyncReviewDialog],
+/// [SyncProgressOverlay], [SyncRecoveryPanel], worded by [SyncStrings]
+/// (French and English). Re-exports the logic of `shipglows_sync_core`.
 library;
 
-export 'src/reconciliation.dart';
-export 'src/sync_collection.dart';
-export 'src/sync_ids.dart';
-export 'src/sync_progress.dart';
+export 'package:shipglows_sync_core/shipglows_sync_core.dart';
+
+export 'src/sync_listenable.dart';
 export 'src/sync_progress_view.dart';
 export 'src/sync_recovery_panel.dart';
-export 'src/sync_review.dart';
 export 'src/sync_review_dialog.dart';
-export 'src/sync_status.dart';
 export 'src/sync_status_widgets.dart';
 export 'src/sync_strings.dart';

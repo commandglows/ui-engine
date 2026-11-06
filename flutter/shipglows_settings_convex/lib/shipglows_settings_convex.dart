@@ -6,7 +6,7 @@
 library;
 
 import 'package:shipglows_convex/shipglows_convex.dart';
-import 'package:shipglows_settings/shipglows_settings.dart';
+import 'package:shipglows_settings_core/shipglows_settings_core.dart';
 
 /// Server codes that mean the account cannot read or write its settings.
 const _authFailureCodes = <String>{

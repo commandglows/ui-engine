@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shipglows_icons/shipglows_icons.dart';
+import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 
-import 'sync_status.dart';
+import 'sync_listenable.dart';
 import 'sync_strings.dart';
 
 /// Local date and time of [value], in [strings]' language when they give a
@@ -35,7 +36,7 @@ class SyncStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: source,
+    listenable: source.asListenable,
     builder: (context, _) {
       final status = source.status;
       final (icon, color) = syncStatusLook(context, status.health);
@@ -104,7 +105,7 @@ class SyncIssueBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: source,
+    listenable: source.asListenable,
     builder: (context, _) {
       final status = source.status;
       if (!status.needsAttention) return const SizedBox.shrink();

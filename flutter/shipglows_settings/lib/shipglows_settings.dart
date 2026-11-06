@@ -8,7 +8,7 @@ library;
 
 // Sync types shared with every synced store; their widgets live in
 // `package:shipglows_sync`.
-export 'package:shipglows_sync/shipglows_sync.dart'
+export 'package:shipglows_sync_core/shipglows_sync_core.dart'
     show
         SyncChoices,
         SyncHealth,
@@ -25,12 +25,7 @@ export 'package:shipglows_sync/shipglows_sync.dart'
         SyncStatus,
         TemporaryIdTest;
 
-export 'src/file_settings_storage_stub.dart'
-    if (dart.library.io) 'src/file_settings_storage_io.dart';
-export 'src/secret_store.dart';
-export 'src/setting_key.dart';
+export 'package:shipglows_settings_core/shipglows_settings_core.dart';
+
 export 'src/settings_controller.dart';
-export 'src/settings_remote.dart';
-export 'src/settings_schema.dart';
-export 'src/settings_storage.dart';
 export 'src/settings_widgets.dart';

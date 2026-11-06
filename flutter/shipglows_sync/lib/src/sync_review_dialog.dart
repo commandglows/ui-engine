@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shipglows_sync_core/shipglows_sync_core.dart';
 
-import 'reconciliation.dart';
-import 'sync_review.dart';
+import 'sync_listenable.dart';
 import 'sync_strings.dart';
 
 /// Names a conflict in the user's words (`theme` → "Thème").
@@ -24,7 +24,7 @@ Future<bool> showSyncReviewDialog(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => ListenableBuilder(
-      listenable: host,
+      listenable: host.asListenable,
       builder: (context, _) => PopScope(
         canPop: !host.isResolvingReview,
         child: Dialog(

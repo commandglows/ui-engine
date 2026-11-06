@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'sync_observable.dart';
 
 /// Where the account data stands against its remote copy.
 enum SyncHealth {
@@ -99,7 +99,7 @@ class SyncStatus {
 
 /// Anything synced to an account that the shared widgets can show: the
 /// settings controller, a data repository...
-abstract interface class SyncSource implements Listenable {
+abstract interface class SyncSource implements SyncObservable {
   SyncStatus get status;
 
   /// Pulls then pushes now. Never throws: the outcome is in [status].

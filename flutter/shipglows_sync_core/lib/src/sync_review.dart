@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 import 'reconciliation.dart';
+import 'sync_observable.dart';
 
 /// The two copies of an account met on a device for the first time, waiting
 /// for the user's choices before anything is synced.
@@ -32,7 +33,7 @@ enum SyncReviewError {
 
 /// Holds the review of an account's first sync on this device (the settings
 /// controller, a data repository...).
-abstract interface class SyncReviewHost implements Listenable {
+abstract interface class SyncReviewHost implements SyncObservable {
   /// The review waiting for the user, or `null`.
   SyncReview? get review;
 
@@ -46,7 +47,7 @@ abstract interface class SyncReviewHost implements Listenable {
 }
 
 /// Holds the [SyncRecovery] of the shown account.
-abstract interface class SyncRecoveryHost implements Listenable {
+abstract interface class SyncRecoveryHost implements SyncObservable {
   SyncRecovery? get recovery;
 
   /// Puts [side]'s copy back, here and in the account. Returns whether it

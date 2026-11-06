@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shipglows_feedback/shipglows_feedback.dart';
 import 'package:shipglows_reviews/shipglows_reviews.dart';
-import 'package:shipglows_settings/shipglows_settings.dart';
+import 'package:shipglows_settings_core/shipglows_settings_core.dart';
 
 class FakeStore implements StoreReviewBackend {
   FakeStore({this.canPrompt = true, this.listing = ReviewStore.googlePlay});

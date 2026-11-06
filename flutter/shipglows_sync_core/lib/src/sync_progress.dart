@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'sync_observable.dart';
 
 /// Steps shown while an account's data first reaches a device.
 enum SyncStage {
@@ -20,7 +20,7 @@ enum SyncStage {
 /// Drives the first-sync progress of a sign-in: each step stays on screen at
 /// least [minStageDuration] so the user can read it, and the final notice
 /// hides by itself after [readyDuration].
-class SyncProgress extends ChangeNotifier {
+class SyncProgress implements SyncObservable {
   SyncProgress({
     this.minStageDuration = const Duration(seconds: 1),
     this.readyDuration = const Duration(seconds: 3),
@@ -28,6 +28,8 @@ class SyncProgress extends ChangeNotifier {
 
   final Duration minStageDuration;
   final Duration readyDuration;
+
+  final List<void Function()> _listeners = [];
 
   SyncStage? _stage;
   DateTime _stageStartedAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -97,9 +99,20 @@ class SyncProgress extends ChangeNotifier {
   }
 
   @override
+  void addListener(void Function() listener) => _listeners.add(listener);
+
+  @override
+  void removeListener(void Function() listener) => _listeners.remove(listener);
+
+  void notifyListeners() {
+    for (final listener in List.of(_listeners)) {
+      listener();
+    }
+  }
+
   void dispose() {
     _disposed = true;
     _hideTimer?.cancel();
-    super.dispose();
+    _listeners.clear();
   }
 }
