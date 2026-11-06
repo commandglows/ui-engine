@@ -14,10 +14,14 @@ never pulls `window_manager`.
 
 ## `flutter/shipglows_journey_map`
 
-Shared winding journey map: chapters of nodes drawn along a smooth path
-(`JourneyMap`, `JourneyChapter`, `JourneyNode`, pure `JourneyLayout`). Data-agnostic:
-DreamGlows adapts goals (Parcours > Carte), Claiire adapts life events
-(Mon parcours de vie). State is never colour-only. See the
+Shared winding journey map: chapters of nodes drawn along a smooth path.
+`JourneyMap` (column), `SliverJourneyMap` / `JourneyMapView` (virtualised, built for
+very long journeys, with `JourneyMapController` to scroll to a node),
+`JourneyMapTheme` (`ThemeExtension`, light and dark from the `ColorScheme`) and
+`JourneyMapLabels` (every string, English and French presets). Accessible by
+construction: state never colour-only, 4.5:1 default contrast, text-scale aware rows,
+RTL mirroring, reduced-motion aware. Data-agnostic: DreamGlows adapts goals
+(Parcours > Carte), Claiire adapts life events (Mon parcours de vie). See the
 [package contract](flutter/shipglows_journey_map/README.md).
 
 ## `flutter/shipglows_swipe_actions`
