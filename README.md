@@ -12,6 +12,14 @@ dependencies:
 Each package keeps its own dependencies: an app that uses only the command bar
 never pulls `window_manager`.
 
+## `flutter/shipglows_journey_map`
+
+Shared winding journey map: chapters of nodes drawn along a smooth path
+(`JourneyMap`, `JourneyChapter`, `JourneyNode`, pure `JourneyLayout`). Data-agnostic:
+DreamGlows adapts goals (Parcours > Carte), Claiire adapts life events
+(Mon parcours de vie). State is never colour-only. See the
+[package contract](flutter/shipglows_journey_map/README.md).
+
 ## `flutter/shipglows_swipe_actions`
 
 Shared bidirectional action rows: swipe, long press, exact modifier-click
