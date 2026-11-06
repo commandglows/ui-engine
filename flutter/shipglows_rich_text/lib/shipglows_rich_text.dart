@@ -2,3 +2,4 @@
 library;
 
 export 'src/editor.dart';
+export 'src/image_preview.dart';

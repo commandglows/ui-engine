@@ -33,3 +33,18 @@ selection-preserving Markdown transformations for hosts that need additional
 commands. Toolbar shortcuts are Ctrl/⌘+B, Ctrl/⌘+I, Ctrl/⌘+U, Ctrl/⌘+K and
 Ctrl/⌘+Shift+X;
 Flutter's text field provides its standard undo and redo keyboard shortcuts.
+
+An item whose content is a picture has no Markdown to edit. Show it read-only
+with `ShipglowsImagePreview`, in place of the field:
+
+```dart
+ShipglowsImagePreview(
+  image: imageFuture, // keep the same future across rebuilds
+  thumbnail: thumbnailBytes,
+  semanticLabel: 'Image 1720 × 1392',
+  missingMessage: 'Image absente.',
+)
+```
+
+It fits the space it gets without upscaling. In an unbounded height, give it a
+maximum height. A failed or null load shows the thumbnail and the message.
