@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -29,6 +30,66 @@ class _FakeBrowser implements ClerkBrowser {
 http.Response _json(Object body, [int status = 200]) =>
     http.Response(jsonEncode(body), status);
 
+/// An unsigned JWT: the client reads claims, the backend verifies signatures.
+String _jwt(Map<String, Object?> claims) {
+  String part(Object value) =>
+      base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
+  return '${part({'alg': 'none'})}.${part(claims)}.sig';
+}
+
+Map<String, Object?> _claims({
+  String iss = 'https://example.clerk.accounts.dev',
+  Object aud = 'client',
+  String sub = 'user_1',
+  String? nonce,
+}) => {
+  'iss': iss,
+  'aud': aud,
+  'sub': sub,
+  'nonce': ?nonce,
+  'exp': DateTime.utc(2030).millisecondsSinceEpoch ~/ 1000,
+};
+
+ClerkAuthClient _signInClient(
+  _FakeBrowser browser,
+  Map<String, Object?> Function(String? nonce) claims,
+) => ClerkAuthClient(
+  config: _config,
+  store: MemoryClerkSessionStore(),
+  browser: browser,
+  clock: () => DateTime.utc(2026, 10, 26, 12),
+  httpClient: MockClient((request) async {
+    if (request.url.path == '/oauth/token') {
+      final nonce = browser.lastUrl?.queryParameters['nonce'];
+      return _json({
+        'access_token': 'at',
+        'refresh_token': 'rt',
+        'id_token': _jwt(claims(nonce)),
+        'expires_in': 86400,
+      });
+    }
+    return _json({'sub': 'user_1'});
+  }),
+);
+
+Matcher _authError(String code) => isA<ClerkAuthException>().having(
+  (error) => error.code,
+  'code',
+  code,
+);
+
+class _ScriptedBrowser implements ClerkBrowser {
+  _ScriptedBrowser(this.respond);
+
+  final String Function(Uri url) respond;
+
+  @override
+  Future<String> authenticate({
+    required Uri url,
+    required String callbackScheme,
+  }) async => respond(url);
+}
+
 void main() {
   final now = DateTime.utc(2026, 10, 26, 12);
 
@@ -47,7 +108,9 @@ void main() {
           return _json({
             'access_token': 'at',
             'refresh_token': 'rt',
-            'id_token': 'it',
+            'id_token': _jwt(
+              _claims(nonce: browser.lastUrl?.queryParameters['nonce']),
+            ),
             'expires_in': 86400,
           });
         }
@@ -162,5 +225,154 @@ void main() {
     expect(client.session.value, isNull);
     expect(await store.read(), isNull);
     expect(revoked!.path, '/oauth/token/revoke');
+  });
+
+  group('id_token checks at sign-in', () {
+    test('accepts an audience list and a trailing slash on the issuer', () async {
+      final browser = _FakeBrowser();
+      final client = _signInClient(
+        browser,
+        (nonce) => _claims(
+          iss: 'https://example.clerk.accounts.dev/',
+          aud: ['client', 'other'],
+          nonce: nonce,
+        ),
+      );
+      expect((await client.signIn()).subject, 'user_1');
+    });
+
+    for (final entry in <String, Map<String, Object?> Function(String?)>{
+      'issuer': (nonce) => _claims(iss: 'https://other.dev', nonce: nonce),
+      'audience': (nonce) => _claims(aud: 'other', nonce: nonce),
+      'subject': (nonce) => _claims(sub: 'user_2', nonce: nonce),
+      'nonce': (nonce) => _claims(nonce: 'other'),
+      'missing nonce': (nonce) => _claims(),
+    }.entries) {
+      test('refuses a wrong ${entry.key}', () async {
+        final store = MemoryClerkSessionStore();
+        final browser = _FakeBrowser();
+        final client = ClerkAuthClient(
+          config: _config,
+          store: store,
+          browser: browser,
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/oauth/token') {
+              return _json({
+                'access_token': 'at',
+                'id_token': _jwt(
+                  entry.value(browser.lastUrl?.queryParameters['nonce']),
+                ),
+              });
+            }
+            return _json({'sub': 'user_1'});
+          }),
+        );
+        await expectLater(client.signIn(), throwsA(_authError('id-token-invalid')));
+        expect(await store.read(), isNull);
+      });
+    }
+  });
+
+  test('checks state before the callback error', () async {
+    final client = ClerkAuthClient(
+      config: _config,
+      store: MemoryClerkSessionStore(),
+      browser: _ScriptedBrowser((_) => '${_config.androidRedirectUri}?error=access_denied&state=forged'),
+      httpClient: MockClient((_) async => _json({})),
+    );
+    await expectLater(client.signIn(), throwsA(_authError('state-mismatch')));
+  });
+
+  test('concurrent signIn calls share one browser flow', () async {
+    var opened = 0;
+    final browser = _FakeBrowser();
+    final client = _signInClient(browser, (nonce) => _claims(nonce: nonce));
+    final counting = ClerkAuthClient(
+      config: _config,
+      store: MemoryClerkSessionStore(),
+      browser: _ScriptedBrowser((url) {
+        opened += 1;
+        browser.lastUrl = url;
+        return '${_config.androidRedirectUri}?code=abc&state=${url.queryParameters['state']}';
+      }),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/oauth/token') {
+          return _json({
+            'access_token': 'at',
+            'id_token': _jwt(_claims(nonce: browser.lastUrl?.queryParameters['nonce'])),
+          });
+        }
+        return _json({'sub': 'user_1'});
+      }),
+    );
+    client.dispose();
+    final sessions = await Future.wait([counting.signIn(), counting.signIn()]);
+    expect(opened, 1);
+    expect(sessions.first.subject, sessions.last.subject);
+  });
+
+  test('a sign-out during a refresh does not restore the session', () async {
+    final store = MemoryClerkSessionStore();
+    final tokenCalled = Completer<void>();
+    final release = Completer<void>();
+    final revoked = <String>[];
+    await store.write(
+      ClerkSession(
+        subject: 'user_1',
+        accessToken: 'old',
+        accessTokenExpiresAt: DateTime.utc(2020),
+        refreshToken: 'rt',
+      ),
+    );
+    final client = ClerkAuthClient(
+      config: _config,
+      store: store,
+      browser: _FakeBrowser(),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/oauth/token') {
+          tokenCalled.complete();
+          await release.future;
+          return _json({'access_token': 'new', 'refresh_token': 'rotated'});
+        }
+        revoked.add(Uri.splitQueryString(request.body)['token']!);
+        return _json({});
+      }),
+    );
+
+    final refresh = client.restore();
+    await tokenCalled.future;
+    await client.signOut();
+    release.complete();
+    await refresh;
+
+    expect(client.session.value, isNull);
+    expect(await store.read(), isNull);
+    expect(revoked, containsAll(['rt', 'rotated']));
+  });
+
+  test('refuses a refreshed id_token for another user', () async {
+    final store = MemoryClerkSessionStore();
+    await store.write(
+      ClerkSession(
+        subject: 'user_1',
+        accessToken: 'old',
+        accessTokenExpiresAt: DateTime.utc(2020),
+        refreshToken: 'rt',
+      ),
+    );
+    final client = ClerkAuthClient(
+      config: _config,
+      store: store,
+      browser: _FakeBrowser(),
+      clock: () => DateTime.utc(2026),
+      httpClient: MockClient(
+        (_) async => _json({
+          'access_token': 'new',
+          'id_token': _jwt(_claims(sub: 'user_2')),
+        }),
+      ),
+    );
+    await client.restore();
+    expect((await store.read())?.accessToken, 'old');
   });
 }

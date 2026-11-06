@@ -34,6 +34,41 @@ which keeps the stored session. An unreadable stored session (for example after
 a Keystore reset) is deleted and reads as signed out; `signOut()` never throws
 on storage errors.
 
+## Platforms and setup
+
+Android, Windows and web (opt-in). iOS, macOS and Linux report
+`unsupported-platform`.
+
+Register these redirects exactly on the Clerk OAuth application (public client,
+PKCE required, scopes `openid profile email offline_access`):
+
+- Android: `<androidScheme>://oauth/clerk`. The app also declares the scheme in
+  `AndroidManifest.xml`, on the `CallbackActivity` of `flutter_web_auth_2`:
+
+  ```xml
+  <activity
+      android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+      android:exported="true"
+      android:taskAffinity="">
+    <intent-filter android:label="flutter_web_auth_2">
+      <action android:name="android.intent.action.VIEW" />
+      <category android:name="android.intent.category.DEFAULT" />
+      <category android:name="android.intent.category.BROWSABLE" />
+      <data android:scheme="com.example.app" />
+    </intent-filter>
+  </activity>
+  ```
+- Windows: `http://localhost:<desktopPort>/callback`, with a port unique per app.
+
+## Security notes
+
+- The product backend verifies the id_token signature. The client only checks
+  `iss`, `aud`, `sub` and `nonce`, to refuse a token that is not for this sign-in.
+- `signOut()` revokes the refresh token when the network allows it. Offline, that
+  token stays valid on the server although it no longer exists on the device.
+- `signOut()` does not end the browser's Clerk session. On a shared computer, the
+  next sign-in must use `forceLogin: true`.
+
 ## Web (opt-in)
 
 Web needs `webRedirectPath`; without it `supportsPlatform` is false on web and
@@ -46,7 +81,9 @@ the app keeps its own sign-in there.
   to the opener (or stores it in `localStorage` when there is no opener, which
   `flutter_web_auth_2` polls). The page must be served from the app origin.
 - Session storage uses `flutter_secure_storage` on web (WebCrypto, stored in
-  `localStorage`). It requires HTTPS or `localhost`.
+  `localStorage`). It requires HTTPS or `localhost`. Clerk refresh tokens do not
+  expire, and script running on the origin can reach this storage: a web app
+  needs a strict Content-Security-Policy.
 - The browser must allow CORS calls to the Clerk token and userinfo endpoints
   from the app origin.
 

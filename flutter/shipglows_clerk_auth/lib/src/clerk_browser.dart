@@ -39,6 +39,11 @@ class SystemClerkBrowser implements ClerkBrowser {
         throw const ClerkAuthException('canceled', 'Sign-in closed.');
       }
       throw ClerkAuthException('browser', error.message ?? error.code);
+    } on Exception catch (error) {
+      // For example the desktop loopback port is already in use.
+      throw ClerkAuthException('browser', error.runtimeType.toString());
+    } on ArgumentError catch (error) {
+      throw ClerkAuthException('browser', error.runtimeType.toString());
     }
   }
 }

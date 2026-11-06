@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'clerk_auth_exception.dart';
 import 'clerk_session.dart';
 
 /// Where the session survives app restarts.
@@ -50,12 +51,17 @@ class SecureClerkSessionStore implements ClerkSessionStore {
   }
 
   @override
-  Future<void> write(ClerkSession session) =>
-      _storage.write(key: _key, value: jsonEncode(session.toJson()));
+  Future<void> write(ClerkSession session) async {
+    try {
+      await _storage.write(key: _key, value: jsonEncode(session.toJson()));
+    } on PlatformException catch (error) {
+      throw ClerkAuthException('storage', error.code);
+    }
+  }
 
   /// Best effort: a delete the platform refuses leaves the entry behind. The
-  /// refresh token is revoked on sign-out, so the next restore refuses it and
-  /// clears the entry again.
+  /// refresh token is revoked on sign-out when the network allows it; the next
+  /// restore then refuses it and clears the entry again.
   @override
   Future<void> clear() async {
     try {

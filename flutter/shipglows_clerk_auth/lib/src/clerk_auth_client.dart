@@ -26,7 +26,7 @@ const _requestTimeout = Duration(seconds: 10);
 /// a usable token, refreshing it first when it is about to expire. Signing
 /// out revokes the refresh token and forgets the session on this device; the
 /// browser keeps its own Clerk sign-in, so the next [signIn] may complete
-/// without asking again.
+/// without asking again (on a shared computer, use `forceLogin: true`).
 class ClerkAuthClient {
   ClerkAuthClient({
     required this.config,
@@ -37,15 +37,22 @@ class ClerkAuthClient {
   }) : _store = store ?? SecureClerkSessionStore(clientId: config.clientId),
        _browser = browser,
        _http = httpClient ?? http.Client(),
+       _ownsHttp = httpClient == null,
        _clock = clock ?? DateTime.now;
 
   final ClerkAuthConfig config;
   final ClerkSessionStore _store;
   final ClerkBrowser _browser;
   final http.Client _http;
+  final bool _ownsHttp;
   final DateTime Function() _clock;
   final _session = ValueNotifier<ClerkSession?>(null);
   Future<ClerkSession>? _refreshing;
+  Future<ClerkSession>? _signingIn;
+
+  /// Bumped by [signOut], so a refresh already in flight cannot restore the
+  /// session afterwards.
+  int _signOutCount = 0;
 
   /// The current session, `null` when signed out.
   ValueListenable<ClerkSession?> get session => _session;
@@ -60,11 +67,9 @@ class ClerkAuthClient {
     }
     try {
       return await _refresh(stored);
-    } on ClerkAuthException catch (error) {
-      if (error.requiresSignIn) {
-        return null;
-      }
-      return stored;
+    } on ClerkAuthException {
+      // Offline keeps the stored session; a revoked one or a sign-out cleared it.
+      return _session.value;
     }
   }
 
@@ -74,11 +79,19 @@ class ClerkAuthClient {
   /// silently with the same account. Pass [forceLogin] `true` to send
   /// `prompt=login`, which makes Clerk show its sign-in form even when the
   /// browser is already signed in. Use it to switch accounts or to
-  /// reauthenticate before a sensitive action.
-  Future<ClerkSession> signIn({bool forceLogin = false}) async {
+  /// reauthenticate before a sensitive action. A call made while another
+  /// sign-in is open joins it instead of opening a second browser flow.
+  Future<ClerkSession> signIn({bool forceLogin = false}) {
+    return _signingIn ??= _doSignIn(forceLogin: forceLogin).whenComplete(
+      () => _signingIn = null,
+    );
+  }
+
+  Future<ClerkSession> _doSignIn({required bool forceLogin}) async {
     _ensureUsable();
     final verifier = _randomUrlSafe(64);
     final state = _randomUrlSafe(24);
+    final nonce = _randomUrlSafe(24);
     final challenge = base64UrlEncode(
       sha256.convert(ascii.encode(verifier)).bytes,
     ).replaceAll('=', '');
@@ -94,6 +107,7 @@ class ClerkAuthClient {
             'state': state,
             'code_challenge': challenge,
             'code_challenge_method': 'S256',
+            'nonce': nonce,
             if (forceLogin) 'prompt': 'login',
           },
         ),
@@ -101,15 +115,16 @@ class ClerkAuthClient {
       ),
     );
     final params = callback.queryParameters;
+    // Checked first: an error from another flow must not be taken for this one.
+    if (params['state'] != state) {
+      throw const ClerkAuthException('state-mismatch', 'Unexpected state.');
+    }
     final error = params['error'];
     if (error != null) {
       throw ClerkAuthException(
         error,
         params['error_description'] ?? 'Authorization refused.',
       );
-    }
-    if (params['state'] != state) {
-      throw const ClerkAuthException('state-mismatch', 'Unexpected state.');
     }
     final code = params['code'];
     if (code == null || code.isEmpty) {
@@ -125,14 +140,19 @@ class ClerkAuthClient {
     });
     final accessToken = tokens['access_token'] as String;
     final userInfo = await _userInfo(accessToken);
+    final subject = userInfo['sub'] as String;
+    final idToken = tokens['id_token'] as String?;
+    if (idToken != null) {
+      _checkIdToken(idToken, subject: subject, nonce: nonce);
+    }
     final session = ClerkSession(
-      subject: userInfo['sub'] as String,
-      email: userInfo['email'] as String?,
-      name: userInfo['name'] as String?,
+      subject: subject,
+      email: _stringOrNull(userInfo['email']),
+      name: _stringOrNull(userInfo['name']),
       accessToken: accessToken,
       accessTokenExpiresAt: _expiry(tokens),
       refreshToken: tokens['refresh_token'] as String?,
-      idToken: tokens['id_token'] as String?,
+      idToken: idToken,
     );
     await _store.write(session);
     _session.value = session;
@@ -182,13 +202,17 @@ class ClerkAuthClient {
 
   /// Revokes the refresh token (best effort) and forgets the session.
   Future<void> signOut() async {
+    _signOutCount += 1;
     final current = _session.value ?? await _store.read();
     _session.value = null;
     await _store.clear();
     final refreshToken = current?.refreshToken;
-    if (refreshToken == null) {
-      return;
+    if (refreshToken != null) {
+      await _revoke(refreshToken);
     }
+  }
+
+  Future<void> _revoke(String refreshToken) async {
     try {
       await _http.post(
         config.revokeEndpoint,
@@ -204,7 +228,12 @@ class ClerkAuthClient {
     }
   }
 
-  void dispose() => _session.dispose();
+  void dispose() {
+    _session.dispose();
+    if (_ownsHttp) {
+      _http.close();
+    }
+  }
 
   /// One refresh at a time; concurrent callers share it.
   Future<ClerkSession> _refresh(ClerkSession current) {
@@ -219,12 +248,25 @@ class ClerkAuthClient {
       await _forget();
       throw const ClerkAuthException('invalid_grant', 'No refresh token.');
     }
+    final signOutCount = _signOutCount;
     try {
       final tokens = await _tokenRequest({
         'grant_type': 'refresh_token',
         'refresh_token': refreshToken,
         'client_id': config.clientId,
       });
+      if (signOutCount != _signOutCount) {
+        // Signed out meanwhile: keep nothing, and revoke a rotated token.
+        final rotated = tokens['refresh_token'];
+        if (rotated is String) {
+          await _revoke(rotated);
+        }
+        throw const ClerkAuthException('signed-out', 'Signed out during refresh.');
+      }
+      final idToken = tokens['id_token'];
+      if (idToken is String) {
+        _checkIdToken(idToken, subject: current.subject);
+      }
       final refreshed = current.copyWith(
         accessToken: tokens['access_token'] as String,
         accessTokenExpiresAt: _expiry(tokens),
@@ -322,6 +364,35 @@ class ClerkAuthClient {
     }
   }
 
+  /// Refuses an id_token that does not belong to this client, instance, user
+  /// and sign-in. The signature is verified by the product backend, which never
+  /// trusts this check. `nonce` is only known at sign-in, not on refresh.
+  void _checkIdToken(String jwt, {required String subject, String? nonce}) {
+    final claims = _jwtClaims(jwt);
+    final audience = claims?['aud'];
+    final audiences = audience is List ? audience : [audience];
+    final issuer = claims?['iss'];
+    final valid =
+        claims != null &&
+        issuer is String &&
+        _withoutTrailingSlash(issuer) == _withoutTrailingSlash(config.issuer) &&
+        audiences.contains(config.clientId) &&
+        claims['sub'] == subject &&
+        (nonce == null || claims['nonce'] == nonce);
+    if (!valid) {
+      throw const ClerkAuthException(
+        'id-token-invalid',
+        'The id_token does not match this sign-in.',
+      );
+    }
+  }
+
+  static String _withoutTrailingSlash(String value) =>
+      value.trim().replaceFirst(RegExp(r'/+$'), '');
+
+  static String? _stringOrNull(Object? value) =>
+      value is String ? value : null;
+
   static bool _isIdTokenFresh(String jwt, DateTime now) {
     final expiresAt = _jwtExpiry(jwt);
     return expiresAt != null &&
@@ -330,6 +401,18 @@ class ClerkAuthClient {
 
   /// The `exp` claim of a JWT, or `null` when it cannot be read.
   static DateTime? _jwtExpiry(String jwt) {
+    final exp = _jwtClaims(jwt)?['exp'];
+    if (exp is! num) {
+      return null;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(
+      exp.toInt() * 1000,
+      isUtc: true,
+    );
+  }
+
+  /// The payload of a JWT, unverified, or `null` when it cannot be read.
+  static Map<String, dynamic>? _jwtClaims(String jwt) {
     final parts = jwt.split('.');
     if (parts.length != 3) {
       return null;
@@ -337,14 +420,7 @@ class ClerkAuthClient {
     final payload = parts[1].padRight((parts[1].length + 3) ~/ 4 * 4, '=');
     try {
       final claims = jsonDecode(utf8.decode(base64Url.decode(payload)));
-      final exp = claims is Map ? claims['exp'] : null;
-      if (exp is! num) {
-        return null;
-      }
-      return DateTime.fromMillisecondsSinceEpoch(
-        exp.toInt() * 1000,
-        isUtc: true,
-      );
+      return claims is Map<String, dynamic> ? claims : null;
     } on FormatException {
       return null;
     }

@@ -1,6 +1,6 @@
 name: shipglows_clerk_auth
 description: Clerk sign-in for native ShipGlows Flutter apps (OIDC, Authorization Code + PKCE, system browser).
-version: 0.1.0
+version: 0.2.0
 publish_to: "none"
 
 environment:

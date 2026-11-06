@@ -1,9 +1,12 @@
 /// A Clerk sign-in, refresh or storage failure.
 ///
 /// [code] is stable for the app to branch on: `not-configured`,
-/// `unsupported-platform`, `canceled`, `state-mismatch`, `missing-code`,
-/// `invalid_grant` (the session is gone: sign in again), `token-<status>`,
-/// `userinfo-<status>`, `network`, or the OAuth `error` Clerk returned.
+/// `unsupported-platform`, `canceled`, `browser` (the system browser or the
+/// desktop loopback listener could not start), `state-mismatch`, `missing-code`,
+/// `id-token-invalid`, `id-token-unavailable`, `invalid_grant` (the session is
+/// gone: sign in again), `signed-out` (signed out during a refresh),
+/// `storage`, `token-<status>`, `token-invalid`, `userinfo-<status>`, `network`,
+/// or the OAuth `error` Clerk returned.
 class ClerkAuthException implements Exception {
   const ClerkAuthException(this.code, this.detail);
 
