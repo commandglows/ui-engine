@@ -42,7 +42,7 @@ final shown = span == null
 Chips: Tout, Aujourd’hui, Hier, 7 derniers jours, 30 derniers jours, Ce mois-ci,
 Cette année, Personnalisé. Personnalisé opens Flutter's date range picker, which
 needs the app's `MaterialLocalizations`; it then shows the chosen dates, and
-another tap changes them. `periods`, `showAll`, `showCustom`, `firstDate` and
+another tap changes them. `periods`, `showAll`, `allLast`, `showCustom`, `firstDate` and
 `lastDate` adjust the choices.
 
 ## With a timeline

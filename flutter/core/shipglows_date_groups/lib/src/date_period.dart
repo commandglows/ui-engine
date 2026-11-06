@@ -7,7 +7,7 @@ import 'date_strings.dart';
 /// choice of a filter.
 @immutable
 final class DatePeriod {
-  const DatePeriod._(this.id, this._title, this._span);
+  const DatePeriod._(this.id, this._title, this._span, [this._window]);
 
   /// A period of your own. [span] receives today, at local noon, and is called
   /// each time the period is resolved.
@@ -41,6 +41,14 @@ final class DatePeriod {
   /// The id of every [DatePeriod.range].
   static const rangeId = 'range';
 
+  /// The last hour, to the minute.
+  static final lastHour = DatePeriod._(
+    'last-hour',
+    (s) => s.lastHour,
+    (_) => DateSpan(),
+    const Duration(hours: 1),
+  );
+
   /// Today.
   static final today = DatePeriod._(
     'today',
@@ -67,6 +75,13 @@ final class DatePeriod {
     'upcoming',
     (s) => s.upcoming,
     (today) => DateSpan(first: _shift(today, 1)),
+  );
+
+  /// The last five days, today included.
+  static final last5Days = DatePeriod._(
+    'last-5-days',
+    (s) => s.last5Days,
+    _daysAgo(0, 4),
   );
 
   /// The last seven days, today included.
@@ -191,11 +206,16 @@ final class DatePeriod {
   final String Function(DateStrings strings) _title;
   final DateSpan Function(DateTime today) _span;
 
+  /// Set for a period counted back from the clock rather than in whole days.
+  final Duration? _window;
+
   /// The text to show, in the language of [strings].
   String titleIn(DateStrings strings) => _title(strings);
 
   /// The days this period covers when the clock reads [now].
   DateSpan spanAt(DateTime now) {
+    final window = _window;
+    if (window != null) return DateSpan.since(now.subtract(window));
     final local = now.toLocal();
     return _span(DateTime(local.year, local.month, local.day, 12));
   }

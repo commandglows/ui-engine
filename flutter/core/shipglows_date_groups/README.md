@@ -83,6 +83,9 @@ final recent = items.where((item) => span.contains(item.date));
 `DatePeriod.range(DateSpan(first: start, last: end))` holds dates the person
 chose; its title reads « Du 3 novembre au 7 novembre 2026 ».
 
+`DatePeriod.lastHour` counts back from the clock, to the minute, instead of in
+whole days.
+
 ## Days are calendar days
 
 « Hier » means the previous calendar day, not 24 hours ago, and a daylight saving

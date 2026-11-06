@@ -12,6 +12,8 @@ final class DateStrings {
     required this.yesterday,
     required this.tomorrow,
     required this.upcoming,
+    required this.lastHour,
+    required this.last5Days,
     required this.last7Days,
     required this.last30Days,
     required this.oneWeekAgo,
@@ -52,6 +54,8 @@ final class DateStrings {
     yesterday: 'Hier',
     tomorrow: 'Demain',
     upcoming: 'À venir',
+    lastHour: 'Dernière heure',
+    last5Days: '5 derniers jours',
     last7Days: '7 derniers jours',
     last30Days: '30 derniers jours',
     oneWeekAgo: 'Il y a une semaine',
@@ -113,6 +117,8 @@ final class DateStrings {
     yesterday: 'Yesterday',
     tomorrow: 'Tomorrow',
     upcoming: 'Upcoming',
+    lastHour: 'Last hour',
+    last5Days: 'Last 5 days',
     last7Days: 'Last 7 days',
     last30Days: 'Last 30 days',
     oneWeekAgo: 'A week ago',
@@ -172,6 +178,8 @@ final class DateStrings {
   final String yesterday;
   final String tomorrow;
   final String upcoming;
+  final String lastHour;
+  final String last5Days;
   final String last7Days;
   final String last30Days;
   final String oneWeekAgo;

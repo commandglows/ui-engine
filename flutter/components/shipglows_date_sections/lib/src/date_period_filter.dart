@@ -16,6 +16,7 @@ class DatePeriodFilter extends StatelessWidget {
     this.periods,
     this.showAll = true,
     this.showCustom = true,
+    this.allLast = false,
     this.firstDate,
     this.lastDate,
   });
@@ -37,6 +38,9 @@ class DatePeriodFilter extends StatelessWidget {
 
   /// Whether to offer [DateStrings.custom], which opens a date range picker.
   final bool showCustom;
+
+  /// Whether [DateStrings.all] comes after the others instead of first.
+  final bool allLast;
 
   /// Earliest day the range picker offers. Defaults to 1 January 2000.
   final DateTime? firstDate;
@@ -76,19 +80,19 @@ class DatePeriodFilter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ShipglowsTheme.of(context);
     final current = value;
+    final all = _chip(
+      theme,
+      label: strings.all,
+      selected: current == null,
+      onTap: () {
+        if (current != null) onChanged(null);
+      },
+    );
     return Wrap(
       spacing: theme.spaceSm,
       runSpacing: theme.spaceSm,
       children: [
-        if (showAll)
-          _chip(
-            theme,
-            label: strings.all,
-            selected: current == null,
-            onTap: () {
-              if (current != null) onChanged(null);
-            },
-          ),
+        if (showAll && !allLast) all,
         for (final period in periods ?? DatePeriod.filters)
           _chip(
             theme,
@@ -105,6 +109,7 @@ class DatePeriodFilter extends StatelessWidget {
             selected: _isRange,
             onTap: () => unawaited(_pickRange(context)),
           ),
+        if (showAll && allLast) all,
       ],
     );
   }
