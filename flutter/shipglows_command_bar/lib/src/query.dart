@@ -60,8 +60,9 @@ class CommandBarQuery {
 ///
 /// A prefix counts only at the very start and, unless its filter has
 /// [CommandBarFilter.requiresSpace] off, only when a space follows it:
-/// `n idea` selects the `n` filter, while `n` alone, or `z idea` with an
-/// unknown letter, is plain text. A filter without the space applies as soon
+/// `n idea` selects the `n` filter (and `yt lofi` a `yt` one: a prefix can
+/// have several characters), while `n` alone, or `z idea` with an unknown
+/// prefix, is plain text. A filter without the space applies as soon
 /// as its prefix is typed (`>foo`). A leading space selects the filter whose
 /// prefix is a space, if there is one.
 CommandBarQuery parseCommandBarQuery(
@@ -87,13 +88,19 @@ CommandBarQuery parseCommandBarQuery(
       );
     }
   }
-  if (raw.length >= 2 && raw[1] == ' ') {
-    final typed = raw[0].toLowerCase();
+  // The prefix is the first word, when a space follows it: one character
+  // (`n idea`) or several (`yt lofi`).
+  final space = raw.indexOf(' ');
+  if (space >= 1) {
+    final typed = raw.substring(0, space).toLowerCase();
     for (final filter in filters) {
       if (filter.prefix != ' ' &&
           filter.requiresSpace &&
           filter.prefix.toLowerCase() == typed) {
-        return CommandBarQuery(filter: filter, text: raw.substring(2).trim());
+        return CommandBarQuery(
+          filter: filter,
+          text: raw.substring(space + 1).trim(),
+        );
       }
     }
   }

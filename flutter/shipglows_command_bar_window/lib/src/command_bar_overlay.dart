@@ -400,10 +400,19 @@ class _CommandBarSurface extends StatefulWidget {
 class _CommandBarSurfaceState extends State<_CommandBarSurface> {
   final _barFocus = FocusNode(debugLabel: 'command bar', skipTraversal: true);
 
+  /// The bar's route, to tell when a menu is pushed over it.
+  ModalRoute<Object?>? _route;
+
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleKey);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
   }
 
   @override
@@ -417,6 +426,9 @@ class _CommandBarSurfaceState extends State<_CommandBarSurface> {
   // elsewhere (parked on the root after the window was reactivated), a plain
   // Escape still closes.
   bool _handleKey(KeyEvent event) {
+    // A menu or sheet over the bar (the ≡ menu) takes Escape for itself: it
+    // closes alone, the bar stays.
+    if (!(_route?.isCurrent ?? true)) return false;
     if (!widget.controller.visible ||
         _barFocus.hasFocus ||
         event is! KeyDownEvent ||

@@ -11,10 +11,8 @@ typedef CommandBarRun = FutureOr<void> Function(BuildContext context);
 
 /// Runs a command on the text typed in the bar ([query], filter prefix
 /// left out), as [CommandBarCommand.query] builds.
-typedef CommandBarQueryRun = FutureOr<void> Function(
-  BuildContext context,
-  String query,
-);
+typedef CommandBarQueryRun =
+    FutureOr<void> Function(BuildContext context, String query);
 
 /// Stands for the typed text in the label and subtitle of an entry that
 /// [CommandBarEntry.usesQuery]: `Search « {query} » on the web`.
@@ -31,10 +29,7 @@ class CommandBarEntryKind {
   const CommandBarEntryKind(this.id, {required this.icon});
 
   /// Goes to a screen of the app.
-  static const open = CommandBarEntryKind(
-    'open',
-    icon: ShipglowsIcons.jump,
-  );
+  static const open = CommandBarEntryKind('open', icon: ShipglowsIcons.jump);
 
   /// Does the work right from the bar: save, copy, toggle, paste.
   static const action = CommandBarEntryKind(
@@ -65,10 +60,8 @@ class CommandBarEntryKind {
 
 /// Runs one of the [CommandBarCommand.actions] of a command, by its
 /// [CommandBarEntryAction.id].
-typedef CommandBarActionRun = FutureOr<void> Function(
-  BuildContext context,
-  String actionId,
-);
+typedef CommandBarActionRun =
+    FutureOr<void> Function(BuildContext context, String actionId);
 
 /// One more thing to do with an entry, listed in its actions panel
 /// (Alt+Enter on the highlighted row, or a right-click): copy, paste, pin,
@@ -192,6 +185,7 @@ class CommandBarEntry {
     this.badge,
     this.kind,
     this.usesQuery = false,
+    this.requiresFilter = false,
     this.actions = const <CommandBarEntryAction>[],
   });
 
@@ -215,6 +209,7 @@ class CommandBarEntry {
     return CommandBarEntry(
       kind: _kindFrom(json['kind'], json['kindIconCodePoint'], iconFor),
       usesQuery: json['usesQuery'] == true,
+      requiresFilter: json['requiresFilter'] == true,
       actions: [
         if (json['actions'] case final List items)
           for (final item in items)
@@ -300,6 +295,11 @@ class CommandBarEntry {
   /// [commandBarQueryPlaceholder] in [label] and [subtitle] shows the text.
   final bool usesQuery;
 
+  /// For a [usesQuery] entry: listed only while a [CommandBarFilter] that
+  /// matches it is active (`yt lofi` for « Search YouTube »), so a dozen
+  /// site searches do not bury the other actions on the text.
+  final bool requiresFilter;
+
   /// More things to do with the entry, listed in its actions panel after
   /// Enter and Ctrl/⌘+Enter. They run even when the entry is disabled, like
   /// the secondary action.
@@ -328,6 +328,7 @@ class CommandBarEntry {
     badge: badge,
     kind: kind,
     usesQuery: usesQuery,
+    requiresFilter: requiresFilter,
     actions: actions,
   );
 
@@ -351,6 +352,7 @@ class CommandBarEntry {
     'kind': kind?.id,
     'kindIconCodePoint': kind?.icon.codePoint,
     'usesQuery': usesQuery,
+    'requiresFilter': requiresFilter,
     'actions': [for (final action in actions) action.toJson()],
   };
 
@@ -374,6 +376,7 @@ class CommandBarEntry {
       other.badge == badge &&
       other.kind == kind &&
       other.usesQuery == usesQuery &&
+      other.requiresFilter == requiresFilter &&
       listEquals(other.actions, actions);
 
   @override
@@ -395,6 +398,7 @@ class CommandBarEntry {
     badge,
     kind,
     usesQuery,
+    requiresFilter,
     Object.hashAll(actions),
   );
 }
@@ -577,9 +581,16 @@ class CommandBarFilter {
     required this.emptyText,
     required this.matches,
     this.requiresSpace = true,
+    this.showButton = true,
   });
 
-  /// One character typed before a space, compared case-insensitively.
+  /// Whether the filter row lists a button for it. Off for a second prefix
+  /// of a category that already has one (a leading space beside `>`): it
+  /// still applies when typed, and its category's button shows as active.
+  final bool showButton;
+
+  /// One or more characters typed before a space (`n`, `yt`), compared
+  /// case-insensitively.
   final String prefix;
 
   /// Whether a space must follow [prefix]. When false the filter applies as

@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:shipglows_menu/shipglows_menu.dart';
-import 'package:shipglows_icons/shipglows_icons.dart';
 import 'package:shipglows_rich_text/shipglows_rich_text.dart';
+import 'package:shipglows_icons/shipglows_icons.dart';
 
 import 'actions_panel.dart';
 import 'behavior.dart';
@@ -56,7 +56,9 @@ class CommandBarChoice {
 /// is up to the owner, so the same widget serves the in-app dialog and a
 /// floating bar.
 ///
-/// Keys: ↑/↓ move, Enter chooses, Ctrl/⌘+Enter chooses the
+/// Keys: ↑/↓ move (PageUp/PageDown by a page), Tab and Shift+Tab step through
+/// the filters, F10 opens the ≡ menu (its shortcuts, such as Ctrl+, , work
+/// too), Enter chooses, Ctrl/⌘+Enter chooses the
 /// secondary action, Alt+Enter (or a right-click on a row) opens the actions
 /// panel of the row, the shortcut of one of its [CommandBarEntry.actions]
 /// chooses it, Ctrl/⌘+1…9 chooses row n, Backspace on an empty field removes
@@ -160,6 +162,9 @@ class CommandBarView extends StatefulWidget {
   @override
   State<CommandBarView> createState() => _CommandBarViewState();
 }
+
+/// Rows PageUp and PageDown move by.
+const int _pageRows = 8;
 
 /// Number of rows reachable with Ctrl/⌘+1…9.
 const int _numberedRows = 9;
@@ -373,11 +378,14 @@ class _CommandBarViewState extends State<CommandBarView> {
   /// Moves to the previous or next button of the filter row, « All » first,
   /// wrapping around.
   void _stepFilter(int delta) {
-    final steps = <CommandBarFilter?>[null, ...widget.filters];
-    // By prefix: the app may rebuild its filters (a new language).
-    final current = steps.indexWhere(
-      (step) => step?.prefix == _filter?.prefix,
-    );
+    final steps = <CommandBarFilter?>[
+      null,
+      for (final filter in widget.filters)
+        if (filter.showButton) filter,
+    ];
+    // By label: the app may rebuild its filters (a new language), and a
+    // second prefix of a category steps like its button.
+    final current = steps.indexWhere((step) => step?.label == _filter?.label);
     final next = steps[(current + delta) % steps.length];
     if (next == null) {
       _clearFilter();
@@ -661,6 +669,8 @@ class _CommandBarViewState extends State<CommandBarView> {
       widget.onClose();
       return KeyEventResult.handled;
     }
+    // Tab stays in the bar: the panel's own field is its only stop.
+    if (key == LogicalKeyboardKey.tab) return KeyEventResult.handled;
     final enter =
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter;
@@ -698,6 +708,30 @@ class _CommandBarViewState extends State<CommandBarView> {
       _moveHighlight(-1, rowHeight);
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.pageDown ||
+        key == LogicalKeyboardKey.pageUp) {
+      // A page of rows, stopping at the ends instead of wrapping.
+      final count = _layout.items.length;
+      if (count == 0) return KeyEventResult.handled;
+      final step = key == LogicalKeyboardKey.pageDown ? _pageRows : -_pageRows;
+      final target = (_effectiveHighlight + step).clamp(0, count - 1);
+      _moveHighlight(target - _effectiveHighlight, rowHeight);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.tab) {
+      // Tab and Shift+Tab step through the filters from anywhere in the
+      // field, like Left and Right at its edges; focus never leaves it.
+      if (event is! KeyRepeatEvent && widget.filters.isNotEmpty) {
+        _stepFilter(keyboard.isShiftPressed ? -1 : 1);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.f10 && !keyboard.isShiftPressed) {
+      // The Windows key for « the menu »: opens the ≡ menu.
+      if (event is! KeyRepeatEvent) _openAppMenuFromKeyboard();
+      return KeyEventResult.handled;
+    }
+    if (_runAppMenuShortcut(event)) return KeyEventResult.handled;
     if ((key == LogicalKeyboardKey.arrowLeft ||
             key == LogicalKeyboardKey.arrowRight) &&
         !keyboard.isShiftPressed &&
@@ -710,9 +744,9 @@ class _CommandBarViewState extends State<CommandBarView> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
       // Shift+Enter belongs to the multiline text field: insert a line break.
       if (keyboard.isShiftPressed) return KeyEventResult.ignored;
-        key == LogicalKeyboardKey.numpadEnter) {
       // Holding Enter must not run a command again and again.
       if (event is KeyRepeatEvent) return KeyEventResult.handled;
       if (keyboard.isAltPressed) {
@@ -872,7 +906,8 @@ class _CommandBarViewState extends State<CommandBarView> {
     if (text.isNotEmpty) {
       final actions = [
         for (final entry in queryActions)
-          if (query.filter?.matches(entry) ?? true) entry.withQuery(text),
+          if (query.filter?.matches(entry) ?? !entry.requiresFilter)
+            entry.withQuery(text),
       ];
       if (actions.isNotEmpty) {
         rows.add(_HeaderRow(widget.strings.queryActionsSection));
@@ -886,6 +921,49 @@ class _CommandBarViewState extends State<CommandBarView> {
 
   Widget _wrapFooter(BuildContext context, Widget footer) =>
       widget.footerBuilder?.call(context, footer) ?? footer;
+
+  /// The ≡ button, so F10 can open its menu from the keyboard.
+  final GlobalKey _menuButtonKey = GlobalKey();
+
+  /// Opens the ≡ menu from the keyboard (F10); true when there is one.
+  bool _openAppMenuFromKeyboard() {
+    final anchor = _menuButtonKey.currentContext;
+    if (widget.appMenu == null || anchor == null) return false;
+    unawaited(_openAppMenu(anchor));
+    return true;
+  }
+
+  /// Runs the app-menu action whose shortcut [event] presses (`Ctrl+,` for
+  /// settings), as the menu lists it; false when none does.
+  bool _runAppMenuShortcut(KeyEvent event) {
+    final menu = widget.appMenu;
+    if (menu == null || event is KeyRepeatEvent) return false;
+    ShipglowsMenuAction? find(Iterable<ShipglowsMenuItem> items) {
+      for (final item in items) {
+        switch (item) {
+          case ShipglowsMenuAction(:final shortcut, :final enabled)
+              when enabled &&
+                  shortcut != null &&
+                  commandBarShortcutMatches(shortcut, event):
+            return item;
+          case ShipglowsMenuSubmenu(:final items):
+            final found = find(items);
+            if (found != null) return found;
+          case ShipglowsMenuAction() ||
+              ShipglowsMenuSeparator() ||
+              ShipglowsMenuHeader():
+            break;
+        }
+      }
+      return null;
+    }
+
+    final action = find(menu.items);
+    if (action == null) return false;
+    action.onSelected?.call();
+    widget.onChoose(CommandBarChoice(id: action.id, appMenu: true));
+    return true;
+  }
 
   /// Opens [CommandBarView.appMenu] above the ≡ button at [anchor].
   Future<void> _openAppMenu(BuildContext anchor) async {
@@ -1119,9 +1197,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                         constraints: BoxConstraints(
                           minHeight: panelActions.isEmpty
                               ? 0
-                              : CommandBarActionsPanel.heightFor(
-                                  panelActions,
-                                ),
+                              : CommandBarActionsPanel.heightFor(panelActions),
                         ),
                         child: _list(layout, highlight, showNumbers),
                       ),
@@ -1157,6 +1233,7 @@ class _CommandBarViewState extends State<CommandBarView> {
                 children: [
                   if (widget.appMenu != null) ...[
                     Builder(
+                      key: _menuButtonKey,
                       builder: (anchor) => IconButton(
                         onPressed: () => unawaited(_openAppMenu(anchor)),
                         tooltip: strings.menu.button,
@@ -1232,8 +1309,10 @@ class _SectionHeader extends StatelessWidget {
         header: true,
         child: Text(
           title,
-          style: Theme.of(context).textTheme.labelSmall
-              ?.copyWith(color: style.mutedColor, fontWeight: FontWeight.w600),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: style.mutedColor,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -1563,23 +1642,26 @@ class _FilterRow extends StatelessWidget {
             selected: active == null,
             onPressed: onClear,
           ),
-          for (final filter in filters) ...[
-            const SizedBox(width: 4),
-            _FilterButton(
-              label: filter.label,
-              prefix: filter.prefix == ' ' ? strings.spaceKey : filter.prefix,
-              tooltip:
-                  (filter.requiresSpace
-                          ? strings.prefixTooltip
-                          : strings.prefixTooltipNoSpace)
-                      .replaceAll(
-                        '{prefix}',
-                        filter.prefix == ' ' ? strings.spaceKey : filter.prefix,
-                      ),
-              selected: active?.prefix == filter.prefix,
-              onPressed: () => onApply(filter),
-            ),
-          ],
+          for (final filter in filters)
+            if (filter.showButton) ...[
+              const SizedBox(width: 4),
+              _FilterButton(
+                label: filter.label,
+                prefix: filter.prefix == ' ' ? strings.spaceKey : filter.prefix,
+                tooltip:
+                    (filter.requiresSpace
+                            ? strings.prefixTooltip
+                            : strings.prefixTooltipNoSpace)
+                        .replaceAll(
+                          '{prefix}',
+                          filter.prefix == ' '
+                              ? strings.spaceKey
+                              : filter.prefix,
+                        ),
+                selected: active?.label == filter.label,
+                onPressed: () => onApply(filter),
+              ),
+            ],
         ],
       ),
     );
@@ -1656,8 +1738,9 @@ class _Badge extends StatelessWidget {
       child: Text(
         text,
         maxLines: 1,
-        style: Theme.of(context).textTheme.labelSmall
-            ?.copyWith(color: style.mutedColor),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: style.mutedColor),
       ),
     );
   }
@@ -1719,8 +1802,9 @@ class _FooterHint extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: Theme.of(context).textTheme.labelSmall
-              ?.copyWith(color: style.mutedColor),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: style.mutedColor),
         ),
       ],
     );
