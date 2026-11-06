@@ -1,0 +1,18 @@
+name: shipglows_feelings
+description: A broad bank of feeling words in French and English, grouped by family, with search, per-app selections and the person's own words.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+
+dependencies:
+  shipglows_organize:
+    path: ../shipglows_organize
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
