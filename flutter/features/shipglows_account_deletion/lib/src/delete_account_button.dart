@@ -5,6 +5,20 @@ import 'package:shipglows_theme/shipglows_theme.dart';
 import 'account_deletion_flow.dart';
 import 'strings.dart';
 
+/// What [ShipglowsDeleteAccountButton.actionBuilder] needs to draw the action.
+@immutable
+class ShipglowsDeleteAccountAction {
+  const ShipglowsDeleteAccountAction({
+    required this.label,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool busy;
+  final VoidCallback onPressed;
+}
+
 /// The « Delete my account » action of an app's settings or profile screen.
 class ShipglowsDeleteAccountButton extends StatefulWidget {
   const ShipglowsDeleteAccountButton({
@@ -13,6 +27,9 @@ class ShipglowsDeleteAccountButton extends StatefulWidget {
     required this.deleteOnServer,
     required this.erasedData,
     this.strings = ShipglowsAccountDeletionStrings.fr,
+    this.paidAccessNotice,
+    this.actionBuilder,
+    this.confirm,
     this.onDeleted,
     this.onFailure,
   });
@@ -26,6 +43,21 @@ class ShipglowsDeleteAccountButton extends StatefulWidget {
   final List<String> erasedData;
 
   final ShipglowsAccountDeletionStrings strings;
+
+  /// Replaces [ShipglowsAccountDeletionStrings.paidAccess] in the confirmation,
+  /// for a product that lets a client take a paid access back.
+  final String? paidAccessNotice;
+
+  /// Draws the action in the app's own style. Defaults to a text button.
+  final Widget Function(
+    BuildContext context,
+    ShipglowsDeleteAccountAction action,
+  )?
+  actionBuilder;
+
+  /// Asks for the confirmation in the app's own dialog. Defaults to a dialog
+  /// listing [erasedData].
+  final Future<bool> Function(BuildContext context)? confirm;
 
   /// After the deletion, to leave the screen. This button may already be gone.
   final VoidCallback? onDeleted;
@@ -44,13 +76,17 @@ class _ShipglowsDeleteAccountButtonState
   String? _error;
 
   Future<void> _onPressed() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => _ConfirmDialog(
-        strings: widget.strings,
-        erasedData: widget.erasedData,
-      ),
-    );
+    final custom = widget.confirm;
+    final confirmed = custom != null
+        ? await custom(context)
+        : await showDialog<bool>(
+            context: context,
+            builder: (context) => _ConfirmDialog(
+              strings: widget.strings,
+              erasedData: widget.erasedData,
+              paidAccess: widget.paidAccessNotice ?? widget.strings.paidAccess,
+            ),
+          );
     if (confirmed != true || !mounted) return;
     setState(() {
       _busy = true;
@@ -81,22 +117,33 @@ class _ShipglowsDeleteAccountButtonState
   Widget build(BuildContext context) {
     final theme = ShipglowsTheme.of(context);
     final error = _error;
+    final builder = widget.actionBuilder;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        TextButton.icon(
-          key: const Key('shipglows-delete-account'),
-          style: TextButton.styleFrom(foregroundColor: theme.danger),
-          onPressed: _busy ? null : _onPressed,
-          icon: _busy
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.delete_forever_outlined),
-          label: Text(widget.strings.button),
-        ),
+        if (builder != null)
+          builder(
+            context,
+            ShipglowsDeleteAccountAction(
+              label: widget.strings.button,
+              busy: _busy,
+              onPressed: _onPressed,
+            ),
+          )
+        else
+          TextButton.icon(
+            key: const Key('shipglows-delete-account'),
+            style: TextButton.styleFrom(foregroundColor: theme.danger),
+            onPressed: _busy ? null : _onPressed,
+            icon: _busy
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_forever_outlined),
+            label: Text(widget.strings.button),
+          ),
         if (error != null)
           Semantics(
             liveRegion: true,
@@ -112,10 +159,15 @@ class _ShipglowsDeleteAccountButtonState
 }
 
 class _ConfirmDialog extends StatelessWidget {
-  const _ConfirmDialog({required this.strings, required this.erasedData});
+  const _ConfirmDialog({
+    required this.strings,
+    required this.erasedData,
+    required this.paidAccess,
+  });
 
   final ShipglowsAccountDeletionStrings strings;
   final List<String> erasedData;
+  final String paidAccess;
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +183,7 @@ class _ConfirmDialog extends StatelessWidget {
             const SizedBox(height: 8),
             for (final item in erasedData) Text('• $item'),
             const SizedBox(height: 12),
-            Text(strings.paidAccess),
+            Text(paidAccess),
           ],
         ),
       ),

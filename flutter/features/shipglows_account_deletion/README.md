@@ -21,6 +21,19 @@ ShipglowsDeleteAccountButton(
   callbacks for an app that wraps its session, such as a web session through Clerk
   JS.
 - `ShipglowsAccountDeletionStrings`: the texts, `.fr` or `.en`.
+- `actionBuilder` and `confirm`: draw the action and the confirmation in the app's
+  own style. `paidAccessNotice` replaces the sentence on paid access.
+- `ShipglowsAccessRecovery`: for a product whose paid access survives in the suite
+  ledger. It stays invisible unless `findRecoverable` says a deleted account with the
+  same verified email left something to take back, then offers one button. The
+  server moves the access only when the user presses it.
+
+```dart
+ShipglowsAccessRecovery(
+  findRecoverable: () => server.hasRecoverableAccess(),
+  recover: () => server.recoverAccess(),
+)
+```
 
 The reconnection does not send `prompt=login`: when the browser already holds the
 same account, Clerk ended the fresh session and looped on its form (CommandGlows,

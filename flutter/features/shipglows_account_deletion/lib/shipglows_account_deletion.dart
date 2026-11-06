@@ -5,8 +5,10 @@
 /// - [runAccountDeletion]: the sequence without a widget.
 /// - [AccountDeletionAuth]: the session the sequence works on.
 /// - [ShipglowsAccountDeletionStrings]: the texts, in French or English.
+/// - [ShipglowsAccessRecovery]: lets a returning client take a paid access back.
 library;
 
+export 'src/access_recovery.dart';
 export 'src/account_deletion_flow.dart';
 export 'src/delete_account_button.dart';
 export 'src/strings.dart';

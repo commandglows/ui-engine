@@ -27,4 +27,29 @@ export const removeClerkUser = internalAction({
 })
 ```
 
+Erasing the data, one bounded batch at a time. The product supplies its tables and
+how to read them; repeat until `done`, then check nothing is left:
+
+```ts
+const take = (table, limit) =>
+  ctx.db.query(table).withIndex('by_userId', (q) => q.eq('userId', userId)).take(limit)
+
+// In a mutation, called until { done: true }.
+await eraseUserDataBatch({ tables: USER_TABLES, take, remove: (_table, row) => ctx.db.delete(row._id) })
+
+// Before removing the Clerk user: throws account_data_remaining.
+await assertUserDataErased({ tables: USER_TABLES, take })
+```
+
+The suite ledger, on the CommandGlows Convex deployment, over its HTTP API:
+
+- `closeInSuiteLedger(account, config)`: closes the product's account and keeps the
+  trace of its access. Call it before erasing data.
+- `hasRecoverableAccess(account, config)` and `recoverAccess(account, config)`: a
+  client who comes back with the same verified email takes their paid access back.
+  It moves only on an explicit request from the user, never on sign-in. Pass an email
+  only when the identity provider confirmed it.
+- `requireSuiteLedgerConfig(values)`: reads the settings, or throws
+  `account_deletion_not_configured`.
+
 The app side is the Flutter package `shipglows_account_deletion`.
