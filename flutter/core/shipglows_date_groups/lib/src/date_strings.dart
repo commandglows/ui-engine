@@ -17,6 +17,14 @@ final class DateStrings {
     required this.oneWeekAgo,
     required this.twoWeeksAgo,
     required this.threeWeeksAgo,
+    required this.fewWeeksAgo,
+    required this.yesterdayMorning,
+    required this.yesterdayAfternoon,
+    required this.yesterdayEvening,
+    required this.underAnHour,
+    required this.underHoursTemplate,
+    required this.hoursAgoTemplate,
+    required this.hoursRangeTemplate,
     required this.thisWeek,
     required this.lastWeek,
     required this.thisMonth,
@@ -28,9 +36,11 @@ final class DateStrings {
     required this.all,
     required this.custom,
     required this.months,
+    required this.weekdays,
     required this.firstOfMonth,
     required this.dayTemplate,
     required this.dayWithYearTemplate,
+    required this.dayTitleTemplate,
     required this.rangeTemplate,
     required this.sinceTemplate,
     required this.untilTemplate,
@@ -47,6 +57,14 @@ final class DateStrings {
     oneWeekAgo: 'Il y a une semaine',
     twoWeeksAgo: 'Il y a deux semaines',
     threeWeeksAgo: 'Il y a trois semaines',
+    fewWeeksAgo: 'Il y a quelques semaines',
+    yesterdayMorning: 'Hier matin',
+    yesterdayAfternoon: 'Hier après-midi',
+    yesterdayEvening: 'Hier soir',
+    underAnHour: 'Il y a moins d’une heure',
+    underHoursTemplate: 'Il y a moins de {n} h',
+    hoursAgoTemplate: 'Il y a {n} h',
+    hoursRangeTemplate: 'Il y a {from} à {to} h',
     thisWeek: 'Cette semaine',
     lastWeek: 'La semaine dernière',
     thisMonth: 'Ce mois-ci',
@@ -71,9 +89,19 @@ final class DateStrings {
       'novembre',
       'décembre',
     ],
+    weekdays: [
+      'lundi',
+      'mardi',
+      'mercredi',
+      'jeudi',
+      'vendredi',
+      'samedi',
+      'dimanche',
+    ],
     firstOfMonth: '1er',
     dayTemplate: '{day} {month}',
     dayWithYearTemplate: '{day} {month} {year}',
+    dayTitleTemplate: '{weekday} {date}',
     rangeTemplate: 'Du {start} au {end}',
     sinceTemplate: 'Depuis le {date}',
     untilTemplate: 'Jusqu’au {date}',
@@ -90,6 +118,14 @@ final class DateStrings {
     oneWeekAgo: 'A week ago',
     twoWeeksAgo: 'Two weeks ago',
     threeWeeksAgo: 'Three weeks ago',
+    fewWeeksAgo: 'A few weeks ago',
+    yesterdayMorning: 'Yesterday morning',
+    yesterdayAfternoon: 'Yesterday afternoon',
+    yesterdayEvening: 'Yesterday evening',
+    underAnHour: 'Under an hour ago',
+    underHoursTemplate: 'Under {n} h ago',
+    hoursAgoTemplate: '{n} h ago',
+    hoursRangeTemplate: '{from} to {to} h ago',
     thisWeek: 'This week',
     lastWeek: 'Last week',
     thisMonth: 'This month',
@@ -114,9 +150,19 @@ final class DateStrings {
       'November',
       'December',
     ],
+    weekdays: [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ],
     firstOfMonth: '1',
     dayTemplate: '{month} {day}',
     dayWithYearTemplate: '{month} {day}, {year}',
+    dayTitleTemplate: '{weekday}, {date}',
     rangeTemplate: 'From {start} to {end}',
     sinceTemplate: 'Since {date}',
     untilTemplate: 'Until {date}',
@@ -131,6 +177,22 @@ final class DateStrings {
   final String oneWeekAgo;
   final String twoWeeksAgo;
   final String threeWeeksAgo;
+  final String fewWeeksAgo;
+  final String yesterdayMorning;
+  final String yesterdayAfternoon;
+  final String yesterdayEvening;
+
+  /// Heading for items of the last hour.
+  final String underAnHour;
+
+  /// Heading for items of the last hours, with `{n}`.
+  final String underHoursTemplate;
+
+  /// Heading for one hour of age, with `{n}`.
+  final String hoursAgoTemplate;
+
+  /// Heading for several hours of age, with `{from}` and `{to}`.
+  final String hoursRangeTemplate;
   final String thisWeek;
   final String lastWeek;
   final String thisMonth;
@@ -153,6 +215,9 @@ final class DateStrings {
   /// Twelve names, January first, as they read inside a sentence.
   final List<String> months;
 
+  /// Seven names, Monday first, as they read inside a sentence.
+  final List<String> weekdays;
+
   /// The first day of a month: « 1er » in French.
   final String firstOfMonth;
 
@@ -161,6 +226,9 @@ final class DateStrings {
 
   /// The same with `{year}`.
   final String dayWithYearTemplate;
+
+  /// Heading for one day, with `{weekday}` and `{date}`.
+  final String dayTitleTemplate;
 
   /// Two days, with `{start}` and `{end}`.
   final String rangeTemplate;
@@ -173,9 +241,28 @@ final class DateStrings {
 
   /// Heading for a month: « Octobre », with its year unless it is [currentYear].
   String monthTitle(int year, int month, {required int currentYear}) {
-    final name = months[month - 1];
-    final title = name.substring(0, 1).toUpperCase() + name.substring(1);
+    final title = _capitalized(months[month - 1]);
     return year == currentYear ? title : '$title $year';
+  }
+
+  /// Heading for one day: « Mardi 3 novembre », with its year unless it is
+  /// [currentYear].
+  String dayTitle(DateTime day, {required int currentYear}) => dayTitleTemplate
+      .replaceAll('{weekday}', _capitalized(weekdays[day.weekday - 1]))
+      .replaceAll('{date}', formatDay(day, withYear: day.year != currentYear));
+
+  /// Heading for items [from] to [to] whole hours old: « Il y a 5 h »,
+  /// « Il y a 2 à 5 h », « Il y a moins de 3 h ».
+  String hoursTitle(int from, int to) {
+    if (from == 0) {
+      return to == 0
+          ? underAnHour
+          : underHoursTemplate.replaceAll('{n}', '${to + 1}');
+    }
+    if (from == to) return hoursAgoTemplate.replaceAll('{n}', '$from');
+    return hoursRangeTemplate
+        .replaceAll('{from}', '$from')
+        .replaceAll('{to}', '$to');
   }
 
   /// One day: « 3 novembre 2026 ».
@@ -206,3 +293,6 @@ final class DateStrings {
         .replaceAll('{end}', formatDay(last));
   }
 }
+
+String _capitalized(String text) =>
+    text.substring(0, 1).toUpperCase() + text.substring(1);

@@ -21,6 +21,29 @@ By default: À venir, Aujourd’hui, Hier, 7 derniers jours, Il y a une semaine,
 Il y a deux semaines, Il y a trois semaines, then one group per month. Empty
 groups are left out.
 
+## Adapting to the density
+
+`groupByDensity()` picks the headings from what there is. A quiet history reads
+Aujourd’hui, Hier, 7 derniers jours, Il y a quelques semaines, Plus ancien. A
+section holding more than `maxPerGroup` items is cut further: today into hours
+(« Il y a moins de 3 h », « Il y a 5 h »), yesterday into morning, afternoon and
+evening, the week into days (« Mardi 3 novembre »), older into years, months and
+days.
+
+```dart
+final groups = groupByDensity(
+  items,
+  dateOf: (item) => item.date,
+  now: DateTime.now(),
+  strings: DateStrings.fr,
+  maxPerGroup: 3,
+);
+```
+
+Neighbouring hours are joined until each group holds `minPerGroup` items, so a
+busy day does not turn into one heading per row. Headings about hours age: refresh
+`now` every minute while the list stays on screen.
+
 ## Choosing the sections
 
 ```dart

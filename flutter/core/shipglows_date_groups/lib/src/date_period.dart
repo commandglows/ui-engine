@@ -112,6 +112,13 @@ final class DatePeriod {
     _daysAgo(21, 27),
   );
 
+  /// Seven to twenty-seven days ago, before it is cut into weeks.
+  static final fewWeeksAgo = DatePeriod._(
+    'few-weeks-ago',
+    (s) => s.fewWeeksAgo,
+    _daysAgo(7, 27),
+  );
+
   /// The calendar month of today, all of it.
   static final thisMonth = DatePeriod._(
     'this-month',
