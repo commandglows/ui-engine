@@ -14,6 +14,12 @@ import 'snapshot.dart';
 /// Width of the ring around the bubble's face.
 const double _ringWidth = 3;
 
+/// Faintest the bubble can get at rest: it stays findable.
+const double _minRestOpacity = 0.2;
+
+/// Key of the rest opacity kept by the overlay host, in thousandths.
+const String _restOpacityKey = 'rest.opacity';
+
 /// Runs the floating launcher in this engine. Call it from the overlay's
 /// entry point, the `entrypoint` given to `ShipglowsFloatingLauncher`:
 ///
@@ -84,6 +90,8 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
       const ShipglowsFloatingLauncherGeometry();
   List<RRect>? _shape;
   bool _visible = false;
+  double _restOpacity = 1;
+  bool _restOpacityLoaded = false;
 
   /// Last snapshot received, null before the first one.
   ShipglowsFloatingLauncherSnapshot? get snapshot => _snapshot;
@@ -101,6 +109,31 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
   /// Screen the window can draw on, in window coordinates
   /// ([ShipglowsOverlayHost.workArea]).
   Rect? get workArea => host.workArea;
+
+  /// Opacity of the bubble while the pointer is away; hovering it brings it
+  /// back to full. Kept across launches with the window's place.
+  double get restOpacity => _restOpacity;
+
+  /// Whether the snapshot gives the right-click menu anything to show.
+  bool get hasMenu =>
+      _snapshot?.hideLabel != null || _snapshot?.opacityLabel != null;
+
+  /// Sets [restOpacity] live, limited to what keeps the bubble findable.
+  void setRestOpacity(double opacity) {
+    final next = opacity.clamp(_minRestOpacity, 1.0);
+    if (next == _restOpacity) return;
+    _restOpacity = next;
+    notifyListeners();
+  }
+
+  /// Keeps [restOpacity] for the next launches.
+  Future<void> saveRestOpacity() async {
+    try {
+      await host.writeValue(_restOpacityKey, (_restOpacity * 1000).round());
+    } on PlatformException {
+      // Not kept: it applies until the app quits.
+    }
+  }
 
   /// Theme of the snapshot, else of the system.
   Brightness get brightness =>
@@ -144,6 +177,9 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
   /// Reports a click on the bubble to the app.
   Future<void> tapBubble() => host.send(bubbleMessage);
 
+  /// Asks the app to hide the launcher.
+  Future<void> requestHide() => host.send(hideMessage);
+
   /// Moves the window with the mouse, from a pointer that is down. The
   /// keyboard stays with the window in front.
   Future<void> startDrag() => host.startDrag();
@@ -174,6 +210,7 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
   Future<void> _onShow(Object? data) async {
     final opening = !_visible;
     _apply(data);
+    await _loadRestOpacity();
     _visible = true;
     notifyListeners();
     // Folded at each opening, before the window appears: the transparent
@@ -186,6 +223,20 @@ class ShipglowsFloatingLauncherOverlayController extends ChangeNotifier {
           size.center(Offset.zero),
         ),
       );
+    }
+  }
+
+  // Before the first frame shows, so the bubble never flashes at full.
+  Future<void> _loadRestOpacity() async {
+    if (_restOpacityLoaded) return;
+    _restOpacityLoaded = true;
+    try {
+      final kept = await host.readValue(_restOpacityKey);
+      if (kept != null) {
+        _restOpacity = (kept / 1000).clamp(_minRestOpacity, 1.0);
+      }
+    } on PlatformException {
+      // Nothing kept: fully opaque.
     }
   }
 
@@ -287,6 +338,11 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   // Placement count when a drag started: until the report that follows it
   // arrives, the layout is for the old place and the fan stays folded.
   int? _dragPlacements;
+  // Right-click menu: asked for, and its room in the window's shape in place.
+  bool _menuOpen = false;
+  bool _menuReady = false;
+  // The opacity slider is held: the mouse may leave the window meanwhile.
+  bool _sliding = false;
 
   ShipglowsFloatingLauncherOverlayController get _controller =>
       widget.controller;
@@ -324,6 +380,10 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
       _tooltipRooms.clear();
       _tooltipReady = null;
       _dragPlacements = null;
+      _pointerInside = false;
+      _menuOpen = false;
+      _menuReady = false;
+      _sliding = false;
       _fan.value = 0;
       return;
     }
@@ -354,7 +414,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   void _expand() {
     _collapseTimer?.cancel();
     _collapseTimer = null;
-    if (_open || _dragPlacements != null) return;
+    if (_open || _menuOpen || _dragPlacements != null) return;
     final layout = _currentLayout();
     if (layout.count == 0) return;
     _open = true;
@@ -370,6 +430,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   }
 
   void _scheduleCollapse() {
+    if (_sliding) return;
     _collapseTimer?.cancel();
     _collapseTimer = Timer(ShipglowsScale.motionSlow, _collapse);
   }
@@ -377,6 +438,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   void _collapse() {
     _collapseTimer?.cancel();
     _collapseTimer = null;
+    if (_menuOpen) _closeMenu();
     if (!_open) return;
     _open = false;
     _setHovered(null);
@@ -398,6 +460,43 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     _tooltipReady = null;
     _fan.value = 0;
     unawaited(_syncShape());
+  }
+
+  // The fan folds and the menu takes its place once the shape has room for
+  // it, as a tooltip does.
+  Future<void> _openMenu() async {
+    if (!_controller.hasMenu) return;
+    if (_menuOpen) {
+      _closeMenu();
+      return;
+    }
+    _menuOpen = true;
+    _collapseNow();
+    await _syncShape();
+    if (!mounted || !_menuOpen) return;
+    setState(() => _menuReady = true);
+  }
+
+  void _closeMenu() {
+    _sliding = false;
+    setState(() {
+      _menuOpen = false;
+      _menuReady = false;
+    });
+    unawaited(_syncShape());
+  }
+
+  void _tapBubble() {
+    if (_menuOpen) {
+      _closeMenu();
+    } else {
+      unawaited(_controller.tapBubble());
+    }
+  }
+
+  void _hideLauncher() {
+    _closeMenu();
+    unawaited(_controller.requestHide());
   }
 
   void _setHovered(String? id) {
@@ -443,6 +542,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
 
   Future<void> _syncShape() {
     final layout = _currentLayout();
+    if (_menuOpen) return _controller.setShape(layout.menuShape);
     final open = _open || _fan.status != AnimationStatus.dismissed;
     return _controller.setShape(
       open ? layout.expandedShape(_roomIndexes()) : layout.collapsedShape,
@@ -456,6 +556,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
   }
 
   void _startDrag() {
+    if (_menuOpen) _closeMenu();
     _collapseNow();
     _dragPlacements = _controller.placements;
     unawaited(_controller.startDrag());
@@ -484,13 +585,23 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
           });
           final bubble = Positioned.fromRect(
             rect: layout.bubbleRect,
-            child: _Bubble(
-              logo: widget.logo,
-              label: _controller.snapshot?.bubbleLabel,
-              ringGradient: widget.ringGradient,
-              onEnter: _expand,
-              onTap: () => unawaited(_controller.tapBubble()),
-              onDragStart: _startDrag,
+            // Faded at rest; the open menu keeps it faded to preview the
+            // slider.
+            child: AnimatedOpacity(
+              opacity: _pointerInside && !_menuOpen
+                  ? 1
+                  : _controller.restOpacity,
+              duration: motion,
+              curve: ShipglowsScale.curveStandard,
+              child: _Bubble(
+                logo: widget.logo,
+                label: _controller.snapshot?.bubbleLabel,
+                ringGradient: widget.ringGradient,
+                onEnter: _expand,
+                onTap: _tapBubble,
+                onSecondaryTap: () => unawaited(_openMenu()),
+                onDragStart: _startDrag,
+              ),
             ),
           );
           return MouseRegion(
@@ -498,11 +609,11 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
             // the fan open, leaving it folds the fan after a short delay.
             hitTestBehavior: HitTestBehavior.opaque,
             onEnter: (_) {
-              _pointerInside = true;
+              setState(() => _pointerInside = true);
               _expand();
             },
             onExit: (_) {
-              _pointerInside = false;
+              setState(() => _pointerInside = false);
               _scheduleCollapse();
             },
             child: AnimatedBuilder(
@@ -516,6 +627,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
                     ?_action(layout, items, i, motion),
                   child!,
                   _tooltip(layout, items, motion),
+                  if (_menuReady) _menu(layout),
                 ],
               ),
             ),
@@ -569,6 +681,29 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
     );
   }
 
+  Widget _menu(FloatingLauncherLayout layout) {
+    final snapshot = _controller.snapshot;
+    return Positioned.fromRect(
+      rect: layout.menuSlot,
+      child: Align(
+        alignment: Alignment(layout.menuOnLeft ? 1 : -1, 0),
+        child: _BubbleMenu(
+          opacityLabel: snapshot?.opacityLabel,
+          hideLabel: snapshot?.hideLabel,
+          opacity: _controller.restOpacity,
+          onOpacity: _controller.setRestOpacity,
+          onOpacityStart: () => _sliding = true,
+          onOpacityEnd: () {
+            _sliding = false;
+            unawaited(_controller.saveRestOpacity());
+            if (!_pointerInside) _scheduleCollapse();
+          },
+          onHide: _hideLauncher,
+        ),
+      ),
+    );
+  }
+
   Widget _tooltip(
     FloatingLauncherLayout layout,
     List<ShipglowsFloatingLauncherItem> items,
@@ -587,10 +722,7 @@ class _LauncherSurfaceState extends State<_LauncherSurface>
       final action = layout.actionCenters[index];
       final vertical = slot.height <= 0
           ? 0.0
-          : ((action.dy - slot.center.dy) / (slot.height / 2)).clamp(
-              -1.0,
-              1.0,
-            );
+          : ((action.dy - slot.center.dy) / (slot.height / 2)).clamp(-1.0, 1.0);
       // Fades in for each action. It goes at once when the action is left:
       // the window's shape drops its room at the same moment.
       cards.add(
@@ -642,6 +774,7 @@ class _Bubble extends StatelessWidget {
     required this.ringGradient,
     required this.onEnter,
     required this.onTap,
+    required this.onSecondaryTap,
     required this.onDragStart,
   });
 
@@ -650,6 +783,7 @@ class _Bubble extends StatelessWidget {
   final Gradient? ringGradient;
   final VoidCallback onEnter;
   final VoidCallback onTap;
+  final VoidCallback onSecondaryTap;
   final VoidCallback onDragStart;
 
   @override
@@ -660,6 +794,7 @@ class _Bubble extends StatelessWidget {
       button: true,
       label: label,
       onTap: onTap,
+      onLongPress: onSecondaryTap,
       child: ExcludeSemantics(
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
@@ -667,6 +802,7 @@ class _Bubble extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onTap,
+            onSecondaryTap: onSecondaryTap,
             // The window follows the mouse until the button is up.
             onPanStart: (_) => onDragStart(),
             child: DecoratedBox(
@@ -763,6 +899,177 @@ class _ActionButton extends StatelessWidget {
                   boxShadow: [_shadow(context)],
                 ),
                 child: Center(child: face),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Right-click menu of the bubble: its opacity at rest, live, and a row to
+/// hide it. Each part shows only when the snapshot labels it.
+class _BubbleMenu extends StatelessWidget {
+  const _BubbleMenu({
+    required this.opacityLabel,
+    required this.hideLabel,
+    required this.opacity,
+    required this.onOpacity,
+    required this.onOpacityStart,
+    required this.onOpacityEnd,
+    required this.onHide,
+  });
+
+  final String? opacityLabel;
+  final String? hideLabel;
+  final double opacity;
+  final ValueChanged<double> onOpacity;
+  final VoidCallback onOpacityStart;
+  final VoidCallback onOpacityEnd;
+  final VoidCallback onHide;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShipglowsTheme.of(context);
+    final style = (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+        .copyWith(color: theme.text, fontSize: ShipglowsScale.textSm);
+    final opacityTitle = opacityLabel;
+    final hideTitle = hideLabel;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surfaceRaised,
+        borderRadius: BorderRadius.circular(theme.radiusMd),
+        border: Border.all(color: theme.border, width: theme.lineWidth),
+        boxShadow: [_shadow(context)],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(theme.spaceXs),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (opacityTitle != null) ...[
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  theme.spaceSm,
+                  theme.spaceXs,
+                  theme.spaceSm,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        opacityTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: style,
+                      ),
+                    ),
+                    Text(
+                      '${(opacity * 100).round()} %',
+                      style: style.copyWith(color: theme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 7,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 14,
+                  ),
+                  activeTrackColor: theme.accent,
+                  inactiveTrackColor: theme.border,
+                  thumbColor: theme.accent,
+                  overlayColor: theme.accent.withValues(alpha: 0.15),
+                ),
+                child: Slider(
+                  value: opacity,
+                  min: _minRestOpacity,
+                  divisions: 16,
+                  semanticFormatterCallback: (value) =>
+                      '${(value * 100).round()} %',
+                  onChanged: onOpacity,
+                  onChangeStart: (_) => onOpacityStart(),
+                  onChangeEnd: (_) => onOpacityEnd(),
+                ),
+              ),
+            ],
+            if (hideTitle != null)
+              _BubbleMenuRow(label: hideTitle, style: style, onTap: onHide),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of the right-click menu, filled with the accent while hovered.
+class _BubbleMenuRow extends StatefulWidget {
+  const _BubbleMenuRow({
+    required this.label,
+    required this.style,
+    required this.onTap,
+  });
+
+  final String label;
+  final TextStyle style;
+  final VoidCallback onTap;
+
+  @override
+  State<_BubbleMenuRow> createState() => _BubbleMenuRowState();
+}
+
+class _BubbleMenuRowState extends State<_BubbleMenuRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShipglowsTheme.of(context);
+    final color = _hovered ? theme.onAccent : theme.text;
+    return Semantics(
+      container: true,
+      button: true,
+      label: widget.label,
+      onTap: widget.onTap,
+      child: ExcludeSemantics(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _hovered ? theme.accent : null,
+                borderRadius: BorderRadius.circular(theme.radiusSm),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(theme.spaceSm),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.visibility_off_outlined,
+                      size: ShipglowsScale.iconSm,
+                      color: color,
+                    ),
+                    SizedBox(width: theme.spaceSm),
+                    Expanded(
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: widget.style.copyWith(color: color),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

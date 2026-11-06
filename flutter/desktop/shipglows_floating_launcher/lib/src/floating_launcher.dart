@@ -96,6 +96,7 @@ class ShipglowsFloatingLauncher {
 
   final _selections = StreamController<String>.broadcast();
   final _bubbleTaps = StreamController<void>.broadcast();
+  final _hideRequests = StreamController<void>.broadcast();
   late final StreamSubscription<ShipglowsOverlayMessage> _subscription;
   ShipglowsFloatingLauncherSnapshot? _snapshot;
   // show() was called and hide() not since: the launcher is on screen or
@@ -109,6 +110,11 @@ class ShipglowsFloatingLauncher {
   /// Clicks on the bubble itself, for the app's primary action (opening its
   /// window, say). Nothing happens when nobody listens.
   Stream<void> get bubbleTaps => _bubbleTaps.stream;
+
+  /// The user chose the `hideLabel` row of the bubble's right-click menu. The
+  /// launcher stays until the app calls [hide], usually after saving the
+  /// choice; the app keeps a way to show it again (a tray entry, a setting).
+  Stream<void> get hideRequests => _hideRequests.stream;
 
   /// Whether the launcher is on screen.
   ValueListenable<bool> get visible => overlay.visible;
@@ -149,6 +155,7 @@ class ShipglowsFloatingLauncher {
     await _subscription.cancel();
     await _selections.close();
     await _bubbleTaps.close();
+    await _hideRequests.close();
     await overlay.dispose();
   }
 
@@ -165,6 +172,8 @@ class ShipglowsFloatingLauncher {
         if (id is String && !_selections.isClosed) _selections.add(id);
       case bubbleMessage:
         if (!_bubbleTaps.isClosed) _bubbleTaps.add(null);
+      case hideMessage:
+        if (!_hideRequests.isClosed) _hideRequests.add(null);
     }
   }
 }

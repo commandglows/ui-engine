@@ -17,6 +17,13 @@ false`, `clampRect`, window shape).
 - Click an action: the fan folds and the app receives its id
   (`selections`). Click the bubble: `bubbleTaps`, for the app's primary
   action. Disabled actions are dimmed and keep their tooltip.
+- Right-click the bubble: a small menu beside it, closed by leaving it, a
+  click on the bubble or a second right-click. Its opacity slider (20 to
+  100 %, `opacityLabel`) fades the bubble at rest, live, and is kept across
+  launches with its place; hovering the bubble brings it back to full. Its
+  hide row (`hideLabel`) reports to `hideRequests`: the app saves the choice,
+  calls `hide()` and keeps a way back (a tray entry, a setting). A snapshot
+  with neither label has no menu.
 - Drag the bubble to move it; only the bubble is kept inside the work area
   (`margin` from the edges), also after a display or taskbar change. Its
   place is remembered (across launches with `appFolder`). The first opening
@@ -32,7 +39,7 @@ false`, `clampRect`, window shape).
 - App engine: `ShipglowsFloatingLauncher` publishes a
   `ShipglowsFloatingLauncherSnapshot` (`items` as
   `ShipglowsFloatingLauncherItem`: id, label, icon, shortcut text, enabled;
-  `bubbleLabel`, `brightness`, `data`), shows and hides the launcher and
+  `bubbleLabel`, `hideLabel`, `opacityLabel`, `brightness`, `data`), shows and hides the launcher and
   updates it in place while shown or still appearing. `appFolder` (on the
   constructor or `defaultOptions`) keeps the bubble's place across launches.
 - Launcher engine: `runShipglowsFloatingLauncherOverlay` from the app's
@@ -59,6 +66,7 @@ final launcher = ShipglowsFloatingLauncher(
 );
 launcher.selections.listen(runCommand); // item id
 launcher.bubbleTaps.listen((_) => showMainWindow());
+launcher.hideRequests.listen((_) => saveBubbleSetting(false)); // then hide()
 await launcher.publish(ShipglowsFloatingLauncherSnapshot(
   items: [
     ShipglowsFloatingLauncherItem(
@@ -69,6 +77,8 @@ await launcher.publish(ShipglowsFloatingLauncherSnapshot(
     ),
   ],
   bubbleLabel: 'MyApp',
+  hideLabel: 'Hide the bubble',
+  opacityLabel: 'Opacity',
   brightness: Brightness.dark,
 ));
 await launcher.show();

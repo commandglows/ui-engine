@@ -76,6 +76,8 @@ class ShipglowsFloatingLauncherSnapshot {
   const ShipglowsFloatingLauncherSnapshot({
     this.items = const <ShipglowsFloatingLauncherItem>[],
     this.bubbleLabel,
+    this.hideLabel,
+    this.opacityLabel,
     this.brightness,
     this.data = const <String, Object?>{},
   });
@@ -89,6 +91,8 @@ class ShipglowsFloatingLauncherSnapshot {
     if (json is! Map) return null;
     final items = json['items'];
     final bubbleLabel = json['bubbleLabel'];
+    final hideLabel = json['hideLabel'];
+    final opacityLabel = json['opacityLabel'];
     return ShipglowsFloatingLauncherSnapshot(
       items: [
         if (items is List)
@@ -97,6 +101,10 @@ class ShipglowsFloatingLauncherSnapshot {
       ],
       bubbleLabel: bubbleLabel is String && bubbleLabel.isNotEmpty
           ? bubbleLabel
+          : null,
+      hideLabel: hideLabel is String && hideLabel.isNotEmpty ? hideLabel : null,
+      opacityLabel: opacityLabel is String && opacityLabel.isNotEmpty
+          ? opacityLabel
           : null,
       brightness: switch (json['brightness']) {
         'dark' => Brightness.dark,
@@ -117,6 +125,13 @@ class ShipglowsFloatingLauncherSnapshot {
   /// click on it does). Null: nothing.
   final String? bubbleLabel;
 
+  /// Row of the right-click menu that asks the app to hide the launcher
+  /// (`ShipglowsFloatingLauncher.hideRequests`). Null: no such row.
+  final String? hideLabel;
+
+  /// Title of the right-click menu's opacity slider. Null: no slider.
+  final String? opacityLabel;
+
   /// Theme the launcher follows. Null: the system brightness.
   final Brightness? brightness;
 
@@ -128,6 +143,8 @@ class ShipglowsFloatingLauncherSnapshot {
   Map<String, Object?> toJson() => <String, Object?>{
     'items': [for (final item in items) item.toJson()],
     'bubbleLabel': bubbleLabel,
+    'hideLabel': hideLabel,
+    'opacityLabel': opacityLabel,
     'brightness': brightness?.name,
     'data': data,
   };

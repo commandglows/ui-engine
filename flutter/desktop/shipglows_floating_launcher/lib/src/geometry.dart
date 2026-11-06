@@ -26,6 +26,7 @@ class ShipglowsFloatingLauncherGeometry {
     this.tooltipHeight = 72,
     this.tooltipGap = 10,
     this.shadowExtent = 12,
+    this.menuHeight = 128,
   });
 
   /// Restores a geometry from [json], as produced by [toJson]; missing or
@@ -34,8 +35,7 @@ class ShipglowsFloatingLauncherGeometry {
     if (json is! Map) return null;
     const fallback = ShipglowsFloatingLauncherGeometry();
     double read(String key, double value) => switch (json[key]) {
-      final num number when number.isFinite && number >= 0 =>
-        number.toDouble(),
+      final num number when number.isFinite && number >= 0 => number.toDouble(),
       _ => value,
     };
     return ShipglowsFloatingLauncherGeometry(
@@ -50,6 +50,7 @@ class ShipglowsFloatingLauncherGeometry {
       tooltipHeight: read('tooltipHeight', fallback.tooltipHeight),
       tooltipGap: read('tooltipGap', fallback.tooltipGap),
       shadowExtent: read('shadowExtent', fallback.shadowExtent),
+      menuHeight: read('menuHeight', fallback.menuHeight),
     );
   }
 
@@ -90,6 +91,9 @@ class ShipglowsFloatingLauncherGeometry {
   /// margin of the window's shape.
   final double shadowExtent;
 
+  /// Tallest right-click menu, beside the bubble; it is [tooltipWidth] wide.
+  final double menuHeight;
+
   /// Distance from the bubble's center to the actions' centers that
   /// [windowSize] provides for: never closer than the bubble allows.
   double get reach => math.max(
@@ -124,6 +128,7 @@ class ShipglowsFloatingLauncherGeometry {
     'tooltipHeight': tooltipHeight,
     'tooltipGap': tooltipGap,
     'shadowExtent': shadowExtent,
+    'menuHeight': menuHeight,
   };
 
   @override
@@ -139,7 +144,8 @@ class ShipglowsFloatingLauncherGeometry {
       other.tooltipWidth == tooltipWidth &&
       other.tooltipHeight == tooltipHeight &&
       other.tooltipGap == tooltipGap &&
-      other.shadowExtent == shadowExtent;
+      other.shadowExtent == shadowExtent &&
+      other.menuHeight == menuHeight;
 
   @override
   int get hashCode => Object.hash(
@@ -154,6 +160,7 @@ class ShipglowsFloatingLauncherGeometry {
     tooltipHeight,
     tooltipGap,
     shadowExtent,
+    menuHeight,
   );
 }
 
@@ -262,9 +269,42 @@ class FloatingLauncherLayout {
     return Rect.fromLTWH(left, top, geometry.tooltipWidth, height);
   }
 
+  /// Whether the right-click menu opens on the bubble's left, the roomier
+  /// side.
+  bool get menuOnLeft {
+    final area = workArea;
+    return area == null || center.dx - area.left >= area.right - center.dx;
+  }
+
+  /// Room for the right-click menu: beside the bubble on the roomier side,
+  /// moved up or down just enough to stay on screen.
+  Rect get menuSlot {
+    final offset = geometry.bubbleSize / 2 + geometry.tooltipGap;
+    final height = geometry.menuHeight;
+    final left = menuOnLeft
+        ? center.dx - offset - geometry.tooltipWidth
+        : center.dx + offset;
+    var top = center.dy - height / 2;
+    final area = workArea;
+    if (area != null && area.height >= height) {
+      top = top.clamp(area.top, area.bottom - height);
+    }
+    return Rect.fromLTWH(left, top, geometry.tooltipWidth, height);
+  }
+
+  /// Window shape while the right-click menu is open: the bubble and the
+  /// menu, overlapping so moving from one to the other never leaves the
+  /// window.
+  List<RRect> get menuShape => [
+    ...collapsedShape,
+    RRect.fromRectAndRadius(
+      menuSlot.inflate(geometry.shadowExtent),
+      Radius.circular(geometry.shadowExtent),
+    ),
+  ];
+
   /// Window shape while folded: the bubble and its shadow.
-  List<RRect> get collapsedShape =>
-      collapsedShapeAt(geometry, center);
+  List<RRect> get collapsedShape => collapsedShapeAt(geometry, center);
 
   /// [collapsedShape] for a bubble at [center].
   static List<RRect> collapsedShapeAt(

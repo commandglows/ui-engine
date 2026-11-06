@@ -10,3 +10,6 @@ const String selectMessage = 'floatingLauncher.select';
 
 /// Launcher → app: the bubble itself was clicked.
 const String bubbleMessage = 'floatingLauncher.bubble';
+
+/// Launcher → app: the user asked to hide the launcher from its own menu.
+const String hideMessage = 'floatingLauncher.hide';
