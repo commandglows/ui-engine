@@ -72,3 +72,64 @@ transaction or durable undo journal.
 `TrashView<T>` supplies the list UI. The host app supplies its item adapter,
 retention policy, restore operation, permanent-delete operation, and localized
 `TrashStrings`.
+
+## More
+
+Shared in-memory undo/redo history, immutable edit journals, active-editor routing, undo snack bars,
+shortcuts, and the reusable trash list. The host supplies editor snapshots,
+domain commands, persistence, stale-state checks, and retention policy. See the
+[package contract](../../features/shipglows_undo_trash/README.md).
+Undo, redo and trash, extracted from ContentGlows. Depends on
+`shipglows_feedback` for its snack bar.
+
+- `UndoRedoHistory<T>`: undo/redo stacks of snapshots for an editor. `record(before)`
+  before each change (clears redo), `undo(current)` / `redo(current)` return
+  the step to restore, `pop()` for an undo-only history. `group(before,
+  change, changed:)` folds a batch (an AI pass) into one step, and records
+  nothing when `changed` says it was a no-op. Capped at `limit` (oldest
+  dropped); optional labels for « Undo: … » tooltips; a `ChangeNotifier`.
+- `UndoCommandStack<T>`: a bounded stack of compensating commands for an app
+  that keeps both events instead of rewriting history. `push(command, label:)`
+  returns the `UndoCommandEntry` kept (oldest dropped past `limit`); `latest`
+  and `popLatest()` serve Ctrl/⌘+Z; `remove(entry)` takes a specific one (its
+  own « Undo » message); `clear()`. It only orders the entries: the caller runs
+  the commands and checks whether a change is still undoable. Undo-only, no
+  redo; a `ChangeNotifier`.
+- `UndoShortcuts`: Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z (and Ctrl+Y off Apple)
+  redoes for the subtree; keys typed in a text field stay its own
+  (`isTextInputFocused()`), disabled actions let the key through. A command
+  bar calls the same handlers directly.
+- `PendingUndo`: an action shown at once whose lasting part (`onCommit`: a
+  server call) waits for the « Undo » window. Settles exactly once, undo or
+  commit; commit errors go to `onError`.
+- `UndoWindow<K>`: a screen's open windows by item. `start(key, commit:)`
+  hides the item (`isHidden`), `undoLast()` for Ctrl/⌘+Z,
+  `flush()` commits everything (app backgrounded). `keepHiddenAfterCommit`
+  avoids a flicker while the list reloads; a failed commit shows it again.
+  Commits still run once the screen is gone.
+- `showUndoSnackBar(context, message:, pending:)`: the shared message snack
+  bar (`feedbackSnackBar`, info by default, `kind:` to change) with « Undo »
+  (persists for assistive-technology users); `attachUndoSnackBar`
+  ties a `PendingUndo` to the app's own toast instead (closing commits),
+  with its content wrapped in `UndoSnackBarContent` so undoing elsewhere
+  closes that toast, never another message it was queued behind.
+- `TrashView<T>`: trash screen body inside the app's scaffold. `entryOf` maps
+  an item to a `TrashEntry` (title, deletion and purge dates, `purging`);
+  search with accents folded, `TrashFilter`s, restore, delete permanently and
+  empty the trash (confirmed through `confirm`, an `AlertDialog` by default),
+  a spinner per row, errors to `onError`. Most recent first; the subtitle
+  turns red `warnDays` before the purge. Texts: `TrashStrings.en`, `.fr`, or
+  the app's own (`copyWith`).
+
+```dart
+final window = UndoWindow<String>();
+
+void trash(Item item) {
+  final pending = window.start(
+    item.id,
+    commit: () => api.trash(item.id),
+    keepHiddenAfterCommit: true,
+  );
+  showUndoSnackBar(context, message: 'Moved to trash', pending: pending);
+}
+```

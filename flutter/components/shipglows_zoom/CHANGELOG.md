@@ -4,7 +4,7 @@
   repeating the notification callback while it remains blocked. Rebase pinch
   scale at the limit so reversing direction takes effect immediately.
 - Move from `shipglows-email-engine/packages` to
-  `shipglows-ui-engine/flutter`; the package name is unchanged.
+  `shipglows-app-engine/flutter`; the package name is unchanged.
 - Add Ctrl/Command+= (also Shift and the `+` keys) and Ctrl/Command+- (also
   the keypad `-`) zoom shortcuts, `keyboardZoomStep` (0.05 by default) and
   `zoomInShortcuts` / `zoomOutShortcuts`.

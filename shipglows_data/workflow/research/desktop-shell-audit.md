@@ -29,7 +29,7 @@ next_step: "Choisir le premier candidat (diagnostics ou réglages) et ouvrir sa 
 
 Tout ce que chaque app refait hors métier. Hors périmètre (déjà partagés) :
 `shipglows_command_bar`, `_command_bar_window`, `_overlay_window`, `_window`,
-`_hotkeys`, `_tray`. Le zoom (`shipglows_flutter_zoom`) est partagé mais vit
+`_hotkeys`, `_tray`. Le zoom (`shipglows_zoom`) est partagé mais vit
 dans `shipglows-email-engine`.
 
 Abréviations : CTG ContentGlows (`contentglows/app`), CMG CommandGlows
@@ -152,12 +152,12 @@ Déjà couverts par un paquet existant, à migrer plutôt qu'à créer :
 
 ### 5. `shipglows_zoom` — Dart
 
-- Déplacer `shipglows_flutter_zoom` de `shipglows-email-engine` vers
+- Déplacer `shipglows_zoom` de `shipglows-email-engine` vers
   ui-engine (5 apps en dépendent par chemin).
 - Ajouter Ctrl+= / Ctrl+- (absents partout), bornes et pas configurables
   (CoG : 75–150 %, pas de 5).
 - Dépendances : aucune ; `shipglows_window` persiste déjà le zoom.
-- **Livré le 2026-10-22** : `flutter/shipglows_flutter_zoom` (nom inchangé),
+- **Livré le 2026-10-22** : `flutter/shipglows_zoom` (nom inchangé),
   `keyboardZoomStep` 0,05, Ctrl+= / Ctrl+- vérifiés dans CommandGlows.
 
 ### 6. `shipglows_ui_states` — Dart

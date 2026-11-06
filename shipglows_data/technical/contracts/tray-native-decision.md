@@ -39,7 +39,7 @@ nothing compiled or run.
 ## Decision
 
 The notification area icon of every ShipGlows desktop app comes from
-`flutter/shipglows_tray`, a Win32 plugin written in house, not from
+`flutter/desktop/shipglows_tray`, a Win32 plugin written in house, not from
 `tray_manager` (pub.dev, community package).
 
 Why:

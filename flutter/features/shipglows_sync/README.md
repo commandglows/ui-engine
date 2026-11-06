@@ -60,3 +60,37 @@ resolved package configuration and declared Doppler `commandglows/dev` scope,
 without resolving dependencies again in this package. These are isolated tests,
 not proof of a live authenticated application or a deployed backend. Follow the
 operator's test authorization rules; no build or lint is required.
+
+## More
+
+Device-to-account sync, ported from CommunityGlows (`cloudReconciliation.ts`,
+`NativeSyncReview.vue`, `postAuthSyncFeedback.ts`). No dependency beyond
+Flutter; `shipglows_settings` builds on it, and business-data stores can too.
+
+This is the shared client-side contract and experience layer, not a cloud
+transport or backend. Each app supplies its authenticated remote, durable
+storage/queue, account binding and domain-specific conflict policy. Snapshot
+reconciliation compares whole records by stable id and asks the user to choose
+the device or account copy; it is not a command/event log merger and does not
+provide Convex schemas, mutations or server authorization.
+
+- `SyncStatus` / `SyncHealth`: localOnly, synced, pending, syncing,
+  needsReview, unreachable, failed. `SyncSource`: anything with a `status`
+  and `sync()`.
+- `reconcileSnapshots(device, account, choices:)` on two `SyncSnapshot`s
+  (`fields`, and `collections` of records by stable id): union; a value or
+  record set differently on both sides is a `SyncConflict`, resolved per key
+  (`fields/theme`, `profiles/p1`) with `SyncSide.device` or `.account`.
+  `fingerprint` tells whether a side changed before confirming.
+- `SyncReviewHost` (`review`, `resolveReview`, `reviewError`: changed or
+  failed) and `SyncRecoveryHost` (`recovery`, `restoreRecovery`,
+  `dropRecovery`); `SyncRecovery` is JSON for the store's own storage.
+- `SyncProgress`: first-sync steps, each shown at least 1 s, the « ready »
+  notice hides after 3 s.
+- Widgets: `SyncStatusChip` (tap syncs or opens the review),
+  `SyncIssueBanner` (retry, sign in, compare), `SyncReviewPrompt` (opens the
+  review once per new comparison) and `showSyncReviewDialog` (keep device or
+  account for all or per difference, « Rester en local »),
+  `SyncProgressOverlay`, `SyncRecoveryPanel`. Texts: `SyncStrings.fr` (default),
+  `.en`, `forLocale`; `labelOf` / `describe` name settings and values in the
+  app's words.

@@ -1,6 +1,10 @@
-# UI Engine Tasks
+# App Engine Tasks
 
 ## Open
+
+- [ ] 2026-11-06: 21 packages have no test (`command_bar`, `window`, `tray`, `updater` first).
+- [ ] 2026-11-06: ContentGlows and the ShipGlows app still share about 12,000 close lines (screens, `project`, `idea`, `content_item` models); only the 7 identical models moved to `shipglows_content_models`.
+- [ ] 2026-11-06: decide the fate of the packages without consumer (`shipglows_ai`, `shipglows_contact`) and of the archived `shipglows-window-engine`.
 
 - [ ] 2026-11-02: generic TypeScript command synchronization engine
   `typescript/shipglows_sync` added for DreamGlows; product domain execution and
@@ -42,6 +46,8 @@
 
 ## Done
 
+- [x] 2026-11-06: layers, Dart workspace, repository renamed app-engine, pure `sync_core` and `settings_core`, one consumption mode with `tool/provide-engines.sh`, generated catalog, one README per package.
+
 - [x] 2026-10-24: migration audit from the code (imports under each app's `lib/`, not checked on screen). Shared packages in use: ContentGlows (command_bar(+window), zoom, guide, overlay_window, settings, sync, tray, undo_trash, window, audio), CommandGlows (command_bar(+window), zoom, menu, settings(+firestore), sync, theme, tray, window), BeatGlows (command_bar(+window), diagnostics, zoom, settings, tray, window, audio, visualization), DreamGlows `path_flutter` + `windows_app` (command_bar(+window), settings, tray, zoom, window), ShipGlows app (command_bar(+window), zoom, hotkeys, window), ReplayGlows (command_bar, guide, onboarding). Closed by this audit: `shipglows_tray` in CommandGlows (commandglows 074879a6; close-or-hide is a user choice through `ShipglowsTrayCloseSetting` in settings) and in ContentGlows (contentglows b44b9a4b; `resident_shell` no longer has a notification icon and `resident_shell_menu_test.cpp` is gone); `shipglows_hotkeys` used by the ShipGlows app floating command bar (shipglows_app aec34168); `shipglows_sync` used by ContentGlows settings (`settings_sync_ui.dart`).
 
 - [x] 2026-10-27: launch at sign-in on a dev checkout (a09c5b5): a Debug/Profile build registers `shipglows-dev start -ProjectPath <project> -FlutterDevice windows` instead of its stale exe, and rewrites its old entry at the next start. Checked on ContentGlows through `s start`: `HKCU\…\Run\ContentGlows` rewritten. CommunityGlows (Tauri) got the same fix (communityglows 8933c53b, not built). Real reboot not checked yet.
@@ -58,7 +64,7 @@
 
 - [x] 2026-10-22: `shipglows_diagnostics` package; BeatGlows pilot replaces `lib/core/diagnostics/crash_log.dart` (same `crash.log`), launched through `s start -FlutterDevice windows` (running, debug). 2026-10-23: copy button, settings panel and preview dialog added after a survey of the 6 apps; BeatGlows gets a header button and two command-bar entries (Aide). Header button copies the report, checked by the operator.
 
-- [x] 2026-10-22: `shipglows_flutter_zoom` moved from `shipglows-email-engine/packages` to `flutter/`, same package name; the 6 consumers point to the new path. Ctrl+= / Ctrl+- added, `keyboardZoomStep` 0.05 (CommunityGlows reference); Ctrl+= / Ctrl+- / Ctrl+0 checked by the operator in CommandGlows run through `s`.
+- [x] 2026-10-22: `shipglows_zoom` moved from `shipglows-email-engine/packages` to `flutter/`, same package name; the 6 consumers point to the new path. Ctrl+= / Ctrl+- added, `keyboardZoomStep` 0.05 (CommunityGlows reference); Ctrl+= / Ctrl+- / Ctrl+0 checked by the operator in CommandGlows run through `s`.
 
 - [x] 2026-10-22: DreamGlows on `shipglows_tray` (dreamglows d353882, ui-engine 3321ace): compiled and run through `s`, icon « DreamGlows » in the notification area, a second launch exits in 0.2 s and leaves one instance; menu checked by the operator; Quitter closes cleanly after the shutdown crash fix (2d88ef7), checked by the operator; the X opens the close-or-hide dialog (c27961e, dreamglows 8d700e8), checked by the operator.
 

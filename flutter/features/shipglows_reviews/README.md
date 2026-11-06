@@ -188,3 +188,67 @@ s start -ProjectPath flutter\shipglows_reviews\example -FlutterDevice web-server
 
 Flutter apps only: the Vue/Tauri apps (CommunityGlows, ToolGlows) need their
 own client for the same backend contract.
+
+## More
+
+Customer reviews, the same on Android, iOS, macOS, Windows and the web:
+asking at the right moment, the app's own review form sent to its backend,
+the public rating page and the settings rows. Depends on `in_app_review`,
+`package_info_plus`, `path_provider`, `url_launcher`, `web`,
+`shipglows_settings` (device state), `shipglows_feedback`, `shipglows_theme`
+and `shipglows_icons`.
+
+- `ShipglowsReviews.open(config: ShipglowsReviewsConfig(appId:, appStoreId:,
+  microsoftStoreId:, playStoreListed:, reviewSite:, policy:), sink:)` once
+  at startup; never throws. Counts launches, reads the install (Google Play,
+  App Store, TestFlight, direct installer or APK, web), sends the reviews
+  left unsent. The state lives in the app support folder
+  (`%APPDATA%\<company>\<app>\shipglows.reviews.json` on Windows), in
+  `localStorage` on the web, or in any `SettingsStorage` given.
+- `maybeAskForReview(context, appName:)` at a natural break: the store's
+  rating prompt on Google Play and App Store installs; elsewhere (Windows,
+  the web, APKs) the app's invitation « Donner mon avis » / « Noter sur
+  {page} » / « Plus tard » / « Ne plus me demander »
+  (`showShipglowsReviewInvitation` on demand, `inviteWithoutStorePrompt`).
+  The `ReviewPolicy` asks only after 7 days, 5 launches and 3 successes
+  since the last prompt, never within 3 days of an error or 30 of a form
+  review, 120 days apart, 3 a year, once per version, never again after
+  rating or « Ne plus me demander ». Never in debug builds
+  (`promptInDebug`). `eligibility` says why it waits. With `followFeedback`
+  (default) every `shipglows_feedback` success counts as a positive moment
+  and every error as a problem.
+- Form: `showShipglowsReviewForm(context, reviews:, appName:, topic:)` (a
+  bottom sheet on compact windows, a dialog otherwise): stars, topic
+  (praise, idea, problem, other), message, optional address, consent to
+  publish as a testimonial with an optional display name, a note on what is
+  sent. Ctrl+Enter sends from any field. The thank-you offers the public
+  page to everyone, whatever the rating: stores and review sites forbid
+  sending only happy people to rate.
+- Public page (`ratingPage`, `openRatingPage()`): the store page (Google
+  Play, App Store, Microsoft Store), or else the `ReviewSite` (Trustpilot,
+  Google reviews…) for the WinSparkle Windows builds and the web.
+- `ShipglowsReviewSettings(reviews:, appName:)`: « Donner mon avis » (with
+  the reviews waiting offline) and « Noter {app} ». `ShipglowsStarRating`
+  alone. `ShipglowsReviewStrings.fr` / `.en`, `ShipglowsReviewStringsScope`.
+- Backend: a `ReviewSink` (`CallbackReviewSink` over a Convex mutation, a
+  Firestore collection, a REST call). `CustomerReview.toJson()` is plain
+  JSON with a device-made `id` for deduplication; no device id, no IP.
+  Unsent reviews stay on the device, retried 30 s doubling to 5 min, on
+  resume and at the next launch; `ReviewRejectedException` drops one.
+  Platform table, field table and Convex example in
+  this README; a Windows and web playground in
+  `example/`.
+
+```dart
+final reviews = await ShipglowsReviews.open(
+  config: const ShipglowsReviewsConfig(
+    appId: 'commandglows',
+    reviewSite: ReviewSite(name: 'Trustpilot', url: 'https://…'),
+  ),
+  sink: CallbackReviewSink(
+    (review) => convex.mutation('reviews:submit', review.toJson()),
+  ),
+);
+unawaited(reviews.maybeAskForReview(context, appName: 'CommandGlows'));
+showShipglowsReviewForm(context, reviews: reviews, appName: 'CommandGlows');
+```

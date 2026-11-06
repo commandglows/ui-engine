@@ -63,3 +63,19 @@ Timestamps: `convexMillisToDateTime(value)` and `dateTimeToConvexMillis(dt)`.
 - Pagination cursors beyond plain args: pass a cursor as a string arg.
 - `int` beyond 2^53, `Uint8List` and `DateTime` args, `$`-prefixed keys
   (see the dartdoc on `ConvexHttpClient`).
+
+## More
+
+Convex HTTP client for the native apps (Android, Windows), used instead of
+Firestore where an app runs on Convex. No Convex SDK, no codegen:
+`ConvexHttpClient` calls `/api/query`, `/api/mutation` and `/api/action`, and
+uploads files to Convex storage, with `Authorization: Bearer` from a `token`
+callback (for Clerk, `ClerkAuthClient.accessToken`).
+
+- `ConvexException.code` is stable: `unauthenticated` (retried once after the
+  token runs again), `convex_error` (payload in `data`, or an app code such as
+  `no_access`), `function_error`, `network`, `bad_response`.
+- Plain JSON only: no int64, bytes or `DateTime` args. Files go through
+  `uploadBytes`, times through `dateTimeToConvexMillis`. No realtime
+  subscriptions.
+- Usage and error table in this README.

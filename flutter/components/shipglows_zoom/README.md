@@ -28,7 +28,7 @@ wheel tick.
 ```yaml
 dependencies:
   shipglows_zoom:
-    path: ../../shipglows-ui-engine/flutter/shipglows_zoom
+    path: ../../shipglows-app-engine/flutter/components/shipglows_zoom
 ```
 
 `ShipglowsWindowSession` (`shipglows_window`) saves and restores the zoom.

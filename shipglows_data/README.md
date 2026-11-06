@@ -2,7 +2,7 @@
 artifact: project_governance
 metadata_schema_version: "1.0"
 artifact_version: "1.0.0"
-project: ShipGlows UI Engine
+project: ShipGlows App Engine
 created: "2026-10-22"
 updated: "2026-10-22"
 status: active
@@ -24,16 +24,17 @@ next_review: "2027-01-22"
 next_step: "Record each new shared package and each consumer migration in technical/context.md and workflow/TASKS.md."
 ---
 
-# UI Engine Governance
+# App Engine Governance
 
-Canonical internal corpus of `shipglows-ui-engine`: shared Flutter interface
-packages for ShipGlows desktop apps, one package per component, consumed by
+Canonical internal corpus of `shipglows-app-engine`: shared Flutter
+packages for ShipGlows apps, one package per component, consumed by
 path dependency.
 
 ## Canonical Entry Points
 
-- `../README.md`: usage and API of every package (integration source of truth).
-- `technical/context.md`: package map, consumers, platform scope.
+- `../README.md`: layers, how to consume a package, tools.
+- `../flutter/CATALOG.md`: generated list of packages and consumers; each package has its README (usage and API).
+- `technical/context.md`: cross-package contracts and decisions.
 - `technical/contracts/tray-native-decision.md`: why the tray is native Win32,
   inventory of the apps' trays, migration order.
 - `workflow/TASKS.md`: open migrations and follow-ups.
