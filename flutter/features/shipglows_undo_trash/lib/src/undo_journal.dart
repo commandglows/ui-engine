@@ -30,7 +30,8 @@ class UndoJournal<T> {
   /// Forks at [cursor], dropping redo. [replaceLast] compacts the last active
   /// entry when one exists; the caller decides when compaction is appropriate.
   UndoJournal<T> append(T entry, {bool replaceLast = false}) {
-    final next = entries.take(cursor).toList();
+    // Typed explicitly: the const journal holds an empty List<Never>.
+    final next = <T>[...entries.take(cursor)];
     if (replaceLast && next.isNotEmpty) {
       next[next.length - 1] = entry;
     } else {
