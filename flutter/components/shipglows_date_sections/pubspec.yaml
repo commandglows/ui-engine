@@ -1,0 +1,23 @@
+name: shipglows_date_sections
+description: Shared list sections by date (today, yesterday, a week ago) and a period filter with a custom date range, built lazily.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_date_groups:
+    path: ../../core/shipglows_date_groups
+  shipglows_theme:
+    path: ../../foundation/shipglows_theme
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
