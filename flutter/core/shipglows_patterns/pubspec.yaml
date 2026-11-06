@@ -1,0 +1,14 @@
+name: shipglows_patterns
+description: Honest pattern finding for self-tracking in pure Dart, comparing a tracked value on days with and without a tag, with sample-size guards.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

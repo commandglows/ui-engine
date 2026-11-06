@@ -1,0 +1,21 @@
+name: shipglows_tag_picker
+description: Shared multi-select chips for feelings, contexts and triggers, with an optional limit that explains itself.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shipglows_theme:
+    path: ../../foundation/shipglows_theme
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
