@@ -18,8 +18,8 @@ Directory useTemporaryAppFolders() {
   return folder;
 }
 
-// ignore: invalid_use_of_visible_for_testing_member, this package is test code.
 class _FolderPathProvider extends PathProviderPlatform
+    // ignore: invalid_use_of_visible_for_testing_member, this package is test code.
     with MockPlatformInterfaceMixin {
   _FolderPathProvider(this.path);
 
