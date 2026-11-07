@@ -13,5 +13,7 @@ dependencies:
   flutter:
     sdk: flutter
 dev_dependencies:
+  shipglows_lints:
+    path: ../../foundation/shipglows_lints
   flutter_test:
     sdk: flutter

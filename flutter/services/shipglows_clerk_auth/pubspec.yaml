@@ -10,14 +10,15 @@ environment:
   flutter: ">=3.41.0"
 
 dependencies:
-  crypto: ^3.0.7
+  crypto: ^3.0.8
   flutter:
     sdk: flutter
-  flutter_secure_storage: ^11.0.0
+  flutter_secure_storage: ^11.2.0
   flutter_web_auth_2: ^5.1.0
-  http: ^1.5.0
+  http: ^1.6.0
 
 dev_dependencies:
-  flutter_lints: ^6.0.0
+  shipglows_lints:
+    path: ../../foundation/shipglows_lints
   flutter_test:
     sdk: flutter

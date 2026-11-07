@@ -16,3 +16,7 @@ dependencies:
     path: ../../core/shipglows_rituals_core
   shipglows_theme:
     path: ../../foundation/shipglows_theme
+
+dev_dependencies:
+  shipglows_lints:
+    path: ../../foundation/shipglows_lints

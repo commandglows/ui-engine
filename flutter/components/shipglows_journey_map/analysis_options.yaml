@@ -1,7 +1,7 @@
 analyzer:
   exclude:
     - build/**
-include: package:flutter_lints/flutter.yaml
+include: package:shipglows_lints/analysis_options.yaml
 linter:
   rules:
     public_member_api_docs: true

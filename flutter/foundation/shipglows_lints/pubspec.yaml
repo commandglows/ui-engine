@@ -1,0 +1,12 @@
+name: shipglows_lints
+description: Analyzer rules shared by the ShipGlows Flutter apps and packages.
+version: 0.1.0
+publish_to: "none"
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.3
+
+dependencies:
+  flutter_lints: ^6.0.0

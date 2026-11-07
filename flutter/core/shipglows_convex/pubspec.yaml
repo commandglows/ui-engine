@@ -10,4 +10,8 @@ environment:
   flutter: ">=3.41.0"
 
 dependencies:
-  http: ^1.5.0
+  http: ^1.6.0
+
+dev_dependencies:
+  shipglows_lints:
+    path: ../../foundation/shipglows_lints

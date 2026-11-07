@@ -19,6 +19,7 @@ abstract interface class UndoTarget implements Listenable {
 /// Routes shell-level undo and redo to the active editor.
 class UndoRegistry extends ChangeNotifier {
   UndoTarget? _active;
+  bool _disposed = false;
 
   /// Editor that receives undo and redo, or null.
   UndoTarget? get active => _active;
@@ -30,11 +31,18 @@ class UndoRegistry extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Forgets [target] if it is the active one.
+  /// Forgets [target] if it is the active one. Does nothing once disposed: an
+  /// editor may be torn down after the shell that owns this registry.
   void release(UndoTarget target) {
-    if (!identical(_active, target)) return;
+    if (_disposed || !identical(_active, target)) return;
     _active = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 

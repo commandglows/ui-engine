@@ -7,3 +7,7 @@ resolution: workspace
 
 environment:
   sdk: ^3.11.3
+
+dev_dependencies:
+  shipglows_lints:
+    path: ../../foundation/shipglows_lints

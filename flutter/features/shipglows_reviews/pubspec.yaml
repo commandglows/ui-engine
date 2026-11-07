@@ -14,7 +14,7 @@ dependencies:
     sdk: flutter
   in_app_review: ^2.0.10
   package_info_plus: ^10.2.2
-  path_provider: ^2.1.5
+  path_provider: ^2.1.6
   shipglows_feedback:
     path: ../../components/shipglows_feedback
   shipglows_icons:
@@ -23,10 +23,11 @@ dependencies:
     path: ../../core/shipglows_settings_core
   shipglows_theme:
     path: ../../foundation/shipglows_theme
-  url_launcher: ^6.3.2
+  url_launcher: ^6.3.3
   web: ^1.1.1
 
 dev_dependencies:
-  flutter_lints: ^6.0.0
+  shipglows_lints:
+    path: ../../foundation/shipglows_lints
   flutter_test:
     sdk: flutter

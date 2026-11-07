@@ -39,9 +39,13 @@ A host that only has the app's repository (CI, Vercel) runs this before
 curl -fsSL https://raw.githubusercontent.com/commandglows/app-engine/main/tool/provide-engines.sh | bash -s -- .
 ```
 
-It follows the path dependencies and clones the missing engines from their main
-branch. To pin one, add `<repository> <commit>` to an `engine-refs` file next to
-the `pubspec.yaml`.
+It follows the path dependencies and clones the missing engines at the commits
+pinned in the `engine-refs` file next to the `pubspec.yaml`, or from their main
+branch without a pin. A local checkout always uses the sibling folders.
+
+To move an app to newer engines, run `dart tool/engine_refs.dart update <app>`
+and commit the file. Push the engine before the app: a host cannot clone a
+commit that is not on GitHub.
 
 ## Working here
 
@@ -54,6 +58,12 @@ member they depend on.
 | `tool/check_layers.dart` | Checks the layers and that `core` stays pure |
 | `tool/gen_catalog.dart` | Rewrites `flutter/CATALOG.md` from the pubspecs of this engine and of the sibling repositories |
 | `tool/provide-engines.sh` | Provides the engines on a single-repository host |
+| `tool/verify.dart` | Analyzes and tests a repository, never builds: `dart tool/verify.dart <dir>` |
+| `tool/check_versions.dart` | Lists caret ranges that differ across the sibling repositories |
+| `tool/engine_refs.dart` | Shows or updates the engines pinned by an app |
+
+Packages and apps share `shipglows_lints`; tests use `shipglows_test_kit` for
+reduced motion, temporary app folders and in-memory preferences.
 
 Add a package in its layer folder with `resolution: workspace` and its README,
 then rerun both Dart tools.
